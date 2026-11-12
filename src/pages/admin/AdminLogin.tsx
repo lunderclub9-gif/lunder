@@ -51,6 +51,7 @@ export default function AdminLogin() {
       return
     }
 
+    await supabase.rpc('log_owner_event', { p_action: 'proprietaire.connexion' })
     navigate('/admin/dashboard')
   }
 

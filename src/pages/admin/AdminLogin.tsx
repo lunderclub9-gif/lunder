@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Printer, Lock, Mail, Loader2, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
+import { isPostHogEnabled, posthogLogger } from '@/lib/posthog'
 import { Navigate } from 'react-router-dom'
 
 export default function AdminLogin() {
@@ -33,6 +34,9 @@ export default function AdminLogin() {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (signInError) {
+      if (isPostHogEnabled) {
+        posthogLogger.warn('owner login rejected', { reason: 'invalid_credentials' })
+      }
       setError('Identifiants invalides.')
       setSubmitting(false)
       return
@@ -45,12 +49,18 @@ export default function AdminLogin() {
       .maybeSingle()
 
     if (profile?.role !== 'owner') {
+      if (isPostHogEnabled) {
+        posthogLogger.warn('owner login rejected', { reason: 'not_authorized' })
+      }
       await supabase.auth.signOut()
       setError('Identifiants invalides.')
       setSubmitting(false)
       return
     }
 
+    if (isPostHogEnabled) {
+      posthogLogger.info('owner login completed', { outcome: 'authorized' })
+    }
     navigate('/admin/dashboard')
   }
 

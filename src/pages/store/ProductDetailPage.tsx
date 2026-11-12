@@ -1,21 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Package, Loader2, ShoppingCart, Check } from 'lucide-react'
-import { supabase, type Product, type ProductImage } from '@/lib/supabase'
+import {
+  supabase,
+  type Product,
+  type ProductImage,
+  type ProductOption,
+  type ProductVariant,
+} from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import Viewer3D from '@/components/Viewer3D'
+import { useCart } from '@/lib/cart'
 
 export default function ProductDetailPage() {
   const { slug } = useParams()
   const [product, setProduct] = useState<Product | null>(null)
   const [images, setImages] = useState<ProductImage[]>([])
+  const [options, setOptions] = useState<ProductOption[]>([])
+  const [variants, setVariants] = useState<ProductVariant[]>([])
   const [loading, setLoading] = useState(true)
   const [activeImage, setActiveImage] = useState<string | null>(null)
   const [selectedColor, setSelectedColor] = useState<string | null>(null)
+  const [selection, setSelection] = useState<Record<string, string>>({})
+  const [added, setAdded] = useState(false)
+  const { add } = useCart()
 
   useEffect(() => {
     if (!slug) return
-    (async () => {
+    ;(async () => {
       setLoading(true)
       const { data } = await supabase
         .from('products')
@@ -32,19 +44,63 @@ export default function ProductDetailPage() {
       const p = data as Product
       setProduct(p)
 
-      const { data: imgs } = await supabase
-        .from('product_images')
-        .select('*')
-        .eq('product_id', p.id)
-        .order('sort_order')
+      const [{ data: imgs }, { data: opts }, { data: vars }] = await Promise.all([
+        supabase.from('product_images').select('*').eq('product_id', p.id).order('sort_order'),
+        supabase
+          .from('product_options')
+          .select('*, values:product_option_values(*)')
+          .eq('product_id', p.id)
+          .order('sort_order'),
+        supabase
+          .from('product_variants')
+          .select('*, values:product_variant_values(option_value_id)')
+          .eq('product_id', p.id)
+          .eq('is_active', true),
+      ])
+
       const imgList = (imgs as ProductImage[]) ?? []
       setImages(imgList)
       const primary = imgList.find((i) => i.is_primary) ?? imgList[0]
       setActiveImage(primary?.image_url ?? null)
+
+      const optionList = ((opts as ProductOption[]) ?? []).map((option) => ({
+        ...option,
+        values: [...(option.values ?? [])]
+          .filter((value) => value.is_active)
+          .sort((a, b) => a.sort_order - b.sort_order || a.value.localeCompare(b.value)),
+      }))
+      setOptions(optionList)
+      setVariants((vars as ProductVariant[]) ?? [])
+
+      const initial: Record<string, string> = {}
+      optionList.forEach((option) => {
+        const first = option.values?.[0]
+        if (first) initial[option.id] = first.id
+      })
+      setSelection(initial)
+
       if (p.available_colors.length > 0) setSelectedColor(p.available_colors[0])
       setLoading(false)
     })()
   }, [slug])
+
+  const selectableOptions = useMemo(
+    () => options.filter((option) => (option.values ?? []).length > 0),
+    [options]
+  )
+
+  const matchedVariant = useMemo(() => {
+    if (selectableOptions.length === 0) return null
+    const chosen = selectableOptions.map((option) => selection[option.id])
+    if (chosen.some((valueId) => !valueId)) return null
+
+    return (
+      variants.find((variant) => {
+        const valueIds = (variant.values ?? []).map((item) => item.option_value_id)
+        return valueIds.length === chosen.length && chosen.every((valueId) => valueIds.includes(valueId))
+      }) ?? null
+    )
+  }, [selectableOptions, selection, variants])
 
   if (loading) {
     return (
@@ -67,7 +123,35 @@ export default function ProductDetailPage() {
     )
   }
 
-  const inStock = product.made_to_order || product.stock_quantity > 0
+  const madeToOrder = matchedVariant?.made_to_order ?? product.made_to_order
+  const stockQuantity = matchedVariant ? matchedVariant.stock_quantity : product.stock_quantity
+  const displayPrice = matchedVariant?.price_dzd ?? product.price_dzd
+  const combinationAvailable = selectableOptions.length === 0 || matchedVariant !== null
+  const inStock = combinationAvailable && (madeToOrder || stockQuantity > 0)
+
+  const selectedVariantLabel = matchedVariant
+    ? matchedVariant.label ??
+      selectableOptions
+        .map((option) => option.values?.find((value) => value.id === selection[option.id])?.value)
+        .filter(Boolean)
+        .join(' / ') ??
+      null
+    : null
+
+  const handleAddToCart = () => {
+    if (!product || !inStock) return
+    add({
+      productId: product.id,
+      variantId: matchedVariant?.id ?? null,
+      slug: product.slug,
+      name: product.name,
+      variantLabel: selectedVariantLabel || null,
+      unitPriceDzd: displayPrice,
+      imageUrl: activeImage,
+    })
+    setAdded(true)
+    window.setTimeout(() => setAdded(false), 3000)
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -100,7 +184,12 @@ export default function ProductDetailPage() {
                     activeImage === img.image_url ? 'border-brand-red' : 'border-transparent hover:border-charcoal-400'
                   }`}
                 >
-                  <img src={img.image_url} alt={img.alt_text ?? ''} className="h-full w-full object-cover" />
+                  <img
+                    src={img.image_url}
+                    alt={img.alt_text ?? ''}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
                 </button>
               ))}
             </div>
@@ -116,13 +205,13 @@ export default function ProductDetailPage() {
             )}
             <h1 className="mt-1 text-3xl font-bold text-offwhite">{product.name}</h1>
             <div className="mt-3 flex items-center gap-3">
-              <span className="text-2xl font-bold text-offwhite">{formatDzd(product.price_dzd)}</span>
+              <span className="text-2xl font-bold text-offwhite">{formatDzd(displayPrice)}</span>
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   inStock ? 'bg-green-600/20 text-green-400' : 'bg-brand-red/20 text-brand-red-light'
                 }`}
               >
-                {product.made_to_order ? 'Sur commande' : inStock ? 'En stock' : 'Épuisé'}
+                {!combinationAvailable ? 'Combinaison indisponible' : madeToOrder ? 'Sur commande' : inStock ? 'En stock' : 'Épuisé'}
               </span>
             </div>
           </div>
@@ -133,7 +222,29 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {product.available_colors.length > 0 && (
+          {selectableOptions.map((option) => (
+            <div key={option.id}>
+              <h3 className="mb-2 text-sm font-semibold text-offwhite">{option.name}</h3>
+              <div className="flex flex-wrap gap-2">
+                {(option.values ?? []).map((value) => (
+                  <button
+                    key={value.id}
+                    onClick={() => setSelection((prev) => ({ ...prev, [option.id]: value.id }))}
+                    aria-pressed={selection[option.id] === value.id}
+                    className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
+                      selection[option.id] === value.id
+                        ? 'border-brand-red bg-brand-red/10 text-brand-red-light'
+                        : 'border-charcoal-400/20 text-charcoal-300 hover:border-charcoal-300'
+                    }`}
+                  >
+                    {value.value}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {selectableOptions.length === 0 && product.available_colors.length > 0 && (
             <div>
               <h3 className="mb-2 text-sm font-semibold text-offwhite">Couleurs disponibles</h3>
               <div className="flex flex-wrap gap-2">
@@ -181,11 +292,26 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          <div className="flex gap-3">
-            <button disabled={!inStock} className="btn-primary flex-1">
-              <ShoppingCart className="h-4 w-4" />
-              {inStock ? 'Ajouter au panier' : 'Indisponible'}
-            </button>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={!inStock}
+                className="btn-primary flex-1"
+              >
+                <ShoppingCart className="h-4 w-4" />
+                {inStock ? 'Ajouter au panier' : combinationAvailable ? 'Indisponible' : 'Combinaison indisponible'}
+              </button>
+              <Link to="/boutique/panier" className="btn-secondary">
+                Voir le panier
+              </Link>
+            </div>
+            {added && (
+              <p role="status" className="text-sm text-green-400">
+                Ajouté au panier.
+              </p>
+            )}
           </div>
 
           <div className="rounded-xl border border-charcoal-400/15 bg-charcoal-800/30 p-4">

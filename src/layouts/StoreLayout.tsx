@@ -1,9 +1,38 @@
 import { Link, Outlet, NavLink } from 'react-router-dom'
-import { Printer, Search, Menu, X } from 'lucide-react'
-import { useState } from 'react'
+import { Printer, Menu, X, ShoppingCart, Search } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useCart } from '@/lib/cart'
+import { supabase } from '@/lib/supabase'
+
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `text-sm font-medium transition-colors ${isActive ? 'text-brand-red' : 'text-charcoal-200 hover:text-offwhite'}`
+
+const SOCIAL_LABELS: Record<string, string> = {
+  instagram_url: 'Instagram',
+  facebook_url: 'Facebook',
+  tiktok_url: 'TikTok',
+}
 
 export default function StoreLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { count } = useCart()
+  const [settings, setSettings] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    supabase
+      .from('store_settings')
+      .select('key, value')
+      .eq('is_public', true)
+      .then(({ data }) => {
+        const next: Record<string, string> = {}
+        ;((data as { key: string; value: string | null }[]) ?? []).forEach((row) => {
+          if (row.value) next[row.key] = row.value
+        })
+        setSettings(next)
+      })
+  }, [])
+
+  const socials = Object.keys(SOCIAL_LABELS).filter((key) => settings[key])
 
   return (
     <div className="min-h-screen bg-charcoal-900 text-offwhite">
@@ -20,19 +49,42 @@ export default function StoreLayout() {
           </Link>
 
           <nav className="hidden items-center gap-8 md:flex">
-            <NavLink to="/boutique" end className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-brand-red' : 'text-charcoal-200 hover:text-offwhite'}`}>
+            <NavLink to="/boutique" end className={navLinkClass}>
               Accueil
             </NavLink>
-            <NavLink to="/boutique/produits" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-brand-red' : 'text-charcoal-200 hover:text-offwhite'}`}>
+            <NavLink to="/boutique/produits" className={navLinkClass}>
               Boutique
+            </NavLink>
+            <NavLink to="/boutique/sur-mesure" className={navLinkClass}>
+              Sur mesure
+            </NavLink>
+            <NavLink to="/boutique/suivi" className={navLinkClass}>
+              Suivre ma commande
             </NavLink>
           </nav>
 
-          <div className="flex items-center gap-3">
-            <button className="btn-ghost hidden md:inline-flex" aria-label="Rechercher">
+          <div className="flex items-center gap-2">
+            <Link
+              to="/boutique/panier"
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-charcoal-200 transition-colors hover:text-offwhite"
+              aria-label={`Panier${count > 0 ? `, ${count} article(s)` : ''}`}
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {count > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold text-white">
+                  {count}
+                </span>
+              )}
+            </Link>
+            <button className="btn-ghost hidden md:inline-flex" aria-label="Rechercher" type="button">
               <Search className="h-5 w-5" />
             </button>
-            <button className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Menu">
+            <button
+              className="md:hidden"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Menu"
+              type="button"
+            >
               {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
@@ -40,11 +92,34 @@ export default function StoreLayout() {
 
         {mobileOpen && (
           <nav className="border-t border-charcoal-400/10 bg-charcoal-900 px-4 py-3 md:hidden">
-            <NavLink to="/boutique" end onClick={() => setMobileOpen(false)} className="block py-2 text-sm font-medium text-charcoal-200">
+            <NavLink
+              to="/boutique"
+              end
+              onClick={() => setMobileOpen(false)}
+              className="block py-2 text-sm font-medium text-charcoal-200"
+            >
               Accueil
             </NavLink>
-            <NavLink to="/boutique/produits" onClick={() => setMobileOpen(false)} className="block py-2 text-sm font-medium text-charcoal-200">
+            <NavLink
+              to="/boutique/produits"
+              onClick={() => setMobileOpen(false)}
+              className="block py-2 text-sm font-medium text-charcoal-200"
+            >
               Boutique
+            </NavLink>
+            <NavLink
+              to="/boutique/sur-mesure"
+              onClick={() => setMobileOpen(false)}
+              className="block py-2 text-sm font-medium text-charcoal-200"
+            >
+              Sur mesure
+            </NavLink>
+            <NavLink
+              to="/boutique/suivi"
+              onClick={() => setMobileOpen(false)}
+              className="block py-2 text-sm font-medium text-charcoal-200"
+            >
+              Suivre ma commande
             </NavLink>
           </nav>
         )}
@@ -65,6 +140,30 @@ export default function StoreLayout() {
             </div>
             <p className="text-xs text-charcoal-400">DESIGN · PRINT · CREATE — From Imagination to Reality</p>
             <p className="text-xs text-charcoal-500">Algérie · Paiement à la livraison</p>
+            {settings.phone && <p className="text-xs text-charcoal-300">{settings.phone}</p>}
+            {socials.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-4">
+                {socials.map((key) => (
+                  <a
+                    key={key}
+                    href={settings[key]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-charcoal-300 underline-offset-4 hover:text-offwhite hover:underline"
+                  >
+                    {SOCIAL_LABELS[key]}
+                  </a>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap justify-center gap-4">
+              <Link to="/boutique/suivi" className="text-xs text-charcoal-400 underline-offset-4 hover:text-offwhite hover:underline">
+                Suivre ma commande
+              </Link>
+              <Link to="/boutique/informations" className="text-xs text-charcoal-400 underline-offset-4 hover:text-offwhite hover:underline">
+                Informations et politiques
+              </Link>
+            </div>
           </div>
         </div>
       </footer>

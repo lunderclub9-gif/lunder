@@ -1,12 +1,31 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X } from 'lucide-react'
+import {
+  Printer,
+  LayoutDashboard,
+  Package,
+  Tag,
+  LogOut,
+  Menu,
+  X,
+  ShoppingBag,
+  Truck,
+  ClipboardList,
+  Settings,
+  History,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 
 const navItems = [
   { to: '/admin/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
   { to: '/admin/produits', label: 'Produits', icon: Package },
   { to: '/admin/categories', label: 'Catégories', icon: Tag },
+  { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },
+  { to: '/admin/livraison', label: 'Livraison', icon: Truck },
+  { to: '/admin/demandes', label: 'Demandes sur mesure', icon: ClipboardList },
+  { to: '/admin/parametres', label: 'Paramètres', icon: Settings },
+  { to: '/admin/historique', label: 'Historique', icon: History },
 ]
 
 export default function AdminLayout() {
@@ -15,6 +34,7 @@ export default function AdminLayout() {
   const navigate = useNavigate()
 
   const handleSignOut = async () => {
+    await supabase.rpc('log_owner_event', { p_action: 'proprietaire.deconnexion' })
     await signOut()
     navigate('/admin')
   }
@@ -42,7 +62,7 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        <nav className="flex flex-col gap-1 p-3">
+        <nav className="flex flex-col gap-1 overflow-y-auto p-3 pb-24">
           {navItems.map((item) => (
             <NavLink
               key={item.to}

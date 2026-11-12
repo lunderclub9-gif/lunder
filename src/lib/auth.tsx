@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import posthog, { isPostHogEnabled } from './posthog'
 import { supabase, type Profile } from './supabase'
 
 type AuthContextType = {
@@ -22,20 +23,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const identifiedUserId = useRef<string | null>(null)
 
   useEffect(() => {
+    const identifyUser = (currentSession: Session, currentProfile: Profile | null) => {
+      if (!isPostHogEnabled || identifiedUserId.current === currentSession.user.id) return
+
+      if (identifiedUserId.current) {
+        posthog.reset()
+      }
+
+      posthog.identify(currentSession.user.id, {
+        ...(currentSession.user.email ? { email: currentSession.user.email } : {}),
+        ...(currentProfile?.full_name ? { name: currentProfile.full_name } : {}),
+        ...(currentProfile ? { role: currentProfile.role } : {}),
+      })
+      identifiedUserId.current = currentSession.user.id
+    }
+
+    const loadProfile = async (currentSession: Session) => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentSession.user.id)
+        .maybeSingle()
+      const currentProfile = data as Profile | null
+
+      setProfile(currentProfile)
+      identifyUser(currentSession, currentProfile)
+      setLoading(false)
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (session) {
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle()
-          .then(({ data }) => {
-            setProfile(data as Profile | null)
-            setLoading(false)
-          })
+        void loadProfile(session)
       } else {
         setLoading(false)
       }
@@ -43,20 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       if (session) {
-        (async () => {
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle()
-          setProfile(data as Profile | null)
-          setLoading(false)
-        })()
+        void loadProfile(session)
       } else {
         setProfile(null)
+        if (event === 'SIGNED_OUT' && isPostHogEnabled) {
+          posthog.reset()
+          identifiedUserId.current = null
+        }
         setLoading(false)
       }
     })

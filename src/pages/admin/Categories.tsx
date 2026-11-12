@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, Pencil, Tag, X, Loader2 } from 'lucide-react'
 import { supabase, type Category } from '@/lib/supabase'
 import { slugify } from '@/lib/format'
+import posthog, { isPostHogEnabled } from '@/lib/posthog'
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -36,9 +37,11 @@ export default function AdminCategories() {
     setSaving(true)
     const slug = slugify(name)
     if (editingId) {
-      await supabase.from('categories').update({ name: name.trim(), slug, description: description || null }).eq('id', editingId)
+      const { error } = await supabase.from('categories').update({ name: name.trim(), slug, description: description || null }).eq('id', editingId)
+      if (!error && isPostHogEnabled) posthog.capture('category_updated', { category_id: editingId })
     } else {
-      await supabase.from('categories').insert({ name: name.trim(), slug, description: description || null, sort_order: categories.length })
+      const { error } = await supabase.from('categories').insert({ name: name.trim(), slug, description: description || null, sort_order: categories.length })
+      if (!error && isPostHogEnabled) posthog.capture('category_created')
     }
     resetForm()
     await loadCategories()
@@ -54,7 +57,9 @@ export default function AdminCategories() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Supprimer cette catégorie ?')) return
-    await supabase.from('categories').delete().eq('id', id)
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) return
+    if (isPostHogEnabled) posthog.capture('category_deleted', { category_id: id })
     await loadCategories()
   }
 

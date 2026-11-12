@@ -12,6 +12,7 @@ import {
 import { slugify, generateSku } from '@/lib/format'
 import { validateImage, validateModel } from '@/lib/media'
 import ProductCostCard from '@/components/admin/ProductCostCard'
+import posthog, { isPostHogEnabled } from '@/lib/posthog'
 
 export default function AdminProductEdit() {
   const { id } = useParams()
@@ -156,6 +157,9 @@ export default function AdminProductEdit() {
           .single()
         if (imgData) setImages((prev) => [...prev, imgData as ProductImage])
       }
+      if (isPostHogEnabled) {
+        posthog.capture('product_images_uploaded', { product_id: id, image_count: files.length })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'upload de l'image.")
     } finally {
@@ -182,6 +186,7 @@ export default function AdminProductEdit() {
       const { data: urlData } = supabase.storage.from('product-models').getPublicUrl(path)
       const previousPath = form.model_url.split('/product-models/')[1]
       setForm((prev) => ({ ...prev, model_url: urlData.publicUrl }))
+      if (isPostHogEnabled) posthog.capture('product_model_uploaded', { product_id: id })
 
       if (previousPath) {
         await supabase.storage.from('product-models').remove([previousPath])
@@ -199,6 +204,7 @@ export default function AdminProductEdit() {
     await supabase.from('product_images').update({ is_primary: false }).eq('product_id', id)
     await supabase.from('product_images').update({ is_primary: true }).eq('id', imageId)
     setImages((prev) => prev.map((img) => ({ ...img, is_primary: img.id === imageId })))
+    if (isPostHogEnabled) posthog.capture('product_primary_image_set', { product_id: id, image_id: imageId })
   }
 
   const deleteImage = async (imageId: string, imageUrl: string) => {
@@ -206,6 +212,7 @@ export default function AdminProductEdit() {
     if (path) await supabase.storage.from('product-images').remove([path])
     await supabase.from('product_images').delete().eq('id', imageId)
     setImages((prev) => prev.filter((img) => img.id !== imageId))
+    if (isPostHogEnabled) posthog.capture('product_image_deleted', { product_id: id, image_id: imageId })
   }
 
   const addColor = () => {
@@ -410,10 +417,16 @@ export default function AdminProductEdit() {
       if (isNew) {
         const { data, error: insErr } = await supabase.from('products').insert(payload).select('*').single()
         if (insErr) throw insErr
+        if (isPostHogEnabled) {
+          posthog.capture('product_created', { product_id: (data as Product).id, has_model: Boolean(payload.model_url) })
+        }
         navigate(`/admin/produits/${(data as Product).id}`, { replace: true })
       } else if (id) {
         const { error: upErr } = await supabase.from('products').update(payload).eq('id', id)
         if (upErr) throw upErr
+        if (isPostHogEnabled) {
+          posthog.capture('product_updated', { product_id: id, status: payload.status, has_model: Boolean(payload.model_url) })
+        }
       }
     } catch {
       setError("Erreur lors de l'enregistrement. Vérifiez les champs.")

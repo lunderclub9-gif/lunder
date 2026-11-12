@@ -3,6 +3,7 @@ import { Package, Search } from 'lucide-react'
 import { supabase, type Product, type Category } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
 import { sanitizeSearchTerm } from '@/lib/format'
+import posthog, { isPostHogEnabled } from '@/lib/posthog'
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -47,6 +48,16 @@ export default function ProductsPage() {
 
   const primaryImage = (p: Product) => p.product_images?.find((img) => img.is_primary)?.image_url ?? p.product_images?.[0]?.image_url
 
+  const applyCategoryFilter = (categoryId: string) => {
+    setActiveCategory(categoryId)
+    if (isPostHogEnabled) {
+      posthog.capture('product_filter_applied', {
+        filter_type: categoryId ? 'category' : 'all_products',
+        category_id: categoryId || undefined,
+      })
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="mb-6 text-3xl font-bold text-offwhite">Boutique</h1>
@@ -67,7 +78,7 @@ export default function ProductsPage() {
       {categories.length > 0 && (
         <div className="mb-6 flex flex-wrap gap-2">
           <button
-            onClick={() => setActiveCategory('')}
+            onClick={() => applyCategoryFilter('')}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               !activeCategory ? 'bg-brand-red text-white' : 'bg-charcoal-800 text-charcoal-300 hover:text-offwhite'
             }`}
@@ -77,7 +88,7 @@ export default function ProductsPage() {
           {categories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
+              onClick={() => applyCategoryFilter(cat.id)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 activeCategory === cat.id ? 'bg-brand-red text-white' : 'bg-charcoal-800 text-charcoal-300 hover:text-offwhite'
               }`}

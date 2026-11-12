@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Package } from 'lucide-react'
 import type { Product } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
+import posthog, { isPostHogEnabled } from '@/lib/posthog'
 
 type Props = {
   product: Product
@@ -12,6 +13,15 @@ export default function ProductCard({ product, imageUrl }: Props) {
   return (
     <Link
       to={`/boutique/produits/${product.slug}`}
+      onClick={() => {
+        if (isPostHogEnabled) {
+          posthog.capture('product_selected', {
+            product_id: product.id,
+            category_id: product.category_id,
+            made_to_order: product.made_to_order,
+          })
+        }
+      }}
       className="group card overflow-hidden transition-all hover:border-brand-red/30"
     >
       <div className="aspect-square overflow-hidden bg-charcoal-800">

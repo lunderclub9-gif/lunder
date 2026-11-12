@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-charcoal-900 text-offwhite font-sans antialiased;
+  }
+
+  *:focus-visible {
+    @apply outline-2 outline-brand-red outline-offset-2;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-red px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-brand-red-dark active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-charcoal-300 bg-transparent px-6 py-3 text-sm font-semibold text-offwhite transition-all hover:border-brand-red hover:text-brand-red active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-charcoal-300 transition-all hover:text-offwhite hover:bg-charcoal-700;
+  }
+
+  .input-field {
+    @apply w-full rounded-lg border border-charcoal-400/30 bg-charcoal-800 px-4 py-3 text-sm text-offwhite placeholder:text-charcoal-400 transition-all focus:border-brand-red focus:outline-none;
+  }
+
+  .card {
+    @apply rounded-xl border border-charcoal-400/15 bg-charcoal-800/50 backdrop-blur-sm;
+  }
+
+  .label-text {
+    @apply mb-1.5 block text-sm font-medium text-charcoal-200;
+  }
+
+  .error-text {
+    @apply mt-1 text-xs text-brand-red-light;
+  }
+
+  .admin-card {
+    @apply rounded-xl border border-charcoal-400/15 bg-charcoal-800 p-6;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #333333 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #333333;
+    border-radius: 3px;
+  }
+}

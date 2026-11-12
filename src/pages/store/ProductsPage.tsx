@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Package, Search } from 'lucide-react'
 import { supabase, type Product, type Category } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
+import { sanitizeSearchTerm } from '@/lib/format'
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -32,8 +33,11 @@ export default function ProductsPage() {
     if (activeCategory) {
       query = query.eq('category_id', activeCategory)
     }
-    if (search.trim()) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+    // La saisie est nettoyée : sans cela, une virgule ou une parenthèse
+    // injecterait de la syntaxe dans le filtre PostgREST.
+    const term = sanitizeSearchTerm(search)
+    if (term) {
+      query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`)
     }
 
     const { data } = await query

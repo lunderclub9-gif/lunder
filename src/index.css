@@ -39,10 +39,6 @@
     @apply mb-1.5 block text-sm font-medium text-charcoal-200;
   }
 
-  .error-text {
-    @apply mt-1 text-xs text-brand-red-light;
-  }
-
   .admin-card {
     @apply rounded-xl border border-charcoal-400/15 bg-charcoal-800 p-6;
   }

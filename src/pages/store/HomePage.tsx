@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Printer, ArrowRight, Package } from 'lucide-react'
 import { supabase, type Product } from '@/lib/supabase'
-import { formatDzd } from '@/lib/format'
 import ProductCard from '@/components/ProductCard'
 
 export default function HomePage() {

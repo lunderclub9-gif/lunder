@@ -1,15 +1,31 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-})
+/**
+ * `true` uniquement si les deux variables publiques sont renseignées.
+ * Tant qu'elles manquent, l'application affiche un écran de configuration
+ * au lieu d'échouer silencieusement.
+ */
+export const isSupabaseConfigured = Boolean(supabaseUrl?.trim() && supabaseAnonKey?.trim())
+
+export const missingConfigKeys = [
+  ...(!supabaseUrl?.trim() ? ['VITE_SUPABASE_URL'] : []),
+  ...(!supabaseAnonKey?.trim() ? ['VITE_SUPABASE_ANON_KEY'] : []),
+]
+
+export const supabase = createClient(
+  supabaseUrl?.trim() || 'http://localhost:54321',
+  supabaseAnonKey?.trim() || 'anon-key-manquante',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
+)
 
 export type Profile = {
   id: string
@@ -62,4 +78,36 @@ export type ProductImage = {
   sort_order: number
   is_primary: boolean
   created_at: string
+}
+
+export type ProductOptionValue = {
+  id: string
+  option_id: string
+  value: string
+  price_delta_dzd: number
+  sort_order: number
+  is_active: boolean
+  created_at?: string
+}
+
+export type ProductOption = {
+  id: string
+  product_id: string
+  name: string
+  sort_order: number
+  created_at?: string
+  values?: ProductOptionValue[]
+}
+
+export type ProductVariant = {
+  id: string
+  product_id: string
+  sku: string | null
+  label: string | null
+  price_dzd: number | null
+  stock_quantity: number
+  made_to_order: boolean | null
+  is_active: boolean
+  created_at?: string
+  values?: { option_value_id: string }[]
 }

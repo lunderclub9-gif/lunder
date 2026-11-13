@@ -1,13 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertCircle, CheckCircle2, Loader2, Paperclip, Upload, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { validateCustomFile } from '@/lib/media'
 import { normalizeAlgerianPhone, orderErrorMessage } from '@/lib/checkout'
-import {
-  calculateManufacturingQuote,
-  type ManufacturingPricingRules,
-} from '@/lib/manufacturing-pricing'
 import { formatDzd } from '@/lib/format'
 
 type UploadedFile = { path: string; name: string; mime: string; size: number; kind: 'image' | 'model' }
@@ -32,7 +28,7 @@ export default function CustomRequestPage() {
   const [submitting, setSubmitting] = useState(false)
   const [created, setCreated] = useState<CreatedRequest | null>(null)
 
-  const [pricingRules, setPricingRules] = useState<ManufacturingPricingRules | null>(null)
+  const [materials, setMaterials] = useState<{ name: string; colors: string[] }[]>([])
   const [estimateMaterial, setEstimateMaterial] = useState('')
   const [estimateGrams, setEstimateGrams] = useState('')
   const [estimateHours, setEstimateHours] = useState('')
@@ -44,6 +40,17 @@ export default function CustomRequestPage() {
     painting: false,
   })
   const [estimateRush, setEstimateRush] = useState(false)
+  const [estimate, setEstimate] = useState<{
+    lines: { label: string; amountDzd: number; detail?: string | null }[]
+    totalDzd: number
+    quantity: number
+    discountPercent?: number
+    discountDzd?: number
+    rushFeeDzd?: number
+    assumptions?: string[]
+  } | null>(null)
+  const [estimateError, setEstimateError] = useState<string | null>(null)
+  const [estimateLoading, setEstimateLoading] = useState(false)
 
   const folder = useRef<string>(
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -55,49 +62,17 @@ export default function CustomRequestPage() {
   useEffect(() => {
     let active = true
     const load = async () => {
-      const [{ data: mats }, { data: rules }] = await Promise.all([
-        supabase
-          .from('manufacturing_materials')
-          .select('name, price_per_gram_dzd, multiplier, colors, is_available')
-          .eq('is_available', true)
-          .order('name'),
-        supabase.from('manufacturing_pricing').select('*').eq('id', true).maybeSingle(),
-      ])
+      const { data } = await supabase
+        .from('manufacturing_materials_public')
+        .select('name, colors')
+        .order('name')
       if (!active) return
-      const materials = (mats ?? []).map((m: Record<string, unknown>) => ({
+      const mats = (data ?? []).map((m: Record<string, unknown>) => ({
         name: String(m.name),
-        pricePerGramDzd: Number(m.price_per_gram_dzd ?? 0),
-        multiplier: Number(m.multiplier ?? 1),
         colors: (m.colors as string[]) ?? [],
-        available: Boolean(m.is_available),
       }))
-      const r = (rules ?? {}) as Record<string, unknown>
-      const discountRaw = (r.quantity_discounts as { minQuantity?: number; min_quantity?: number; percent: number }[]) ?? []
-      const discounts = discountRaw.map((t) => ({
-        minQuantity: Number(t.minQuantity ?? t.min_quantity ?? 0),
-        percent: Number(t.percent ?? 0),
-      }))
-      setPricingRules({
-        materials,
-        pricePerHourDzd: Number(r.price_per_hour_dzd ?? 0),
-        machineHourlyCostDzd: Number(r.machine_hourly_cost_dzd ?? 0),
-        electricityPerHourDzd: Number(r.electricity_per_hour_dzd ?? 0),
-        minimumPrintChargeDzd: Number(r.minimum_print_charge_dzd ?? 0),
-        extraProductionDzd: Number(r.extra_production_dzd ?? 0),
-        designPreparationFeeDzd: Number(r.design_preparation_fee_dzd ?? 0),
-        modelingFeeDzd: Number(r.modeling_fee_dzd ?? 0),
-        assemblyFeeDzd: Number(r.assembly_fee_dzd ?? 0),
-        finishingFeeDzd: Number(r.finishing_fee_dzd ?? 0),
-        paintingFeeDzd: Number(r.painting_fee_dzd ?? 0),
-        marginPercent: Number(r.margin_percent ?? 0),
-        minimumOrderDzd: Number(r.minimum_order_dzd ?? 0),
-        complexityFeeDzd: Number(r.complexity_fee_dzd ?? 0),
-        wastePercent: Number(r.waste_percent ?? 0),
-        quantityDiscounts: discounts,
-        rushFeePercent: Number(r.rush_fee_percent ?? 0),
-        validityDays: Number(r.validity_days ?? 14),
-      })
-      if (materials.length > 0) setEstimateMaterial(materials[0].name)
+      setMaterials(mats)
+      if (mats.length > 0) setEstimateMaterial(mats[0].name)
     }
     load()
     return () => {
@@ -105,27 +80,49 @@ export default function CustomRequestPage() {
     }
   }, [])
 
-  let estimate: ReturnType<typeof calculateManufacturingQuote> | null = null
-  let estimateError: string | null = null
-  if (pricingRules && estimateMaterial && estimateGrams && estimateHours) {
+  const runEstimate = useCallback(async () => {
     const grams = Number(estimateGrams)
     const hours = Number(estimateHours)
     const qty = Number(quantity) || 1
-    if (Number.isFinite(grams) && grams > 0 && Number.isFinite(hours) && hours > 0) {
-      try {
-        estimate = calculateManufacturingQuote(pricingRules, {
-          materialName: estimateMaterial,
-          grams,
-          printHours: hours,
-          quantity: qty,
-          rush: estimateRush,
-          options: estimateOptions,
-        })
-      } catch (err) {
-        estimateError = err instanceof Error ? err.message : 'Estimation impossible.'
-      }
+    if (!estimateMaterial || !Number.isFinite(grams) || grams <= 0 || !Number.isFinite(hours) || hours <= 0) {
+      setEstimate(null)
+      setEstimateError(null)
+      return
     }
-  }
+    setEstimateLoading(true)
+    setEstimateError(null)
+    const { data, error: rpcError } = await supabase.rpc('estimate_manufacturing_quote', {
+      p_material_name: estimateMaterial,
+      p_grams: grams,
+      p_print_hours: hours,
+      p_quantity: qty,
+      p_options: estimateOptions,
+      p_rush: estimateRush,
+    })
+    setEstimateLoading(false)
+    if (rpcError || !data) {
+      setEstimateError(orderErrorMessage(rpcError?.message, 'Estimation impossible.'))
+      setEstimate(null)
+      return
+    }
+    const d = data as Record<string, unknown>
+    setEstimate({
+      lines: (d.lines as { label: string; amountDzd: number; detail?: string | null }[]) ?? [],
+      totalDzd: Number(d.totalDzd ?? 0),
+      quantity: Number(d.quantity ?? qty),
+      discountPercent: Number(d.discountPercent ?? 0),
+      discountDzd: Number(d.discountDzd ?? 0),
+      rushFeeDzd: Number(d.rushFeeDzd ?? 0),
+      assumptions: (d.assumptions as string[]) ?? [],
+    })
+  }, [estimateMaterial, estimateGrams, estimateHours, quantity, estimateOptions, estimateRush])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      runEstimate()
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [runEstimate])
 
   const handleFiles = async (list: FileList | null, kind: 'image' | 'model') => {
     if (!list || list.length === 0) return
@@ -351,7 +348,7 @@ export default function CustomRequestPage() {
             mesures garanties. Le prix ferme est confirmé par le studio après réception du fichier ou
             des dimensions définitives. Les frais de livraison sont calculés séparément.
           </p>
-          {pricingRules ? (
+          {materials.length > 0 ? (
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block">
@@ -361,7 +358,7 @@ export default function CustomRequestPage() {
                     onChange={(event) => setEstimateMaterial(event.target.value)}
                     className="input-field"
                   >
-                    {pricingRules.materials.map((m) => (
+                    {materials.map((m) => (
                       <option key={m.name} value={m.name}>
                         {m.name}
                       </option>
@@ -424,6 +421,9 @@ export default function CustomRequestPage() {
                   Urgence
                 </label>
               </div>
+              {estimateLoading && (
+                <p className="text-xs text-charcoal-300">Calcul en cours…</p>
+              )}
               {estimateError && (
                 <p className="text-xs text-brand-red-light">{estimateError}</p>
               )}

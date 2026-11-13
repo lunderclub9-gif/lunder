@@ -62,6 +62,7 @@ export default function AdminOrders() {
     if (queryError) {
       setError('Impossible de charger les commandes.')
     } else {
+      setError(null)
       setOrders((data as OrderRow[]) ?? [])
     }
     setLoading(false)
@@ -99,6 +100,7 @@ export default function AdminOrders() {
       setDeleteError(orderErrorMessage(rpcError.message, 'Impossible d\'archiver cette commande.'))
       return
     }
+    setDeleteError(null)
     await load()
   }
 

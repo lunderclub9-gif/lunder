@@ -245,3 +245,15 @@ Après application, renseigner au moins une matière et les tarifs : la ligne
 unique de `manufacturing_pricing` est initialisée à zéro, un devis rendrait donc
 le prix minimum de commande. Vérification :
 `select quote_custom_manufacturing('<request-uuid>', 'PLA', 120, 2.5);`
+
+### Sécurité de la tarification (010)
+
+`manufacturing_materials` et `manufacturing_pricing` ne sont plus lisibles par
+`anon` : la policy `USING (true)` a été supprimée et les deux tables sont
+réservées à `is_owner()`. Le public dispose uniquement de la vue
+`manufacturing_materials_public` (nom, couleurs, disponibilité) et de la
+fonction `estimate_manufacturing_quote`, qui renvoie une estimation agrégée
+sans prix au gramme, tarif horaire ni marge. La ventilation renvoyée au client
+par `get_custom_request_by_token` est également assainie par
+`customer_quote_breakdown` : les postes internes sont regroupés et la marge
+n'est jamais exposée.

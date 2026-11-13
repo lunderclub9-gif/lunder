@@ -55,6 +55,7 @@ const emptyPricing: MfgPricing = {
 export default function ManufacturingPricingPage() {
   const [materials, setMaterials] = useState<MfgMaterial[]>([])
   const [pricing, setPricing] = useState<MfgPricing>(emptyPricing)
+  const [discountsText, setDiscountsText] = useState('[]')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -93,6 +94,7 @@ export default function ManufacturingPricingPage() {
         rush_fee_percent: Number(row.rush_fee_percent ?? 0),
         validity_days: Number(row.validity_days ?? 14),
       })
+      setDiscountsText(JSON.stringify(row.quantity_discounts ?? []))
     }
     setLoading(false)
   }, [])
@@ -104,10 +106,25 @@ export default function ManufacturingPricingPage() {
   const savePricing = async () => {
     setError(null)
     setSaved(false)
+    let discounts: { minQuantity: number; percent: number }[]
+    try {
+      const parsed = JSON.parse(discountsText)
+      if (!Array.isArray(parsed)) throw new Error('not an array')
+      discounts = parsed.map((tier) => ({
+        minQuantity: Number(tier.minQuantity) || 0,
+        percent: Number(tier.percent) || 0,
+      }))
+    } catch {
+      setError('Les remises quantité doivent être un tableau JSON valide.')
+      return
+    }
     setSaving(true)
     const { error: writeError } = await supabase
       .from('manufacturing_pricing')
-      .upsert({ id: true, ...pricing, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+      .upsert(
+        { id: true, ...pricing, quantity_discounts: discounts, updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      )
     setSaving(false)
     if (writeError) {
       setError("Impossible d'enregistrer la tarification.")
@@ -370,17 +387,8 @@ export default function ManufacturingPricingPage() {
           <span className="label-text">Remises quantité (JSON)</span>
           <textarea
             rows={3}
-            value={JSON.stringify(pricing.quantity_discounts)}
-            onChange={(event) => {
-              try {
-                const parsed = JSON.parse(event.target.value)
-                if (Array.isArray(parsed)) {
-                  setPricing((current) => ({ ...current, quantity_discounts: parsed }))
-                }
-              } catch {
-                // ignore invalid JSON while typing
-              }
-            }}
+            value={discountsText}
+            onChange={(event) => setDiscountsText(event.target.value)}
             className="input-field resize-none font-mono text-xs"
           />
           <span className="mt-1 block text-xs text-charcoal-500">

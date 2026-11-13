@@ -59,6 +59,7 @@ const RPC_MESSAGES: Record<string, string> = {
   MATIERE_INDISPONIBLE: 'Matière indisponible.',
   POIDS_INVALIDE: 'Poids de matière invalide.',
   TEMPS_INVALIDE: 'Temps d\'impression invalide.',
+  TARIFICATION_INDISPONIBLE: 'La tarification sur mesure n\'est pas encore configurée.',
 }
 
 /** Traduit un code d'erreur remonté par une fonction Postgres en message français. */

@@ -118,7 +118,8 @@ export default function AdminRequests() {
 
   const openAutoQuote = (request: RequestRow) => {
     setAutoRequestId(request.id)
-    setAutoMaterial(request.material_preference ?? '')
+    const preferred = request.material_preference?.trim() ?? ''
+    setAutoMaterial(materials.some((m) => m.name.toLowerCase() === preferred.toLowerCase()) ? preferred : '')
     setAutoGrams('')
     setAutoHours('')
     setAutoOptions({ design: false, modeling: false, assembly: false, finishing: false, painting: false })

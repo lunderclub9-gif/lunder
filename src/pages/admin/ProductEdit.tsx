@@ -377,7 +377,7 @@ export default function AdminProductEdit() {
     return names.join(' / ') || 'Variante'
   }
 
-  const handleSave = async () => {
+  const handleSave = async (publish = false) => {
     setError(null)
     if (!form.name.trim()) {
       setError('Le nom du produit est requis.')
@@ -408,7 +408,7 @@ export default function AdminProductEdit() {
         material: form.material || null,
         available_colors: colors,
         model_url: form.model_url || null,
-        status: form.status,
+        status: publish ? ('published' as const) : form.status,
         is_featured: form.is_featured,
         seo_title: form.seo_title || null,
         seo_description: form.seo_description || null,
@@ -427,6 +427,8 @@ export default function AdminProductEdit() {
         if (isPostHogEnabled) {
           posthog.capture('product_updated', { product_id: id, status: payload.status, has_model: Boolean(payload.model_url) })
         }
+        // Le bandeau de visibilité doit refléter l'état réellement enregistré.
+        setForm((prev) => ({ ...prev, status: payload.status }))
       }
     } catch {
       setError("Erreur lors de l'enregistrement. Vérifiez les champs.")
@@ -453,6 +455,15 @@ export default function AdminProductEdit() {
       <h1 className="mb-6 text-2xl font-bold text-offwhite">
         {isNew ? 'Nouveau produit' : 'Modifier le produit'}
       </h1>
+
+      {form.status !== 'published' && (
+        <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {form.status === 'draft'
+            ? 'Ce produit est en brouillon : il n’apparaît pas dans la boutique.'
+            : 'Ce produit est archivé : il n’apparaît pas dans la boutique.'}{' '}
+          Utilisez « Enregistrer et publier » pour le rendre visible aux clients.
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
@@ -948,10 +959,16 @@ export default function AdminProductEdit() {
             {isNew && <p className="text-xs text-charcoal-500">Enregistrez le produit pour pouvoir ajouter un modèle 3D.</p>}
           </div>
 
-          <button onClick={handleSave} disabled={saving} className="btn-primary w-full">
+          <button onClick={() => handleSave()} disabled={saving} className="btn-primary w-full">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Enregistrer
           </button>
+          {form.status !== 'published' && (
+            <button onClick={() => handleSave(true)} disabled={saving} className="btn-secondary mt-2 w-full">
+              <Save className="h-4 w-4" />
+              Enregistrer et publier
+            </button>
+          )}
         </div>
       </div>
     </div>

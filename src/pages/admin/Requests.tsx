@@ -13,7 +13,18 @@ type Quote = {
   valid_until: string
   terms: string | null
   status: string
+  source: string
   order_id: string | null
+  breakdown: {
+    lines?: { label: string; amountDzd: number; detail?: string | null }[]
+    unitPriceDzd?: number
+    quantity?: number
+    subtotalDzd?: number
+    discountPercent?: number
+    discountDzd?: number
+    rushFeeDzd?: number
+    totalDzd?: number
+  } | null
 }
 type RequestRow = {
   id: string
@@ -59,18 +70,36 @@ export default function AdminRequests() {
   const [validUntil, setValidUntil] = useState('')
   const [terms, setTerms] = useState('')
 
+  const [autoRequestId, setAutoRequestId] = useState<string | null>(null)
+  const [autoMaterial, setAutoMaterial] = useState('')
+  const [autoGrams, setAutoGrams] = useState('')
+  const [autoHours, setAutoHours] = useState('')
+  const [autoOptions, setAutoOptions] = useState({
+    design: false,
+    modeling: false,
+    assembly: false,
+    finishing: false,
+    painting: false,
+  })
+  const [autoRush, setAutoRush] = useState(false)
+  const [materials, setMaterials] = useState<{ name: string }[]>([])
+
   const load = useCallback(async () => {
     setLoading(true)
-    const { data, error: queryError } = await supabase
-      .from('custom_requests')
-      .select('*, custom_request_files(*), custom_quotes(*)')
-      .order('created_at', { ascending: false })
-      .limit(100)
+    const [{ data, error: queryError }, { data: mats }] = await Promise.all([
+      supabase
+        .from('custom_requests')
+        .select('*, custom_request_files(*), custom_quotes(*)')
+        .order('created_at', { ascending: false })
+        .limit(100),
+      supabase.from('manufacturing_materials').select('name').eq('is_available', true).order('name'),
+    ])
     if (queryError) {
       setError('Impossible de charger les demandes.')
     } else {
       setRequests((data as RequestRow[]) ?? [])
     }
+    setMaterials((mats as { name: string }[]) ?? [])
     setLoading(false)
   }, [])
 
@@ -84,6 +113,16 @@ export default function AdminRequests() {
     setLeadDays('')
     setValidUntil('')
     setTerms('')
+    setError(null)
+  }
+
+  const openAutoQuote = (request: RequestRow) => {
+    setAutoRequestId(request.id)
+    setAutoMaterial(request.material_preference ?? '')
+    setAutoGrams('')
+    setAutoHours('')
+    setAutoOptions({ design: false, modeling: false, assembly: false, finishing: false, painting: false })
+    setAutoRush(false)
     setError(null)
   }
 
@@ -128,6 +167,40 @@ export default function AdminRequests() {
       setError(orderErrorMessage(rpcError.message, 'Impossible de modifier le statut.'))
       return
     }
+    await load()
+  }
+
+  const submitAutoQuote = async (requestId: string) => {
+    setError(null)
+    const grams = Number(autoGrams)
+    const hours = Number(autoHours)
+    if (!autoMaterial) {
+      setError('Sélectionnez une matière.')
+      return
+    }
+    if (!Number.isFinite(grams) || grams <= 0) {
+      setError('Poids de matière invalide.')
+      return
+    }
+    if (!Number.isFinite(hours) || hours <= 0) {
+      setError('Temps d\'impression invalide.')
+      return
+    }
+    setBusy(true)
+    const { error: rpcError } = await supabase.rpc('quote_custom_manufacturing', {
+      p_request_id: requestId,
+      p_material_name: autoMaterial,
+      p_grams: grams,
+      p_print_hours: hours,
+      p_options: autoOptions,
+      p_rush: autoRush,
+    })
+    setBusy(false)
+    if (rpcError) {
+      setError(orderErrorMessage(rpcError.message, "Impossible d'émettre ce devis automatique."))
+      return
+    }
+    setAutoRequestId(null)
     await load()
   }
 
@@ -240,22 +313,151 @@ export default function AdminRequests() {
                       {request.custom_quotes.length === 0 ? (
                         <p className="text-xs text-charcoal-400">Aucun devis émis.</p>
                       ) : (
-                        <ul className="space-y-1">
+                        <ul className="space-y-3">
                           {[...request.custom_quotes]
                             .sort((a, b) => b.version - a.version)
                             .map((quote) => (
-                              <li key={quote.id} className="text-xs text-charcoal-300">
-                                v{quote.version} · {formatDzd(quote.price_dzd)} · valable jusqu'au{' '}
-                                {new Date(quote.valid_until).toLocaleDateString('fr-DZ')} ·{' '}
-                                {quote.status}
-                                {quote.order_id ? ' · commande créée' : ''}
+                              <li key={quote.id} className="rounded-lg border border-charcoal-400/15 p-2 text-xs text-charcoal-300">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-semibold text-offwhite">
+                                    v{quote.version} · {formatDzd(quote.price_dzd)} · {quote.source === 'automatic' ? 'Automatique' : 'Manuel'}
+                                  </span>
+                                  <span className="rounded-full bg-charcoal-700 px-2 py-0.5 text-[10px] text-offwhite">
+                                    {quote.status}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-charcoal-400">
+                                  Valable jusqu'au {new Date(quote.valid_until).toLocaleDateString('fr-DZ')}
+                                  {quote.order_id ? ' · commande créée' : ''}
+                                </p>
+                                {quote.breakdown?.lines && quote.breakdown.lines.length > 0 && (
+                                  <ul className="mt-2 space-y-0.5">
+                                    {quote.breakdown.lines.map((line, index) => (
+                                      <li key={index} className="flex justify-between gap-2">
+                                        <span>
+                                          {line.label}
+                                          {line.detail ? (
+                                            <span className="ml-1 text-charcoal-500">({line.detail})</span>
+                                          ) : null}
+                                        </span>
+                                        <span>{formatDzd(line.amountDzd)}</span>
+                                      </li>
+                                    ))}
+                                    {quote.breakdown.discountPercent ? (
+                                      <li className="flex justify-between gap-2 text-green-400">
+                                        <span>Remise {quote.breakdown.discountPercent} %</span>
+                                        <span>-{formatDzd(quote.breakdown.discountDzd ?? 0)}</span>
+                                      </li>
+                                    ) : null}
+                                    {quote.breakdown.rushFeeDzd ? (
+                                      <li className="flex justify-between gap-2">
+                                        <span>Supplément urgence</span>
+                                        <span>{formatDzd(quote.breakdown.rushFeeDzd)}</span>
+                                      </li>
+                                    ) : null}
+                                  </ul>
+                                )}
+                                {quote.terms && (
+                                  <p className="mt-2 whitespace-pre-line text-charcoal-400">{quote.terms}</p>
+                                )}
                               </li>
                             ))}
                         </ul>
                       )}
                     </div>
 
-                    {quoteRequestId === request.id ? (
+                    {autoRequestId === request.id ? (
+                      <div className="space-y-3 rounded-lg border border-charcoal-400/15 p-3">
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <label className="block">
+                            <span className="label-text">Matière</span>
+                            <select
+                              value={autoMaterial}
+                              onChange={(event) => setAutoMaterial(event.target.value)}
+                              className="input-field"
+                            >
+                              <option value="">Sélectionner...</option>
+                              {materials.map((m) => (
+                                <option key={m.name} value={m.name}>
+                                  {m.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="label-text">Poids matière (g)</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={autoGrams}
+                              onChange={(event) => setAutoGrams(event.target.value)}
+                              className="input-field"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="label-text">Temps d'impression (h)</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.1"
+                              value={autoHours}
+                              onChange={(event) => setAutoHours(event.target.value)}
+                              className="input-field"
+                            />
+                          </label>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs text-charcoal-300">
+                          {(
+                            [
+                              ['design', 'Préparation du design'],
+                              ['modeling', 'Modélisation / modification'],
+                              ['assembly', 'Assemblage'],
+                              ['finishing', 'Ponçage et finition'],
+                              ['painting', 'Peinture'],
+                            ] as const
+                          ).map(([key, label]) => (
+                            <label key={key} className="flex items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                checked={autoOptions[key]}
+                                onChange={(event) =>
+                                  setAutoOptions((current) => ({ ...current, [key]: event.target.checked }))
+                                }
+                                className="h-3.5 w-3.5 accent-brand-red"
+                              />
+                              {label}
+                            </label>
+                          ))}
+                          <label className="flex items-center gap-1.5">
+                            <input
+                              type="checkbox"
+                              checked={autoRush}
+                              onChange={(event) => setAutoRush(event.target.checked)}
+                              className="h-3.5 w-3.5 accent-brand-red"
+                            />
+                            Urgence
+                          </label>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => submitAutoQuote(request.id)}
+                            className="btn-primary"
+                          >
+                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Émettre le devis automatique
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAutoRequestId(null)}
+                            className="btn-ghost"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </div>
+                    ) : quoteRequestId === request.id ? (
                       <div className="space-y-3 rounded-lg border border-charcoal-400/15 p-3">
                         <div className="grid gap-3 sm:grid-cols-2">
                           <label className="block">
@@ -320,8 +522,11 @@ export default function AdminRequests() {
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => openNewQuote(request)} className="btn-primary">
-                          Nouveau devis
+                        <button type="button" onClick={() => openAutoQuote(request)} className="btn-primary">
+                          Devis automatique
+                        </button>
+                        <button type="button" onClick={() => openNewQuote(request)} className="btn-secondary">
+                          Devis manuel
                         </button>
                         {request.status === 'new' && (
                           <button type="button" onClick={() => setStatus(request.id, 'reviewing')} className="btn-secondary">

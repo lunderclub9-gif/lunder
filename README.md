@@ -141,6 +141,9 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261112211000_005_delivery_and_orders.sql` | delivery rates, pickup points, orders, quote/order functions | 004 |
 | `20261112220000_006_custom_requests_and_quotes.sql` | private intake bucket, requests, files, versioned quotes | 005 |
 | `20261112230000_007_costs_settings_and_audit.sql` | materials, product costs, store settings, audit log | 002, 003, 005, 006 |
+| `20261113140000_008_auto_manufacturing_pricing.sql` | manufacturing materials/pricing, automatic quote, decision, delete RPC | 007 |
+| `20261113150000_009_order_archive_source_and_security.sql` | order archive columns, source, soft-delete, owner-only quote generation | 008 |
+| `20261113160000_010_pricing_security_and_public_estimate.sql` | revoke public pricing access, safe materials view, public estimate RPC | 009 |
 
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
 seed rows use `ON CONFLICT DO NOTHING`.
@@ -217,3 +220,28 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
 - Product search input is interpolated into the PostgREST filter, and `slugify` strips accented
   characters — both predate the phases and are unfixed.
 - No license file is present; redistribution rights are unresolved.
+
+## Migrations de fabrication sur mesure (008)
+
+La migration `20261113140000_008_auto_manufacturing_pricing.sql` ajoute la
+tarification automatique : `manufacturing_materials`, `manufacturing_pricing`,
+le snapshot de prix sur `custom_quotes`, puis `quote_custom_manufacturing`,
+`decide_custom_quote` et `delete_order`.
+
+Ordre d'exécution complet, du plus ancien au plus récent :
+
+1. `20261112190919_001_lunders_catalog_and_auth.sql`
+2. `20261112193000_002_owner_access_and_profile_hardening.sql`
+3. `20261112200000_003_catalog_variants_and_media_limits.sql`
+4. `20261112210000_004_algeria_geography.sql`
+5. `20261112211000_005_delivery_and_orders.sql`
+6. `20261112220000_006_custom_requests_and_quotes.sql`
+7. `20261112230000_007_costs_settings_and_audit.sql`
+8. `20261113140000_008_auto_manufacturing_pricing.sql`
+9. `20261113150000_009_order_archive_source_and_security.sql`
+10. `20261113160000_010_pricing_security_and_public_estimate.sql`
+
+Après application, renseigner au moins une matière et les tarifs : la ligne
+unique de `manufacturing_pricing` est initialisée à zéro, un devis rendrait donc
+le prix minimum de commande. Vérification :
+`select quote_custom_manufacturing('<request-uuid>', 'PLA', 120, 2.5);`

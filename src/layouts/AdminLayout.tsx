@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Settings,
   History,
+  Calculator,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -24,6 +25,7 @@ const navItems = [
   { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },
   { to: '/admin/livraison', label: 'Livraison', icon: Truck },
   { to: '/admin/demandes', label: 'Demandes sur mesure', icon: ClipboardList },
+  { to: '/admin/tarification', label: 'Tarification fabrication', icon: Calculator },
   { to: '/admin/parametres', label: 'Paramètres', icon: Settings },
   { to: '/admin/historique', label: 'Historique', icon: History },
 ]

@@ -54,6 +54,11 @@ const RPC_MESSAGES: Record<string, string> = {
   TRANSITION_INVALIDE: 'Cette modification de statut est impossible.',
   ACCES_REFUSE: 'Accès refusé.',
   CLE_IDEMPOTENCE_MANQUANTE: 'Erreur technique. Rechargez la page et réessayez.',
+  COMMANDE_NON_SUPPRIMABLE: 'Cette commande ne peut pas être supprimée (expédiée ou livrée).',
+  DEMANDE_CLOTUREE: 'Cette demande est déjà clôturée ou acceptée.',
+  MATIERE_INDISPONIBLE: 'Matière indisponible.',
+  POIDS_INVALIDE: 'Poids de matière invalide.',
+  TEMPS_INVALIDE: 'Temps d\'impression invalide.',
 }
 
 /** Traduit un code d'erreur remonté par une fonction Postgres en message français. */

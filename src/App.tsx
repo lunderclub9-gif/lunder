@@ -25,6 +25,7 @@ const AdminCategories = lazy(() => import('@/pages/admin/Categories'))
 const AdminOrders = lazy(() => import('@/pages/admin/Orders'))
 const AdminDelivery = lazy(() => import('@/pages/admin/Delivery'))
 const AdminRequests = lazy(() => import('@/pages/admin/Requests'))
+const AdminManufacturingPricing = lazy(() => import('@/pages/admin/ManufacturingPricing'))
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'))
 const AdminHistory = lazy(() => import('@/pages/admin/History'))
 
@@ -101,6 +102,7 @@ export default function App() {
                 <Route path="commandes" element={<AdminOrders />} />
                 <Route path="livraison" element={<AdminDelivery />} />
                 <Route path="demandes" element={<AdminRequests />} />
+                <Route path="tarification" element={<AdminManufacturingPricing />} />
                 <Route path="parametres" element={<AdminSettings />} />
                 <Route path="historique" element={<AdminHistory />} />
               </Route>

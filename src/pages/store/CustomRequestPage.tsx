@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertCircle, CheckCircle2, Loader2, Paperclip, Upload, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { validateCustomFile } from '@/lib/media'
 import { normalizeAlgerianPhone, orderErrorMessage } from '@/lib/checkout'
+import { formatDzd } from '@/lib/format'
 
 type UploadedFile = { path: string; name: string; mime: string; size: number; kind: 'image' | 'model' }
 type CreatedRequest = { request_number: string; tracking_token: string }
@@ -27,12 +28,101 @@ export default function CustomRequestPage() {
   const [submitting, setSubmitting] = useState(false)
   const [created, setCreated] = useState<CreatedRequest | null>(null)
 
+  const [materials, setMaterials] = useState<{ name: string; colors: string[] }[]>([])
+  const [estimateMaterial, setEstimateMaterial] = useState('')
+  const [estimateGrams, setEstimateGrams] = useState('')
+  const [estimateHours, setEstimateHours] = useState('')
+  const [estimateOptions, setEstimateOptions] = useState({
+    design: false,
+    modeling: false,
+    assembly: false,
+    finishing: false,
+    painting: false,
+  })
+  const [estimateRush, setEstimateRush] = useState(false)
+  const [estimate, setEstimate] = useState<{
+    lines: { label: string; amountDzd: number; detail?: string | null }[]
+    totalDzd: number
+    quantity: number
+    discountPercent?: number
+    discountDzd?: number
+    rushFeeDzd?: number
+    assumptions?: string[]
+  } | null>(null)
+  const [estimateError, setEstimateError] = useState<string | null>(null)
+  const [estimateLoading, setEstimateLoading] = useState(false)
+
   const folder = useRef<string>(
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `${Date.now()}`
   )
   const idempotencyKey = useRef<string>(crypto.randomUUID())
+
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      const { data } = await supabase
+        .from('manufacturing_materials_public')
+        .select('name, colors')
+        .order('name')
+      if (!active) return
+      const mats = (data ?? []).map((m: Record<string, unknown>) => ({
+        name: String(m.name),
+        colors: (m.colors as string[]) ?? [],
+      }))
+      setMaterials(mats)
+      if (mats.length > 0) setEstimateMaterial(mats[0].name)
+    }
+    load()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const runEstimate = useCallback(async () => {
+    const grams = Number(estimateGrams)
+    const hours = Number(estimateHours)
+    const qty = Number(quantity) || 1
+    if (!estimateMaterial || !Number.isFinite(grams) || grams <= 0 || !Number.isFinite(hours) || hours <= 0) {
+      setEstimate(null)
+      setEstimateError(null)
+      return
+    }
+    setEstimateLoading(true)
+    setEstimateError(null)
+    const { data, error: rpcError } = await supabase.rpc('estimate_manufacturing_quote', {
+      p_material_name: estimateMaterial,
+      p_grams: grams,
+      p_print_hours: hours,
+      p_quantity: qty,
+      p_options: estimateOptions,
+      p_rush: estimateRush,
+    })
+    setEstimateLoading(false)
+    if (rpcError || !data) {
+      setEstimateError(orderErrorMessage(rpcError?.message, 'Estimation impossible.'))
+      setEstimate(null)
+      return
+    }
+    const d = data as Record<string, unknown>
+    setEstimate({
+      lines: (d.lines as { label: string; amountDzd: number; detail?: string | null }[]) ?? [],
+      totalDzd: Number(d.totalDzd ?? 0),
+      quantity: Number(d.quantity ?? qty),
+      discountPercent: Number(d.discountPercent ?? 0),
+      discountDzd: Number(d.discountDzd ?? 0),
+      rushFeeDzd: Number(d.rushFeeDzd ?? 0),
+      assumptions: (d.assumptions as string[]) ?? [],
+    })
+  }, [estimateMaterial, estimateGrams, estimateHours, quantity, estimateOptions, estimateRush])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      runEstimate()
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [runEstimate])
 
   const handleFiles = async (list: FileList | null, kind: 'image' | 'model') => {
     if (!list || list.length === 0) return
@@ -249,6 +339,123 @@ export default function CustomRequestPage() {
               />
             </label>
           </div>
+        </div>
+
+        <div className="admin-card">
+          <h2 className="mb-2 text-lg font-semibold text-offwhite">Estimation automatique (indicative)</h2>
+          <p className="mb-4 text-xs text-charcoal-400">
+            Le poids de matière et le temps d'impression sont des estimations de production, pas des
+            mesures garanties. Le prix ferme est confirmé par le studio après réception du fichier ou
+            des dimensions définitives. Les frais de livraison sont calculés séparément.
+          </p>
+          {materials.length > 0 ? (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block">
+                  <span className="label-text">Matière</span>
+                  <select
+                    value={estimateMaterial}
+                    onChange={(event) => setEstimateMaterial(event.target.value)}
+                    className="input-field"
+                  >
+                    {materials.map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="label-text">Poids estimé (g)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={estimateGrams}
+                    onChange={(event) => setEstimateGrams(event.target.value)}
+                    className="input-field"
+                    placeholder="ex. 120"
+                  />
+                </label>
+                <label className="block">
+                  <span className="label-text">Temps d'impression (h)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={estimateHours}
+                    onChange={(event) => setEstimateHours(event.target.value)}
+                    className="input-field"
+                    placeholder="ex. 2.5"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-3 text-xs text-charcoal-300">
+                {(
+                  [
+                    ['design', 'Préparation du design'],
+                    ['modeling', 'Modélisation / modification'],
+                    ['assembly', 'Assemblage'],
+                    ['finishing', 'Ponçage et finition'],
+                    ['painting', 'Peinture'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={estimateOptions[key]}
+                      onChange={(event) =>
+                        setEstimateOptions((current) => ({ ...current, [key]: event.target.checked }))
+                      }
+                      className="h-3.5 w-3.5 accent-brand-red"
+                    />
+                    {label}
+                  </label>
+                ))}
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={estimateRush}
+                    onChange={(event) => setEstimateRush(event.target.checked)}
+                    className="h-3.5 w-3.5 accent-brand-red"
+                  />
+                  Urgence
+                </label>
+              </div>
+              {estimateLoading && (
+                <p className="text-xs text-charcoal-300">Calcul en cours…</p>
+              )}
+              {estimateError && (
+                <p className="text-xs text-brand-red-light">{estimateError}</p>
+              )}
+              {estimate && (
+                <div className="rounded-lg border border-charcoal-400/15 p-3">
+                  <ul className="space-y-1 text-sm">
+                    {estimate.lines.map((line, index) => (
+                      <li key={index} className="flex justify-between gap-3 text-charcoal-300">
+                        <span>
+                          {line.label}
+                          {line.detail ? (
+                            <span className="ml-2 text-xs text-charcoal-500">{line.detail}</span>
+                          ) : null}
+                        </span>
+                        <span>{formatDzd(line.amountDzd)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-2 flex justify-between border-t border-charcoal-400/15 pt-2 text-sm font-semibold text-offwhite">
+                    <span>Total estimé ({estimate.quantity} pièce(s))</span>
+                    <span>{formatDzd(estimate.totalDzd)}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-charcoal-500">
+                    Estimation indicative — géométrie non vérifiée. Le prix ferme est confirmé par le
+                    studio.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-charcoal-400">Tarification non configurée.</p>
+          )}
         </div>
 
         <div className="admin-card">

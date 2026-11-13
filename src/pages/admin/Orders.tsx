@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, Loader2, Package } from 'lucide-react'
+import { ChevronDown, Loader2, Package, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import {
@@ -12,6 +12,8 @@ type OrderRow = {
   id: string
   order_number: string
   status: string
+  source: string
+  archived_at: string | null
   customer_name: string
   phone: string
   wilaya_name: string
@@ -45,7 +47,10 @@ export default function AdminOrders() {
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -53,7 +58,7 @@ export default function AdminOrders() {
       .from('orders')
       .select('*, order_items(*)')
       .order('created_at', { ascending: false })
-      .limit(100)
+      .limit(200)
     if (queryError) {
       setError('Impossible de charger les commandes.')
     } else {
@@ -81,12 +86,39 @@ export default function AdminOrders() {
     await load()
   }
 
-  const visible = filter ? orders.filter((order) => order.status === filter) : orders
+  const handleDelete = async (order: OrderRow) => {
+    setDeleteError(null)
+    if (!confirm(`Archiver la commande ${order.order_number} ? Elle restera consultable dans les archives.`)) return
+    setDeletingId(order.id)
+    const { error: rpcError } = await supabase.rpc('delete_order', {
+      p_order_id: order.id,
+      p_reason: 'Suppression demandée depuis l\'interface',
+    })
+    setDeletingId(null)
+    if (rpcError) {
+      setDeleteError(orderErrorMessage(rpcError.message, 'Impossible d\'archiver cette commande.'))
+      return
+    }
+    await load()
+  }
+
+  const visible = (filter ? orders.filter((order) => order.status === filter) : orders).filter(
+    (order) => showArchived || !order.archived_at
+  )
 
   return (
     <div className="animate-fade-in">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-offwhite">Commandes</h1>
+        <label className="flex items-center gap-2 text-xs text-charcoal-300">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => setShowArchived(event.target.checked)}
+            className="h-4 w-4 accent-brand-red"
+          />
+          Afficher les archives
+        </label>
         <select value={filter} onChange={(event) => setFilter(event.target.value)} className="input-field sm:w-56">
           <option value="">Tous les statuts</option>
           <option value="pending">En attente</option>
@@ -100,6 +132,11 @@ export default function AdminOrders() {
       {error && (
         <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
           {error}
+        </div>
+      )}
+      {deleteError && (
+        <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
+          {deleteError}
         </div>
       )}
 
@@ -138,6 +175,16 @@ export default function AdminOrders() {
                     <span className="rounded-full bg-charcoal-700 px-3 py-1 text-xs text-offwhite">
                       {orderStatusLabel(order.status)}
                     </span>
+                    {order.source === 'custom' && (
+                      <span className="rounded-full bg-brand-red/20 px-3 py-1 text-xs text-brand-red-light">
+                        Sur mesure
+                      </span>
+                    )}
+                    {order.archived_at && (
+                      <span className="rounded-full bg-charcoal-600 px-3 py-1 text-xs text-charcoal-300">
+                        Archivée
+                      </span>
+                    )}
                     <span className="text-sm font-semibold text-offwhite">
                       {formatDzd(order.total_dzd)}
                     </span>
@@ -184,6 +231,24 @@ export default function AdminOrders() {
                             {action.label}
                           </button>
                         ))}
+                      </div>
+                    )}
+
+                    {!order.archived_at && order.status !== 'delivered' && order.status !== 'shipped' && (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={deletingId === order.id}
+                          onClick={() => handleDelete(order)}
+                          className="btn-secondary text-brand-red-light"
+                        >
+                          {deletingId === order.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                          Supprimer
+                        </button>
                       </div>
                     )}
                   </div>

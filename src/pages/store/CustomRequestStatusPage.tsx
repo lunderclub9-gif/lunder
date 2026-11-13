@@ -13,6 +13,13 @@ type Quote = {
   valid_until: string
   terms: string | null
   status: string
+  source: string
+  breakdown: {
+    lines?: { label: string; amountDzd: number; detail?: string | null }[]
+    discountPercent?: number
+    discountDzd?: number
+    rushFeeDzd?: number
+  } | null
   created_at: string
 }
 
@@ -63,6 +70,7 @@ export default function CustomRequestStatusPage() {
   const [pickupId, setPickupId] = useState('')
   const [terms, setTerms] = useState(false)
   const [approving, setApproving] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState<string | null>(null)
   const [approvalError, setApprovalError] = useState<string | null>(null)
   const [orderResult, setOrderResult] = useState<{ order_number: string; tracking_token: string } | null>(null)
 
@@ -113,6 +121,21 @@ export default function CustomRequestStatusPage() {
       .then(({ data }) => setPickupPoints((data as PickupPoint[]) ?? []))
   }, [wilayaCode])
 
+  const cancelQuote = async (quote: Quote) => {
+    setApprovalError(null)
+    setCancelling(quote.public_token)
+    const { error: rpcError } = await supabase.rpc('decide_custom_quote', {
+      p_quote_token: quote.public_token,
+      p_decision: 'cancel',
+    })
+    setCancelling(null)
+    if (rpcError) {
+      setApprovalError(orderErrorMessage(rpcError.message, "Impossible d'annuler ce devis."))
+      return
+    }
+    await load()
+  }
+
   const approve = async (quote: Quote) => {
     setApprovalError(null)
     if (!wilayaCode || !communeId) {
@@ -133,8 +156,9 @@ export default function CustomRequestStatusPage() {
     }
 
     setApproving(quote.public_token)
-    const { data, error: rpcError } = await supabase.rpc('approve_custom_quote', {
+    const { data, error: rpcError } = await supabase.rpc('decide_custom_quote', {
       p_quote_token: quote.public_token,
+      p_decision: 'accept',
       p_delivery: {
         wilaya_code: Number(wilayaCode),
         commune_id: communeId,
@@ -244,7 +268,44 @@ export default function CustomRequestStatusPage() {
                   ? ` · délai de production ${quote.production_lead_days} jours`
                   : ''}
               </p>
+              {quote.breakdown?.lines && quote.breakdown.lines.length > 0 && (
+                <ul className="mt-2 space-y-0.5 text-xs text-charcoal-300">
+                  {quote.breakdown.lines.map((line, index) => (
+                    <li key={index} className="flex justify-between gap-2">
+                      <span>
+                        {line.label}
+                        {line.detail ? (
+                          <span className="ml-1 text-charcoal-500">({line.detail})</span>
+                        ) : null}
+                      </span>
+                      <span>{formatDzd(line.amountDzd)}</span>
+                    </li>
+                  ))}
+                  {quote.breakdown.discountPercent ? (
+                    <li className="flex justify-between gap-2 text-green-400">
+                      <span>Remise {quote.breakdown.discountPercent} %</span>
+                      <span>-{formatDzd(quote.breakdown.discountDzd ?? 0)}</span>
+                    </li>
+                  ) : null}
+                  {quote.breakdown.rushFeeDzd ? (
+                    <li className="flex justify-between gap-2">
+                      <span>Supplément urgence</span>
+                      <span>{formatDzd(quote.breakdown.rushFeeDzd)}</span>
+                    </li>
+                  ) : null}
+                </ul>
+              )}
               {quote.terms && <p className="mt-2 whitespace-pre-line text-sm text-charcoal-300">{quote.terms}</p>}
+              {quote.status === 'sent' && !orderResult && (
+                <button
+                  type="button"
+                  onClick={() => cancelQuote(quote)}
+                  disabled={cancelling !== null}
+                  className="mt-2 text-xs text-charcoal-400 underline-offset-4 hover:underline"
+                >
+                  {cancelling === quote.public_token ? 'Annulation...' : 'Refuser ce devis'}
+                </button>
+              )}
             </div>
           ))}
         </div>

@@ -141,6 +141,8 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261112211000_005_delivery_and_orders.sql` | delivery rates, pickup points, orders, quote/order functions | 004 |
 | `20261112220000_006_custom_requests_and_quotes.sql` | private intake bucket, requests, files, versioned quotes | 005 |
 | `20261112230000_007_costs_settings_and_audit.sql` | materials, product costs, store settings, audit log | 002, 003, 005, 006 |
+| `20261113140000_008_auto_manufacturing_pricing.sql` | manufacturing materials/pricing, automatic quote, decision, delete RPC | 007 |
+| `20261113150000_009_order_archive_source_and_security.sql` | order archive columns, source, soft-delete, owner-only quote generation | 008 |
 
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
 seed rows use `ON CONFLICT DO NOTHING`.
@@ -235,6 +237,8 @@ Ordre d'exécution complet, du plus ancien au plus récent :
 6. `20261112220000_006_custom_requests_and_quotes.sql`
 7. `20261112230000_007_costs_settings_and_audit.sql`
 8. `20261113140000_008_auto_manufacturing_pricing.sql`
+9. `20261113150000_009_order_archive_source_and_security.sql`
+9. `20261113150000_009_order_archive_source_and_security.sql`
 
 Après application, renseigner au moins une matière et les tarifs : la ligne
 unique de `manufacturing_pricing` est initialisée à zéro, un devis rendrait donc

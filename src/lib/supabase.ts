@@ -3,21 +3,38 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
+const trimmedUrl = supabaseUrl?.trim() ?? ''
+const trimmedKey = supabaseAnonKey?.trim() ?? ''
+
+/** Vrai si la valeur est une URL http(s) absolue et exploitable. */
+export function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'https:' || url.protocol === 'http:') && Boolean(url.hostname)
+  } catch {
+    return false
+  }
+}
+
+/** Une URL renseignée mais malformée doit être signalée, pas utilisée. */
+export const supabaseUrlInvalid = trimmedUrl.length > 0 && !isValidHttpUrl(trimmedUrl)
+
 /**
- * `true` uniquement si les deux variables publiques sont renseignées.
- * Tant qu'elles manquent, l'application affiche un écran de configuration
- * au lieu d'échouer silencieusement.
+ * `true` uniquement si les deux variables publiques sont renseignées et que
+ * l'URL est valide. Tant qu'elles manquent, l'application affiche un écran de
+ * configuration au lieu d'échouer silencieusement.
  */
-export const isSupabaseConfigured = Boolean(supabaseUrl?.trim() && supabaseAnonKey?.trim())
+export const isSupabaseConfigured =
+  Boolean(trimmedUrl && trimmedKey) && !supabaseUrlInvalid
 
 export const missingConfigKeys = [
-  ...(!supabaseUrl?.trim() ? ['VITE_SUPABASE_URL'] : []),
-  ...(!supabaseAnonKey?.trim() ? ['VITE_SUPABASE_ANON_KEY'] : []),
+  ...(!trimmedUrl ? ['VITE_SUPABASE_URL'] : supabaseUrlInvalid ? ['VITE_SUPABASE_URL (URL invalide)'] : []),
+  ...(!trimmedKey ? ['VITE_SUPABASE_ANON_KEY'] : []),
 ]
 
 export const supabase = createClient(
-  supabaseUrl?.trim() || 'http://localhost:54321',
-  supabaseAnonKey?.trim() || 'anon-key-manquante',
+  (isValidHttpUrl(trimmedUrl) ? trimmedUrl : '') || 'http://localhost:54321',
+  trimmedKey || 'anon-key-manquante',
   {
     auth: {
       persistSession: true,

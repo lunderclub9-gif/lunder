@@ -1,8 +1,9 @@
-import { Link, Outlet, NavLink } from 'react-router-dom'
+import { Link, Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { Printer, Menu, X, ShoppingCart, Search } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useCart } from '@/lib/cart'
 import { supabase } from '@/lib/supabase'
+import { safeExternalUrl } from '@/lib/url'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium transition-colors ${isActive ? 'text-brand-red' : 'text-charcoal-200 hover:text-offwhite'}`
@@ -15,7 +16,10 @@ const SOCIAL_LABELS: Record<string, string> = {
 
 export default function StoreLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   const { count } = useCart()
+  const navigate = useNavigate()
   const [settings, setSettings] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -23,7 +27,15 @@ export default function StoreLayout() {
       .from('store_settings')
       .select('key, value')
       .eq('is_public', true)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        // Un réglage indisponible ne doit jamais casser la boutique : on garde
+        // les valeurs par défaut et on continue.
+        if (error) {
+          console.error('[LUNDER] réglages de la boutique indisponibles')
+          setSettings({})
+          return
+        }
+
         const next: Record<string, string> = {}
         ;((data as { key: string; value: string | null }[]) ?? []).forEach((row) => {
           if (row.value) next[row.key] = row.value
@@ -32,7 +44,18 @@ export default function StoreLayout() {
       })
   }, [])
 
-  const socials = Object.keys(SOCIAL_LABELS).filter((key) => settings[key])
+  // Les liens externes ne sont rendus que si l'URL est réellement http(s).
+  const socials = Object.keys(SOCIAL_LABELS)
+    .map((key) => ({ key, label: SOCIAL_LABELS[key], url: safeExternalUrl(settings[key]) }))
+    .filter((social): social is { key: string; label: string; url: string } => Boolean(social.url))
+
+  const submitSearch = (event: FormEvent) => {
+    event.preventDefault()
+    const term = searchTerm.trim()
+    setSearchOpen(false)
+    setMobileOpen(false)
+    navigate(term ? `/boutique/produits?q=${encodeURIComponent(term)}` : '/boutique/produits')
+  }
 
   return (
     <div className="min-h-screen bg-charcoal-900 text-offwhite">
@@ -76,7 +99,13 @@ export default function StoreLayout() {
                 </span>
               )}
             </Link>
-            <button className="btn-ghost hidden md:inline-flex" aria-label="Rechercher" type="button">
+            <button
+              className="btn-ghost hidden md:inline-flex"
+              aria-label="Rechercher"
+              aria-expanded={searchOpen}
+              type="button"
+              onClick={() => setSearchOpen((open) => !open)}
+            >
               <Search className="h-5 w-5" />
             </button>
             <button
@@ -90,8 +119,35 @@ export default function StoreLayout() {
           </div>
         </div>
 
+        {searchOpen && (
+          <form onSubmit={submitSearch} className="hidden border-t border-charcoal-400/10 px-4 py-3 md:block" role="search">
+            <div className="relative mx-auto max-w-3xl">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
+              <input
+                type="search"
+                value={searchTerm}
+                autoFocus
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Rechercher un produit..."
+                aria-label="Rechercher un produit"
+                className="input-field pl-10"
+              />
+            </div>
+          </form>
+        )}
+
         {mobileOpen && (
           <nav className="border-t border-charcoal-400/10 bg-charcoal-900 px-4 py-3 md:hidden">
+            <form onSubmit={submitSearch} className="mb-2" role="search">
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Rechercher un produit..."
+                aria-label="Rechercher un produit"
+                className="input-field"
+              />
+            </form>
             <NavLink
               to="/boutique"
               end
@@ -143,15 +199,15 @@ export default function StoreLayout() {
             {settings.phone && <p className="text-xs text-charcoal-300">{settings.phone}</p>}
             {socials.length > 0 && (
               <div className="flex flex-wrap justify-center gap-4">
-                {socials.map((key) => (
+                {socials.map((social) => (
                   <a
-                    key={key}
-                    href={settings[key]}
+                    key={social.key}
+                    href={social.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-charcoal-300 underline-offset-4 hover:text-offwhite hover:underline"
                   >
-                    {SOCIAL_LABELS[key]}
+                    {social.label}
                   </a>
                 ))}
               </div>

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, FileText, Loader2, Upload } from 'lucide-react'
+import { ChevronDown, FileText, Loader2, Trash2, Upload } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import { orderErrorMessage } from '@/lib/checkout'
+import { canOwnerApproveCustomQuote } from '@/lib/custom-workflow'
 
 type RequestFile = { id: string; kind: string; storage_path: string; original_name: string }
 type Quote = {
@@ -61,6 +62,7 @@ type RequestRow = {
   delivery_pickup?: { name: string } | null
   manufacturing_options: Record<string, boolean> | null
   rush: boolean
+  deletion_started_at: string | null
   custom_request_files: RequestFile[]
   custom_quotes: Quote[]
 }
@@ -88,6 +90,7 @@ export default function AdminRequests() {
   const [requests, setRequests] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -296,18 +299,74 @@ export default function AdminRequests() {
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
   }
 
+  const deleteRequest = async (request: RequestRow) => {
+    setError(null)
+    setNotice(null)
+    const confirmation = request.deletion_started_at
+      ? `Reprendre la suppression de la demande ${request.request_number} ?`
+      : `Supprimer définitivement la demande ${request.request_number} ? Cette action est réservée aux demandes sans devis ni commande.`
+    if (!confirm(confirmation)) return
+
+    setBusy(true)
+    const { data, error: beginError } = await supabase.rpc('begin_custom_request_deletion', {
+      p_request_id: request.id,
+    })
+    if (beginError || !data) {
+      setBusy(false)
+      setError(orderErrorMessage(beginError?.message, 'Impossible de préparer la suppression de cette demande.'))
+      return
+    }
+
+    const deletion = data as { deletion_token?: string; file_paths?: string[] }
+    const filePaths = Array.isArray(deletion.file_paths) ? deletion.file_paths : []
+    if (!deletion.deletion_token) {
+      setBusy(false)
+      setError('La préparation de suppression a échoué. Réessayez ou contactez le support technique.')
+      return
+    }
+
+    if (filePaths.length > 0) {
+      const { error: storageError } = await supabase.storage.from('custom-requests').remove(filePaths)
+      if (storageError) {
+        setBusy(false)
+        setError('Suppression préparée mais fichiers non nettoyés. Réessayez pour terminer sans laisser de fichiers orphelins.')
+        await load()
+        return
+      }
+    }
+
+    const { error: finishError } = await supabase.rpc('finish_custom_request_deletion', {
+      p_request_id: request.id,
+      p_deletion_token: deletion.deletion_token,
+      p_deleted_paths: filePaths,
+    })
+    setBusy(false)
+    if (finishError) {
+      setError(orderErrorMessage(finishError.message, 'Les fichiers ont été nettoyés, mais la suppression de la demande reste à terminer. Réessayez.'))
+      await load()
+      return
+    }
+    setNotice(`La demande ${request.request_number} a été supprimée. L’événement reste dans le journal d’audit.`)
+    await load()
+  }
+
   return (
     <div className="animate-fade-in">
       <h1 className="mb-2 text-2xl font-bold text-offwhite">Demandes sur mesure</h1>
       <p className="mb-6 text-sm text-charcoal-400">
-        Le client a accepté l'estimation et fourni ses coordonnées. Vérifiez le fichier, créez ou
-        ajustez le devis, puis approuvez explicitement la fabrication pour créer une commande. Un
-        nouveau devis expire la version précédente ; une seule commande peut en découler.
+        Vérifiez la demande et les fichiers, créez ou ajustez le devis, puis approuvez explicitement
+        la fabrication pour créer une commande. L’acceptation du devis par le client est informative
+        et n’est pas requise pour l’approbation propriétaire. Un nouveau devis expire la version précédente.
       </p>
 
       {error && (
         <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
           {error}
+        </div>
+      )}
+      {notice && (
+        <div className="mb-4 rounded-lg border border-green-600/30 bg-green-600/10 px-4 py-3 text-sm text-green-400">
+          {notice}
         </div>
       )}
 
@@ -495,12 +554,20 @@ export default function AdminRequests() {
                                 {quote.terms && (
                                   <p className="mt-2 whitespace-pre-line text-charcoal-400">{quote.terms}</p>
                                 )}
-                                {!quote.order_id && quote.status === 'sent' && (
+                                {!quote.order_id && ['sent', 'accepted'].includes(quote.status) && (
                                   <p className="mt-2 text-[11px] text-charcoal-500">
-                                    En attente de l'acceptation du client avant approbation.
+                                    {quote.status === 'sent'
+                                      ? 'Le devis est envoyé. Le propriétaire peut approuver la demande sans attendre une acceptation du client.'
+                                      : 'Le client a accepté le devis ; l’approbation du propriétaire reste la décision finale.'}
                                   </p>
                                 )}
-                                {!quote.order_id && quote.status === 'accepted' && (
+                                {canOwnerApproveCustomQuote({
+                                  requestStatus: request.status,
+                                  quoteStatus: quote.status,
+                                  validUntil: quote.valid_until,
+                                  orderId: quote.order_id,
+                                  today: today(),
+                                }) && (
                                   <button
                                     type="button"
                                     disabled={busy}
@@ -706,6 +773,18 @@ export default function AdminRequests() {
                         {request.status === 'rejected' && request.rejection_reason && (
                           <p className="text-xs text-charcoal-400">Motif : {request.rejection_reason}</p>
                         )}
+                        {(request.status === 'new' || request.status === 'reviewing') &&
+                          request.custom_quotes.length === 0 && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => deleteRequest(request)}
+                              className="btn-ghost border border-brand-red/30 text-brand-red-light"
+                            >
+                              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                              {request.deletion_started_at ? 'Reprendre la suppression' : 'Supprimer la demande'}
+                            </button>
+                          )}
                       </div>
                     )}
                   </div>

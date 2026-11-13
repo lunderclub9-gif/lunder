@@ -70,6 +70,7 @@ export default function CustomRequestPage() {
   const folder = useRef<string>(
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`
   )
+  const uploadLock = useRef(false)
   const idempotencyKey = useRef<string>(crypto.randomUUID())
 
   useEffect(() => {
@@ -184,19 +185,21 @@ export default function CustomRequestPage() {
   }
 
   const handleFiles = async (list: FileList | null, kind: 'image' | 'model') => {
-    if (!list || list.length === 0) return
+    if (!list || list.length === 0 || uploadLock.current) return
+    uploadLock.current = true
     setError(null)
     setUploading(true)
+    let uploadedCount = files.length
     try {
       for (const file of Array.from(list)) {
-        if (files.length >= 10) throw new Error('Maximum 10 fichiers par demande.')
+        if (uploadedCount >= 10) throw new Error('Maximum 10 fichiers par demande.')
         const check = await validateCustomFile(file)
         if (!check.ok) throw new Error(check.message)
         const isModel = check.contentType.startsWith('model/')
         if (kind === 'image' && isModel) throw new Error(`« ${file.name} » n'est pas une photo.`)
         if (kind === 'model' && !isModel) throw new Error(`« ${file.name} » n'est pas un fichier 3D.`)
 
-        const path = `${folder.current}/${Date.now()}-${files.length}.${check.extension}`
+        const path = `${folder.current}/${Date.now()}-${uploadedCount}.${check.extension}`
         const { error: uploadError } = await supabase.storage
           .from('custom-requests')
           .upload(path, file, { contentType: check.contentType, upsert: false })
@@ -206,16 +209,24 @@ export default function CustomRequestPage() {
           ...current,
           { path, name: file.name, mime: check.contentType, size: file.size, kind },
         ])
+        uploadedCount += 1
       }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Échec du téléversement.')
     } finally {
+      uploadLock.current = false
       setUploading(false)
     }
   }
 
   const removeFile = async (path: string) => {
-    await supabase.storage.from('custom-requests').remove([path])
+    if (uploadLock.current) return
+    setError(null)
+    const { error: removeError } = await supabase.storage.from('custom-requests').remove([path])
+    if (removeError) {
+      setError('Impossible de supprimer ce fichier du stockage privé. Réessayez avant d’envoyer la demande.')
+      return
+    }
     setFiles((current) => current.filter((file) => file.path !== path))
   }
 
@@ -572,6 +583,7 @@ export default function CustomRequestPage() {
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/avif"
                 multiple
+                disabled={uploading}
                 className="hidden"
                 onChange={(event) => handleFiles(event.target.files, 'image')}
               />
@@ -583,6 +595,7 @@ export default function CustomRequestPage() {
                 type="file"
                 accept=".glb,.gltf,.stl,.obj"
                 multiple
+                disabled={uploading}
                 className="hidden"
                 onChange={(event) => handleFiles(event.target.files, 'model')}
               />
@@ -605,6 +618,7 @@ export default function CustomRequestPage() {
                   <span className="min-w-0 truncate text-charcoal-200">{file.name}</span>
                   <button
                     type="button"
+                    disabled={uploading}
                     onClick={() => removeFile(file.path)}
                     className="text-charcoal-400 hover:text-brand-red"
                     aria-label={`Retirer ${file.name}`}

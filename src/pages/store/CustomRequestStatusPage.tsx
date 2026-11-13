@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import { orderErrorMessage } from '@/lib/checkout'
+import { canCustomerDecideCustomQuote } from '@/lib/custom-workflow'
 
 type Quote = {
   version: number
@@ -132,7 +133,10 @@ export default function CustomRequestStatusPage() {
     )
   }
 
-  const validQuote = request.quotes.find((quote) => quote.status === 'sent')
+  const today = new Date().toISOString().slice(0, 10)
+  const validQuote = request.quotes.find(
+    (quote) => canCustomerDecideCustomQuote({ quoteStatus: quote.status, validUntil: quote.valid_until, today }),
+  )
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -244,7 +248,12 @@ export default function CustomRequestStatusPage() {
               {quote.terms && (
                 <p className="mt-2 whitespace-pre-line text-sm text-charcoal-300">{quote.terms}</p>
               )}
-              {quote.status === 'sent' && (
+              {quote.status === 'sent' && !canCustomerDecideCustomQuote({ quoteStatus: quote.status, validUntil: quote.valid_until, today }) && (
+                <p className="mt-3 text-xs text-charcoal-500">
+                  Ce devis a expiré. Contactez le studio pour demander une nouvelle version.
+                </p>
+              )}
+              {canCustomerDecideCustomQuote({ quoteStatus: quote.status, validUntil: quote.valid_until, today }) && (
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <button
                     type="button"

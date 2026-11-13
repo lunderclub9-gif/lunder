@@ -10,8 +10,9 @@ manufacturing requests with versioned quotes, and an owner-only admin area at `/
 
 ## Status
 
-Code is complete through the five implementation phases. Be aware of the open items at the bottom:
-**the migrations have not been applied to any live project yet**, and there are no automated tests.
+The repository contains the storefront, owner back office, custom-manufacturing workflow and unit
+tests. The Supabase migrations have **not** been applied or verified against a live project; see the
+remaining validation limits at the bottom before any deployment.
 
 ## Architecture and trust boundaries
 
@@ -34,11 +35,11 @@ Every write that carries money, stock, privacy or status is only reachable throu
 |---|---|---|---|
 | `create_guest_order(payload)` | `SECURITY DEFINER` | anon | Re-reads every price and total from tables, locks product rows `FOR UPDATE`, validates commune↔wilaya and an active delivery rate, reserves stock once, one order per idempotency key (advisory lock + unique key) |
 | `estimate_manufacturing_dimensions(l, w, h, material, qty, options, rush)` | `SECURITY DEFINER` | anon | Derives estimated grams and print hours from the bounding-box volume, the configured fill ratio and material density, then runs the same pricing engine and returns a customer-safe breakdown |
-| `decide_custom_quote(token, decision)` | `SECURITY DEFINER` | anon | Accepts or refuses a sent quote; acceptance only marks `accepted` and never creates an order |
+| `decide_custom_quote(token, decision)` | `SECURITY DEFINER` | anon | Accepts or refuses a sent quote; customer acceptance never creates an order |
 | `create_custom_request(payload)` | `SECURITY DEFINER` | anon | Validates phone, dimensions, delivery and acceptance, computes the estimate server-side, verifies each uploaded path really exists in the private bucket before recording it |
 | `create_custom_quote(...)` | `SECURITY DEFINER` | owner | Computes the next version server-side and expires the previous `sent` quote, so only one version is ever approvable |
 | `create_custom_quote_from_estimate(request)` | `SECURITY DEFINER` | owner | Issues the next quote version directly from the stored automatic estimate, keeping the immutable snapshot |
-| `owner_approve_custom_request(quote, note)` | `SECURITY DEFINER` | owner | The only path from an accepted quote to an order: locks quote and request, re-quotes delivery, creates exactly one order derived from the quote id, and is idempotent |
+| `owner_approve_custom_request(quote, note)` | `SECURITY DEFINER` | owner | The only path from a valid `sent` or `accepted` quote to an order: locks quote and request, re-quotes delivery, creates exactly one order derived from the quote id, and is idempotent |
 | `owner_reject_custom_request(request, reason)` | `SECURITY DEFINER` | owner | Refuses the request and any open quote with an optional reason, without creating an order |
 | `delete_delivered_order(id, reason)` | `SECURITY DEFINER` | owner | Hard-deletes a `delivered` order only, after inserting an audit entry; related items/history are removed by cascade |
 | `get_order_by_token(token)` | `SECURITY DEFINER` | anon | Returns a full order only for a 128-bit token; there is no table access for guests |
@@ -54,8 +55,9 @@ Every write that carries money, stock, privacy or status is only reachable throu
 | `handle_new_user()` | `SECURITY DEFINER` trigger | nobody | Creates the profile with `role = 'customer'` on signup |
 | `prevent_role_change()` | trigger | nobody | Rejects any role change coming from `authenticated` |
 
-With the sole exception of the sequence helper `next_order_number()`, each of these pins
-`search_path = public` and has `EXECUTE` revoked from `PUBLIC`, granted only to the roles listed.
+With the sole exception of the sequence helper `next_order_number()`, each of these pins an explicit
+`search_path` (`public` for legacy functions; `pg_catalog, public` for new 012 functions) and has
+`EXECUTE` revoked from `PUBLIC`, granted only to the roles listed.
 
 ### Which boundary enforces what
 
@@ -88,10 +90,13 @@ With the sole exception of the sequence helper `next_order_number()`, each of th
 ### Quote approval, step by step
 
 1. Guest opens their request with the request token and sees only their own quotes.
-2. Only a `sent` quote that is still within `valid_until` can be approved; older versions are
-   expired automatically when a new one is issued.
-3. Approval locks the quote row, so two concurrent clicks serialise; the second returns the order the
-   first one created.
+2. The customer may accept or refuse a valid `sent` quote, but acceptance is only a communication
+   status and never creates an order. A refusal invalidates the quote but does not reject the request;
+   only the owner can make the final request decision.
+3. The owner may approve an eligible, unexpired `sent` or `accepted` quote without waiting for the
+   customer's acceptance. Older quote versions expire when a new one is issued.
+4. Approval locks the quote and request rows, validates delivery and final DZD totals, and uses a
+   unique quote-linked idempotency key; retries return the existing order.
 
 ### Limits of this model
 
@@ -115,6 +120,7 @@ npm run dev             # http://localhost:5173 (Vite default)
 ```bash
 npm run typecheck       # tsc --noEmit
 npm run lint            # eslint
+npm test                # Vitest unit tests
 npm run build           # production bundle in dist/
 ```
 
@@ -149,6 +155,8 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261113140000_008_auto_manufacturing_pricing.sql` | manufacturing materials/pricing, automatic quote, decision, delete RPC | 007 |
 | `20261113150000_009_order_archive_source_and_security.sql` | order archive columns, source, soft-delete, owner-only quote generation | 008 |
 | `20261113160000_010_pricing_security_and_public_estimate.sql` | revoke public pricing access, safe materials view, public estimate RPC | 009 |
+| `20261113170000_011_custom_workflow_and_delivered_deletion.sql` | dimension estimate, client decision history, owner approval, delivered-order deletion | 010 |
+| `20261113180000_012_owner_approval_and_safe_request_deletion.sql` | remove legacy public order-creation RPC, allow owner approval of `sent` quotes, two-phase deletion of eligible unlinked requests | 011 |
 
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
 seed rows use `ON CONFLICT DO NOTHING`.
@@ -228,39 +236,56 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
    seulement, et `create_custom_request` n'enregistre la demande qu'avec cette acceptation, les
    coordonnées et la livraison complètes. Aucune commande n'est créée à cette étape.
 4. Le propriétaire voit la demande complète, les fichiers, les dimensions, l'estimation et son
-   détail interne, l'acceptation client et les devis. Il peut créer un devis depuis l'estimation,
-   saisir un devis manuel ou un devis technique, puis l'envoyer.
-5. Accepter un devis ne crée toujours aucune commande : le propriétaire doit approuver
-   explicitement via `owner_approve_custom_request`. Cette fonction crée une seule commande liée au
-   devis et à la demande, de façon atomique et idempotente, puis la commande suit le circuit
+   détail interne, l'acceptation éventuelle du client et l'historique des devis. Il peut créer un
+   devis depuis l'estimation, saisir un devis manuel ou un devis technique, puis l'envoyer.
+5. L'acceptation client ne crée aucune commande et n'est pas requise. Le propriétaire peut approuver
+   un devis valide `sent` ou `accepted` via `owner_approve_custom_request`; ce RPC vérifie la livraison,
+   le montant, l'éligibilité de la demande et l'idempotence. La commande suit ensuite le système
    existant de suivi et de livraison.
 6. Une commande `delivered` affiche un bouton de suppression directement sur sa carte. La
    suppression est définitive (`delete_delivered_order`) et réservée au propriétaire ; une entrée
    d'audit est conservée et les commandes non livrées sont refusées.
 
-Les migrations sont strictement progressives : `011` ajoute des colonnes et redéfinit des fonctions,
-mais ne modifie aucune migration déjà appliquée.
+Les migrations sont strictement progressives : `011` ajoute des colonnes et redéfinit des fonctions;
+`012` corrige les règles d'approbation, retire les anciens RPC qui pouvaient créer une commande et
+ajoute une suppression en deux phases pour les demandes sans devis, décision historique ou commande.
+La suppression des fichiers passe par Supabase Storage API; le RPC final vérifie ensuite qu'aucun objet
+correspondant ne subsiste avant de supprimer les métadonnées. Un journal d'audit conserve une référence
+et l'instantané des événements métier avant suppression. Les demandes avec devis ou commande ne sont
+pas supprimables par cette action.
 
 ## Known open items
 
-- **Migrations have never been executed** against a real project in this repository's history. Expect
-  to fix small SQL issues on the first run; nothing has been verified end to end.
-- **No automated tests.** Verification so far is `typecheck`, `lint`, `build` and manual review.
+- **Database validation is pending.** Migrations have not been applied to a local/test or production
+  database in this task. The sandbox has no local PostgreSQL/Supabase CLI environment; migration 012
+  therefore still needs isolated-database validation before deployment. Do not apply it to production
+  without separate approval.
+- **Automated coverage is partial.** `npm test` runs the Vitest unit suite; it does not exercise RLS,
+  Postgres RPC transactions, Storage permissions, end-to-end customer flows or mobile layouts.
+- **Admin notifications remain incomplete.** The dashboard now uses real counters through an owner-only
+  RPC, but there is no durable read/unread notification center or event-driven notification delivery.
+- **Storage deletion race is not fully closed.** The final RPC checks that the known request objects are
+  absent, but anonymous bucket inserts are not serialized against that check. Do not deploy request
+  deletion until uploads are bound to server-issued sessions or an equivalent reconciliation/cleanup
+  mechanism prevents a concurrent re-upload from becoming orphaned.
+- **Production stage is not tracked separately.** Orders support pending/confirmed/shipped/delivered;
+  there is no distinct manufacturing-in-progress status, so the dashboard does not invent one.
 - **No transactional email or SMS.** No order confirmation, quote notification or password reset is
   sent; guests must keep their tracking link. Password recovery is therefore hidden.
-- **Uploads:** the custom-request bucket accepts anonymous inserts (guests must upload without an
-  account). Size and type are limited, but there is no rate limit and abandoned uploads are not
-  cleaned up automatically.
-- Product search input is interpolated into the PostgREST filter, and `slugify` strips accented
-  characters — both predate the phases and are unfixed.
+- **Uploads:** the private custom-request bucket accepts anonymous inserts (guests must upload without
+  an account). Storage caps individual size and declared MIME, but there is no quota/rate limit or
+  server-side geometry parser; abandoned/partially uploaded files require cleanup.
 - No license file is present; redistribution rights are unresolved.
 
-## Migrations de fabrication sur mesure (008)
+## Migrations de fabrication sur mesure (008–012)
 
 La migration `20261113140000_008_auto_manufacturing_pricing.sql` ajoute la
 tarification automatique : `manufacturing_materials`, `manufacturing_pricing`,
 le snapshot de prix sur `custom_quotes`, puis `quote_custom_manufacturing`,
 `decide_custom_quote` et `delete_order`.
+
+La séquence complète est listée ci-dessus. Les migrations 011 et 012 ne doivent être validées que sur
+une base isolée avant tout déploiement.
 
 Ordre d'exécution complet, du plus ancien au plus récent :
 
@@ -274,6 +299,8 @@ Ordre d'exécution complet, du plus ancien au plus récent :
 8. `20261113140000_008_auto_manufacturing_pricing.sql`
 9. `20261113150000_009_order_archive_source_and_security.sql`
 10. `20261113160000_010_pricing_security_and_public_estimate.sql`
+11. `20261113170000_011_custom_workflow_and_delivered_deletion.sql`
+12. `20261113180000_012_owner_approval_and_safe_request_deletion.sql`
 
 Après application, renseigner au moins une matière et les tarifs : la ligne
 unique de `manufacturing_pricing` est initialisée à zéro, un devis rendrait donc

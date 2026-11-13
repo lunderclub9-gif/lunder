@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useCart } from '@/lib/cart'
 import { supabase } from '@/lib/supabase'
 import { safeExternalUrl } from '@/lib/url'
+import { toMailtoHref, toTelHref, toWhatsAppHref } from '@/lib/contact'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium transition-colors ${isActive ? 'text-brand-red' : 'text-charcoal-200 hover:text-offwhite'}`
@@ -43,6 +44,10 @@ export default function StoreLayout() {
         setSettings(next)
       })
   }, [])
+
+  const telHref = toTelHref(settings.phone)
+  const whatsappHref = toWhatsAppHref(settings.whatsapp || settings.phone)
+  const mailHref = toMailtoHref(settings.email)
 
   // Les liens externes ne sont rendus que si l'URL est réellement http(s).
   const socials = Object.keys(SOCIAL_LABELS)
@@ -196,7 +201,30 @@ export default function StoreLayout() {
             </div>
             <p className="text-xs text-charcoal-400">DESIGN · PRINT · CREATE — From Imagination to Reality</p>
             <p className="text-xs text-charcoal-500">Algérie · Paiement à la livraison</p>
-            {settings.phone && <p className="text-xs text-charcoal-300">{settings.phone}</p>}
+            {(telHref || whatsappHref || mailHref) && (
+              <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+                {telHref && (
+                  <a href={telHref} className="text-charcoal-300 underline-offset-4 hover:text-offwhite hover:underline">
+                    {settings.phone}
+                  </a>
+                )}
+                {whatsappHref && (
+                  <a
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-charcoal-300 underline-offset-4 hover:text-offwhite hover:underline"
+                  >
+                    WhatsApp
+                  </a>
+                )}
+                {mailHref && (
+                  <a href={mailHref} className="text-charcoal-300 underline-offset-4 hover:text-offwhite hover:underline">
+                    {settings.email}
+                  </a>
+                )}
+              </div>
+            )}
             {socials.length > 0 && (
               <div className="flex flex-wrap justify-center gap-4">
                 {socials.map((social) => (

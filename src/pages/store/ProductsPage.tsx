@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Package, Search } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { AlertTriangle, Package, RefreshCw, Search } from 'lucide-react'
 import { supabase, type Product, type Category } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
 import { sanitizeSearchTerm } from '@/lib/format'
@@ -9,22 +10,37 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [failed, setFailed] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  // La recherche du bandeau arrive par l'URL (?q=...), ce qui rend le résultat
+  // partageable et gère correctement le bouton Précédent du navigateur.
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [activeCategory, setActiveCategory] = useState<string>('')
 
   useEffect(() => {
     (async () => {
-      const { data: cats } = await supabase.from('categories').select('*').eq('is_active', true).order('name')
+      const { data: cats, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
+      if (error) {
+        console.error('[LUNDER] chargement des catégories impossible')
+        setCategories([])
+        return
+      }
       setCategories((cats as Category[]) ?? [])
     })()
   }, [])
 
+  const urlQuery = searchParams.get('q') ?? ''
   useEffect(() => {
-    loadProducts()
-  }, [activeCategory, search])
+    setSearch((current) => (current === urlQuery ? current : urlQuery))
+  }, [urlQuery])
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setLoading(true)
+    setFailed(false)
     let query = supabase
       .from('products')
       .select('*, category:categories(*), product_images(*)')
@@ -41,10 +57,23 @@ export default function ProductsPage() {
       query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`)
     }
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) {
+      console.error('[LUNDER] chargement des produits impossible', error.code ?? 'erreur inconnue')
+      setProducts([])
+      setFailed(true)
+      setLoading(false)
+      return
+    }
+
     setProducts((data as Product[]) ?? [])
+    setFailed(false)
     setLoading(false)
-  }
+  }, [activeCategory, search])
+
+  useEffect(() => {
+    void loadProducts()
+  }, [loadProducts])
 
   const primaryImage = (p: Product) => p.product_images?.find((img) => img.is_primary)?.image_url ?? p.product_images?.[0]?.image_url
 
@@ -69,8 +98,16 @@ export default function ProductsPage() {
             type="text"
             placeholder="Rechercher un produit..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value
+              setSearch(value)
+              const next = new URLSearchParams(searchParams)
+              if (value.trim()) next.set('q', value)
+              else next.delete('q')
+              setSearchParams(next, { replace: true })
+            }}
             className="input-field pl-10"
+            aria-label="Rechercher un produit"
           />
         </div>
       </div>
@@ -100,8 +137,17 @@ export default function ProductsPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
+        <div className="flex items-center justify-center py-16" aria-busy="true">
           <Package className="h-8 w-8 animate-pulse text-charcoal-500" />
+        </div>
+      ) : failed ? (
+        <div className="card py-16 text-center" role="alert">
+          <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-brand-red" />
+          <p className="text-charcoal-300">Impossible de charger les produits.</p>
+          <button type="button" onClick={() => void loadProducts()} className="btn-ghost mx-auto mt-4">
+            <RefreshCw className="h-4 w-4" />
+            Réessayer
+          </button>
         </div>
       ) : products.length === 0 ? (
         <div className="card text-center py-16">

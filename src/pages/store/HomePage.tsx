@@ -1,33 +1,54 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Printer, ArrowRight, Package } from 'lucide-react'
+import { Printer, ArrowRight, Package, AlertTriangle, RefreshCw } from 'lucide-react'
 import { supabase, type Product } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
 
 export default function HomePage() {
   const [featured, setFeatured] = useState<Product[]>([])
   const [recent, setRecent] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+
+  const loadProducts = useCallback(async () => {
+    setLoading(true)
+    setFailed(false)
+
+    const featuredQuery = supabase
+      .from('products')
+      .select('*, category:categories(*), product_images(*)')
+      .eq('status', 'published')
+      .eq('is_featured', true)
+      .order('created_at', { ascending: false })
+      .limit(4)
+
+    const recentQuery = supabase
+      .from('products')
+      .select('*, category:categories(*), product_images(*)')
+      .eq('status', 'published')
+      .order('created_at', { ascending: false })
+      .limit(8)
+
+    const [featuredResult, recentResult] = await Promise.all([featuredQuery, recentQuery])
+
+    // Une erreur réseau ou RLS ne doit jamais ressembler à un catalogue vide.
+    if (featuredResult.error || recentResult.error) {
+      console.error('[LUNDER] chargement du catalogue impossible')
+      setFeatured([])
+      setRecent([])
+      setFailed(true)
+      setLoading(false)
+      return
+    }
+
+    setFeatured((featuredResult.data as Product[]) ?? [])
+    setRecent((recentResult.data as Product[]) ?? [])
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
-    (async () => {
-      const { data: f } = await supabase
-        .from('products')
-        .select('*, category:categories(*), product_images(*)')
-        .eq('status', 'published')
-        .eq('is_featured', true)
-        .order('created_at', { ascending: false })
-        .limit(4)
-      setFeatured((f as Product[]) ?? [])
-
-      const { data: r } = await supabase
-        .from('products')
-        .select('*, category:categories(*), product_images(*)')
-        .eq('status', 'published')
-        .order('created_at', { ascending: false })
-        .limit(8)
-      setRecent((r as Product[]) ?? [])
-    })()
-  }, [])
+    void loadProducts()
+  }, [loadProducts])
 
   const primaryImage = (p: Product) => p.product_images?.find((img) => img.is_primary)?.image_url ?? p.product_images?.[0]?.image_url
 
@@ -78,7 +99,24 @@ export default function HomePage() {
             Tout voir →
           </Link>
         </div>
-        {recent.length === 0 ? (
+        {loading ? (
+          <div className="card py-16 text-center" aria-busy="true">
+            <Package className="mx-auto mb-4 h-12 w-12 animate-pulse text-charcoal-500" />
+            <p className="text-charcoal-400">Chargement des produits…</p>
+          </div>
+        ) : failed ? (
+          <div className="card py-16 text-center" role="alert">
+            <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-brand-red" />
+            <p className="text-charcoal-300">Impossible de charger les produits pour le moment.</p>
+            <p className="mt-1 text-xs text-charcoal-500">
+              Vérifiez votre connexion, puis réessayez.
+            </p>
+            <button type="button" onClick={() => void loadProducts()} className="btn-ghost mx-auto mt-4">
+              <RefreshCw className="h-4 w-4" />
+              Réessayer
+            </button>
+          </div>
+        ) : recent.length === 0 ? (
           <div className="card text-center py-16">
             <Package className="mx-auto mb-4 h-12 w-12 text-charcoal-500" />
             <p className="text-charcoal-400">La boutique ouvre bientôt. Revenez vite !</p>

@@ -33,9 +33,14 @@ Every write that carries money, stock, privacy or status is only reachable throu
 | Function | Mode | Callable by | What it guarantees |
 |---|---|---|---|
 | `create_guest_order(payload)` | `SECURITY DEFINER` | anon | Re-reads every price and total from tables, locks product rows `FOR UPDATE`, validates commune↔wilaya and an active delivery rate, reserves stock once, one order per idempotency key (advisory lock + unique key) |
-| `approve_custom_quote(token, delivery)` | `SECURITY DEFINER` | anon | Locks the quote, refuses expired/already-decided versions, derives `orders.idempotency_key` from the quote id so retries cannot create a second order |
-| `create_custom_request(payload)` | `SECURITY DEFINER` | anon | Validates phone and payload, verifies each uploaded path really exists in the private bucket before recording it |
+| `estimate_manufacturing_dimensions(l, w, h, material, qty, options, rush)` | `SECURITY DEFINER` | anon | Derives estimated grams and print hours from the bounding-box volume, the configured fill ratio and material density, then runs the same pricing engine and returns a customer-safe breakdown |
+| `decide_custom_quote(token, decision)` | `SECURITY DEFINER` | anon | Accepts or refuses a sent quote; acceptance only marks `accepted` and never creates an order |
+| `create_custom_request(payload)` | `SECURITY DEFINER` | anon | Validates phone, dimensions, delivery and acceptance, computes the estimate server-side, verifies each uploaded path really exists in the private bucket before recording it |
 | `create_custom_quote(...)` | `SECURITY DEFINER` | owner | Computes the next version server-side and expires the previous `sent` quote, so only one version is ever approvable |
+| `create_custom_quote_from_estimate(request)` | `SECURITY DEFINER` | owner | Issues the next quote version directly from the stored automatic estimate, keeping the immutable snapshot |
+| `owner_approve_custom_request(quote, note)` | `SECURITY DEFINER` | owner | The only path from an accepted quote to an order: locks quote and request, re-quotes delivery, creates exactly one order derived from the quote id, and is idempotent |
+| `owner_reject_custom_request(request, reason)` | `SECURITY DEFINER` | owner | Refuses the request and any open quote with an optional reason, without creating an order |
+| `delete_delivered_order(id, reason)` | `SECURITY DEFINER` | owner | Hard-deletes a `delivered` order only, after inserting an audit entry; related items/history are removed by cascade |
 | `get_order_by_token(token)` | `SECURITY DEFINER` | anon | Returns a full order only for a 128-bit token; there is no table access for guests |
 | `track_order(number, phone)` | `SECURITY DEFINER` | anon | Order number + phone, minimal fields only, capped at 8 attempts per order per 15 minutes |
 | `get_custom_request_by_token(token)` | `SECURITY DEFINER` | anon | Guest view of their own request and quotes; also expires stale quotes |
@@ -206,6 +211,35 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
 | "Stock insuffisant" | quantity exceeds available stock (counted on variant, else product) |
 | "Trop de tentatives" | more than 8 tracking lookups for one order in 15 minutes |
 | "Devis expiré" | quote passed `valid_until`; issue a new version |
+| `DIMENSIONS_INVALIDES` | one of the three dimensions is missing, non-positive or above 2000 mm |
+| `ESTIMATION_INDISPONIBLE` | the customer accepted but no server-side estimate could be computed |
+| `LIVRAISON_REQUISE` | owner approval attempted on a request without complete delivery information |
+| `COMMANDE_NON_LIVREE` | hard delete attempted on an order that is not `delivered` |
+
+## Workflow fabrication sur mesure (011)
+
+1. Le client saisit le projet, les trois dimensions en millimètres, la quantité, la matière, la
+   couleur et les options. Il ne saisit jamais de poids ni d'heures d'impression.
+2. `estimate_manufacturing_dimensions` calcule un poids et un temps à partir du volume de la boîte
+   englobante, du taux de remplissage (`effective_volume_percent`), de la densité de la matière
+   (`density_g_cm3`) et de la vitesse d'impression (`print_speed_g_per_hour`). Le résultat est
+   explicitement présenté comme une estimation non vérifiée, pas comme un devis ferme.
+3. Le client accepte l'estimation. Le formulaire de coordonnées et de livraison apparaît alors
+   seulement, et `create_custom_request` n'enregistre la demande qu'avec cette acceptation, les
+   coordonnées et la livraison complètes. Aucune commande n'est créée à cette étape.
+4. Le propriétaire voit la demande complète, les fichiers, les dimensions, l'estimation et son
+   détail interne, l'acceptation client et les devis. Il peut créer un devis depuis l'estimation,
+   saisir un devis manuel ou un devis technique, puis l'envoyer.
+5. Accepter un devis ne crée toujours aucune commande : le propriétaire doit approuver
+   explicitement via `owner_approve_custom_request`. Cette fonction crée une seule commande liée au
+   devis et à la demande, de façon atomique et idempotente, puis la commande suit le circuit
+   existant de suivi et de livraison.
+6. Une commande `delivered` affiche un bouton de suppression directement sur sa carte. La
+   suppression est définitive (`delete_delivered_order`) et réservée au propriétaire ; une entrée
+   d'audit est conservée et les commandes non livrées sont refusées.
+
+Les migrations sont strictement progressives : `011` ajoute des colonnes et redéfinit des fonctions,
+mais ne modifie aucune migration déjà appliquée.
 
 ## Known open items
 

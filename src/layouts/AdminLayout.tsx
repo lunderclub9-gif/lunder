@@ -14,7 +14,7 @@ import {
   History,
   Calculator,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
@@ -32,8 +32,30 @@ const navItems = [
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [newRequests, setNewRequests] = useState(0)
   const { signOut } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    let active = true
+    const refresh = async () => {
+      const { count } = await supabase
+        .from('custom_requests')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['new', 'reviewing'])
+        .not('estimate_accepted_at', 'is', null)
+      if (active) setNewRequests(count ?? 0)
+    }
+    refresh()
+    const timer = setInterval(refresh, 60000)
+    const onFocus = () => refresh()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      active = false
+      clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
 
   const handleSignOut = async () => {
     await supabase.rpc('log_owner_event', { p_action: 'proprietaire.deconnexion' })
@@ -78,6 +100,11 @@ export default function AdminLayout() {
             >
               <item.icon className="h-4 w-4" />
               {item.label}
+              {item.to === '/admin/demandes' && newRequests > 0 && (
+                <span className="ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white">
+                  {newRequests}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

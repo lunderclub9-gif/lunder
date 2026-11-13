@@ -15,6 +15,8 @@ type Quote = {
   status: string
   source: string
   order_id: string | null
+  created_at: string
+  decided_at: string | null
   breakdown: {
     lines?: { label: string; amountDzd: number; detail?: string | null }[]
     unitPriceDzd?: number
@@ -42,6 +44,23 @@ type RequestRow = {
   color_preference: string | null
   quantity: number
   created_at: string
+  dim_length_mm: number | null
+  dim_width_mm: number | null
+  dim_height_mm: number | null
+  estimate_price_dzd: number | null
+  estimate_breakdown: Quote['breakdown']
+  estimate_accepted_at: string | null
+  delivery_wilaya_code: number | null
+  delivery_commune_id: string | null
+  delivery_method: string | null
+  delivery_address: string | null
+  delivery_pickup_point_id: string | null
+  rejection_reason: string | null
+  delivery_wilaya?: { name_fr: string } | null
+  delivery_commune?: { name_fr: string } | null
+  delivery_pickup?: { name: string } | null
+  manufacturing_options: Record<string, boolean> | null
+  rush: boolean
   custom_request_files: RequestFile[]
   custom_quotes: Quote[]
 }
@@ -53,6 +72,14 @@ const STATUS_LABELS: Record<string, string> = {
   approved: 'Acceptée',
   rejected: 'Non réalisable',
   closed: 'Clôturée',
+}
+
+const QUOTE_STATUS_LABELS: Record<string, string> = {
+  sent: 'Envoyé — en attente client',
+  accepted: 'Accepté par le client — à approuver',
+  approved: 'Approuvé — commande créée',
+  rejected: 'Refusé',
+  expired: 'Expiré',
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -89,7 +116,9 @@ export default function AdminRequests() {
     const [{ data, error: queryError }, { data: mats }] = await Promise.all([
       supabase
         .from('custom_requests')
-        .select('*, custom_request_files(*), custom_quotes(*)')
+        .select(
+          '*, custom_request_files(*), custom_quotes(*), delivery_wilaya:wilayas!custom_requests_delivery_wilaya_code_fkey(name_fr), delivery_commune:communes!custom_requests_delivery_commune_id_fkey(name_fr), delivery_pickup:pickup_points!custom_requests_delivery_pickup_point_id_fkey(name)'
+        )
         .order('created_at', { ascending: false })
         .limit(100),
       supabase.from('manufacturing_materials').select('name').eq('is_available', true).order('name'),
@@ -205,6 +234,56 @@ export default function AdminRequests() {
     await load()
   }
 
+  const createQuoteFromEstimate = async (request: RequestRow) => {
+    setError(null)
+    if (!request.estimate_price_dzd) {
+      setError('Aucune estimation disponible pour cette demande.')
+      return
+    }
+    setBusy(true)
+    const { error: rpcError } = await supabase.rpc('create_custom_quote_from_estimate', {
+      p_request_id: request.id,
+    })
+    setBusy(false)
+    if (rpcError) {
+      setError(orderErrorMessage(rpcError.message, "Impossible de créer le devis depuis l'estimation."))
+      return
+    }
+    await load()
+  }
+
+  const approveQuote = async (quote: Quote) => {
+    setError(null)
+    if (!confirm(`Approuver le devis v${quote.version} et créer la commande ?`)) return
+    setBusy(true)
+    const { error: rpcError } = await supabase.rpc('owner_approve_custom_request', {
+      p_quote_id: quote.id,
+    })
+    setBusy(false)
+    if (rpcError) {
+      setError(orderErrorMessage(rpcError.message, "Impossible d'approuver cette demande."))
+      return
+    }
+    await load()
+  }
+
+  const rejectRequest = async (request: RequestRow) => {
+    setError(null)
+    const reason = prompt('Motif du refus (optionnel) :') ?? ''
+    if (!confirm(`Refuser la demande ${request.request_number} ?`)) return
+    setBusy(true)
+    const { error: rpcError } = await supabase.rpc('owner_reject_custom_request', {
+      p_request_id: request.id,
+      p_reason: reason.trim() || null,
+    })
+    setBusy(false)
+    if (rpcError) {
+      setError(orderErrorMessage(rpcError.message, 'Impossible de refuser cette demande.'))
+      return
+    }
+    await load()
+  }
+
   const openFile = async (file: RequestFile) => {
     setError(null)
     const { data, error: signError } = await supabase.storage
@@ -221,9 +300,9 @@ export default function AdminRequests() {
     <div className="animate-fade-in">
       <h1 className="mb-2 text-2xl font-bold text-offwhite">Demandes sur mesure</h1>
       <p className="mb-6 text-sm text-charcoal-400">
-        Étudiez la faisabilité avant d'émettre un devis. Chaque nouveau devis expire la version
-        précédente ; un client ne peut accepter qu'une seule version valide, et une seule commande
-        en découle.
+        Le client a accepté l'estimation et fourni ses coordonnées. Vérifiez le fichier, créez ou
+        ajustez le devis, puis approuvez explicitement la fabrication pour créer une commande. Un
+        nouveau devis expire la version précédente ; une seule commande peut en découler.
       </p>
 
       {error && (
@@ -281,10 +360,65 @@ export default function AdminRequests() {
                     <p className="text-xs text-charcoal-400">
                       Quantité {request.quantity}
                       {request.dimensions ? ` · ${request.dimensions} ${request.dimension_unit}` : ''}
+                      {request.dim_length_mm ? ` · ${request.dim_length_mm} × ${request.dim_width_mm} × ${request.dim_height_mm} mm` : ''}
                       {request.intended_use ? ` · ${request.intended_use}` : ''}
                       {request.material_preference ? ` · ${request.material_preference}` : ''}
                       {request.color_preference ? ` · ${request.color_preference}` : ''}
+                      {request.rush ? ' · urgent' : ''}
                     </p>
+
+                    <div className="rounded-lg border border-charcoal-400/15 p-3 text-xs text-charcoal-300">
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-charcoal-400">
+                        Client et livraison
+                      </p>
+                      <p>{request.customer_name} · {request.phone}{request.email ? ` · ${request.email}` : ''}</p>
+                      <p className="mt-1">
+                        {request.delivery_method === 'stopdesk'
+                          ? 'Point relais'
+                          : 'Livraison à domicile'}
+                        {request.delivery_wilaya?.name_fr
+                          ? ` — ${request.delivery_commune?.name_fr ?? ''}, ${request.delivery_wilaya.name_fr}`
+                          : ''}
+                        {request.delivery_address ? ` — ${request.delivery_address}` : ''}
+                        {request.delivery_pickup?.name ? ` — ${request.delivery_pickup.name}` : ''}
+                      </p>
+                      <p className="mt-1 text-charcoal-500">
+                        Estimation acceptée :{' '}
+                        {request.estimate_accepted_at
+                          ? new Date(request.estimate_accepted_at).toLocaleString('fr-DZ')
+                          : 'non'}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-charcoal-400/15 p-3 text-xs text-charcoal-300">
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-charcoal-400">
+                        Estimation automatique (détail propriétaire)
+                      </p>
+                      {request.estimate_price_dzd ? (
+                        <>
+                          <p className="mb-2 text-sm font-semibold text-offwhite">
+                            {formatDzd(request.estimate_price_dzd)}
+                          </p>
+                          {request.estimate_breakdown?.lines && (
+                            <ul className="space-y-0.5">
+                              {request.estimate_breakdown.lines.map((line, index) => (
+                                <li key={index} className="flex justify-between gap-2">
+                                  <span>
+                                    {line.label}
+                                    {line.detail ? (
+                                      <span className="ml-1 text-charcoal-500">({line.detail})</span>
+                                    ) : null}
+                                  </span>
+                                  <span>{formatDzd(line.amountDzd)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-charcoal-400">Aucune estimation automatique.</p>
+                      )}
+                    </div>
 
                     {request.custom_request_files.length > 0 && (
                       <div>
@@ -324,7 +458,7 @@ export default function AdminRequests() {
                                     v{quote.version} · {formatDzd(quote.price_dzd)} · {quote.source === 'automatic' ? 'Automatique' : 'Manuel'}
                                   </span>
                                   <span className="rounded-full bg-charcoal-700 px-2 py-0.5 text-[10px] text-offwhite">
-                                    {quote.status}
+                                    {QUOTE_STATUS_LABELS[quote.status] ?? quote.status}
                                   </span>
                                 </div>
                                 <p className="mt-1 text-charcoal-400">
@@ -360,6 +494,22 @@ export default function AdminRequests() {
                                 )}
                                 {quote.terms && (
                                   <p className="mt-2 whitespace-pre-line text-charcoal-400">{quote.terms}</p>
+                                )}
+                                {!quote.order_id && quote.status === 'sent' && (
+                                  <p className="mt-2 text-[11px] text-charcoal-500">
+                                    En attente de l'acceptation du client avant approbation.
+                                  </p>
+                                )}
+                                {!quote.order_id && quote.status === 'accepted' && (
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => approveQuote(quote)}
+                                    className="btn-primary mt-2"
+                                  >
+                                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                    Approuver et créer la commande
+                                  </button>
                                 )}
                               </li>
                             ))}
@@ -523,8 +673,17 @@ export default function AdminRequests() {
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => openAutoQuote(request)} className="btn-primary">
-                          Devis automatique
+                        <button
+                          type="button"
+                          disabled={busy || !request.estimate_price_dzd}
+                          onClick={() => createQuoteFromEstimate(request)}
+                          className="btn-primary"
+                        >
+                          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                          Créer le devis depuis l'estimation
+                        </button>
+                        <button type="button" onClick={() => openAutoQuote(request)} className="btn-secondary">
+                          Devis technique (poids / heures)
                         </button>
                         <button type="button" onClick={() => openNewQuote(request)} className="btn-secondary">
                           Devis manuel
@@ -534,15 +693,18 @@ export default function AdminRequests() {
                             Marquer en étude
                           </button>
                         )}
-                        {['new', 'reviewing', 'quoted'].includes(request.status) && (
+                        {!['approved', 'rejected', 'closed'].includes(request.status) && (
                           <>
-                            <button type="button" onClick={() => setStatus(request.id, 'rejected')} className="btn-secondary">
-                              Non réalisable
+                            <button type="button" disabled={busy} onClick={() => rejectRequest(request)} className="btn-secondary">
+                              Refuser la demande
                             </button>
                             <button type="button" onClick={() => setStatus(request.id, 'closed')} className="btn-secondary">
                               Clôturer
                             </button>
                           </>
+                        )}
+                        {request.status === 'rejected' && request.rejection_reason && (
+                          <p className="text-xs text-charcoal-400">Motif : {request.rejection_reason}</p>
                         )}
                       </div>
                     )}

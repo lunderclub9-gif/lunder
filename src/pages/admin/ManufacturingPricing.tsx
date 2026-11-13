@@ -6,6 +6,7 @@ type MfgMaterial = {
   id: string
   name: string
   price_per_gram_dzd: number
+  density_g_cm3: number
   multiplier: number
   colors: string[]
   is_available: boolean
@@ -30,6 +31,8 @@ type MfgPricing = {
   quantity_discounts: { minQuantity: number; percent: number }[]
   rush_fee_percent: number
   validity_days: number
+  effective_volume_percent: number
+  print_speed_g_per_hour: number
 }
 
 const emptyPricing: MfgPricing = {
@@ -50,6 +53,8 @@ const emptyPricing: MfgPricing = {
   quantity_discounts: [],
   rush_fee_percent: 0,
   validity_days: 14,
+  effective_volume_percent: 35,
+  print_speed_g_per_hour: 12,
 }
 
 export default function ManufacturingPricingPage() {
@@ -93,6 +98,8 @@ export default function ManufacturingPricingPage() {
         quantity_discounts: (row.quantity_discounts as { minQuantity: number; percent: number }[]) ?? [],
         rush_fee_percent: Number(row.rush_fee_percent ?? 0),
         validity_days: Number(row.validity_days ?? 14),
+        effective_volume_percent: Number(row.effective_volume_percent ?? 35),
+        print_speed_g_per_hour: Number(row.print_speed_g_per_hour ?? 12),
       })
       setDiscountsText(JSON.stringify(row.quantity_discounts ?? []))
     }
@@ -219,6 +226,16 @@ export default function ManufacturingPricingPage() {
     { key: 'waste_percent', label: 'Perte matière (%)' },
     { key: 'rush_fee_percent', label: 'Supplément urgence (%)' },
     { key: 'validity_days', label: 'Validité d’un devis (jours)' },
+    {
+      key: 'effective_volume_percent',
+      label: 'Volume utile des dimensions (%)',
+      help: 'Part du volume de la boîte englobante réellement imprimée.',
+    },
+    {
+      key: 'print_speed_g_per_hour',
+      label: 'Vitesse d’impression (g/h)',
+      help: 'Sert à déduire le temps depuis le poids estimé.',
+    },
   ]
 
   return (
@@ -275,7 +292,7 @@ export default function ManufacturingPricingPage() {
                     </button>
                   </div>
                 </div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="mt-3 grid gap-3 sm:grid-cols-4">
                   <label className="block">
                     <span className="label-text">Prix (DA/g)</span>
                     <input
@@ -285,6 +302,21 @@ export default function ManufacturingPricingPage() {
                       onBlur={(event) =>
                         updateMaterial(material, {
                           price_per_gram_dzd: Math.round(Number(event.target.value) || 0),
+                        })
+                      }
+                      className="input-field"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label-text">Densité (g/cm³)</span>
+                    <input
+                      type="number"
+                      min={0.1}
+                      step="0.01"
+                      defaultValue={material.density_g_cm3}
+                      onBlur={(event) =>
+                        updateMaterial(material, {
+                          density_g_cm3: Number(event.target.value) || 1,
                         })
                       }
                       className="input-field"
@@ -372,6 +404,9 @@ export default function ManufacturingPricingPage() {
           {numericFields.map((field) => (
             <label key={String(field.key)} className="block">
               <span className="label-text">{field.label}</span>
+              {field.help ? (
+                <span className="mb-1 block text-xs text-charcoal-500">{field.help}</span>
+              ) : null}
               <input
                 type="number"
                 min={0}

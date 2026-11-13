@@ -104,6 +104,30 @@ export default function AdminOrders() {
     await load()
   }
 
+  const hardDelete = async (order: OrderRow) => {
+    setDeleteError(null)
+    if (
+      !confirm(
+        `Supprimer DÉFINITIVEMENT la commande ${order.order_number} ?\n\nCette action est irréversible et supprime aussi ses articles, son historique et ses fichiers. Seule une trace d'audit est conservée.`
+      )
+    ) {
+      return
+    }
+    setDeletingId(order.id)
+    const { error: rpcError } = await supabase.rpc('delete_delivered_order', {
+      p_order_id: order.id,
+      p_reason: 'Suppression définitive demandée depuis l\'interface propriétaire',
+    })
+    setDeletingId(null)
+    if (rpcError) {
+      setDeleteError(
+        orderErrorMessage(rpcError.message, 'Impossible de supprimer définitivement cette commande.')
+      )
+      return
+    }
+    await load()
+  }
+
   const visible = (filter ? orders.filter((order) => order.status === filter) : orders).filter(
     (order) => showArchived || !order.archived_at
   )
@@ -157,10 +181,11 @@ export default function AdminOrders() {
             const open = expanded === order.id
             return (
               <div key={order.id} className="admin-card">
+                <div className="flex items-start gap-3">
                 <button
                   type="button"
                   onClick={() => setExpanded(open ? null : order.id)}
-                  className="flex w-full items-start justify-between gap-3 text-left"
+                  className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left"
                   aria-expanded={open}
                 >
                   <div className="min-w-0">
@@ -193,6 +218,23 @@ export default function AdminOrders() {
                     <ChevronDown className={`h-4 w-4 text-charcoal-400 transition-transform ${open ? 'rotate-180' : ''}`} />
                   </div>
                 </button>
+                {order.status === 'delivered' && !order.archived_at && (
+                  <button
+                    type="button"
+                    disabled={deletingId === order.id}
+                    onClick={() => hardDelete(order)}
+                    className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-brand-red/40 px-3 py-2 text-xs font-medium text-brand-red-light transition-colors hover:bg-brand-red/10 disabled:opacity-50"
+                    title={`Supprimer définitivement ${order.order_number}`}
+                  >
+                    {deletingId === order.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Supprimer
+                  </button>
+                )}
+                </div>
 
                 {open && (
                   <div className="mt-4 space-y-4 border-t border-charcoal-400/15 pt-4">

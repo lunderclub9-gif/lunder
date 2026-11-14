@@ -17,6 +17,8 @@ import {
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { AdminNotificationsProvider } from '@/components/admin/AdminNotificationsProvider'
+import NotificationCenter from '@/components/admin/NotificationCenter'
 
 const navItems = [
   { to: '/admin/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -33,7 +35,7 @@ const navItems = [
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [newRequests, setNewRequests] = useState(0)
-  const { signOut } = useAuth()
+  const { signOut, profile } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -64,6 +66,7 @@ export default function AdminLayout() {
   }
 
   return (
+    <AdminNotificationsProvider ownerId={profile?.id ?? null} navigate={navigate}>
     <div className="flex h-screen overflow-hidden bg-charcoal-950">
       {sidebarOpen && (
         <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />
@@ -126,6 +129,7 @@ export default function AdminLayout() {
             <Menu className="h-6 w-6 text-charcoal-200" />
           </button>
           <span className="text-sm text-charcoal-400">Espace propriétaire</span>
+          <NotificationCenter />
         </header>
 
         <main className="flex-1 overflow-y-auto scrollbar-thin p-4 md:p-6">
@@ -133,5 +137,6 @@ export default function AdminLayout() {
         </main>
       </div>
     </div>
+    </AdminNotificationsProvider>
   )
 }

@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, Loader2, Package, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ChevronDown, Loader2, Package, Printer, Search, Trash2 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
+import { buildOrderSearchExpression } from '@/lib/admin-notification-utils'
+import { useAuth } from '@/lib/auth'
+import { readAdminPreferences, type AdminPreferences } from '@/lib/admin-preferences'
+import OrderPrintPreview from '@/components/admin/OrderPrintPreview'
 import {
   DELIVERY_METHOD_LABELS,
   orderErrorMessage,
@@ -16,9 +21,13 @@ type OrderRow = {
   archived_at: string | null
   customer_name: string
   phone: string
+  email: string | null
   wilaya_name: string
   commune_name: string
   delivery_method: string
+  payment_method: string
+  subtotal_dzd: number
+  delivery_dzd: number
   total_dzd: number
   created_at: string
   address: string | null
@@ -42,23 +51,39 @@ const NEXT_ACTIONS: Record<string, { status: string; label: string; danger?: boo
 }
 
 export default function AdminOrders() {
+  const { profile } = useAuth()
+  const [searchParams] = useSearchParams()
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
+  const [searchText, setSearchText] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [busy, setBusy] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [printOrder, setPrintOrder] = useState<OrderRow | null>(null)
+  const [printPreferences, setPrintPreferences] = useState<AdminPreferences>(() => readAdminPreferences(profile?.id ?? null))
+  const requestSequence = useRef(0)
+  const handledOrderId = useRef<string | null>(null)
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    setPrintPreferences(readAdminPreferences(profile?.id ?? null))
+  }, [profile?.id])
+
+  const load = useCallback(async (term: string) => {
+    const sequence = ++requestSequence.current
     setLoading(true)
-    const { data, error: queryError } = await supabase
+    let query = supabase
       .from('orders')
       .select('*, order_items(*)')
       .order('created_at', { ascending: false })
       .limit(200)
+    const expression = buildOrderSearchExpression(term)
+    if (expression) query = query.or(expression)
+    const { data, error: queryError } = await query
+    if (sequence !== requestSequence.current) return
     if (queryError) {
       setError('Impossible de charger les commandes.')
     } else {
@@ -69,8 +94,36 @@ export default function AdminOrders() {
   }, [])
 
   useEffect(() => {
-    load()
-  }, [load])
+    const timer = window.setTimeout(() => void load(searchText), 250)
+    return () => window.clearTimeout(timer)
+  }, [load, searchText])
+
+  const requestedOrderId = searchParams.get('order')
+  useEffect(() => {
+    if (!requestedOrderId || loading || handledOrderId.current === requestedOrderId) return
+    const existing = orders.find((order) => order.id === requestedOrderId)
+    handledOrderId.current = requestedOrderId
+    if (existing) {
+      setExpanded(existing.id)
+      return
+    }
+
+    void supabase
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', requestedOrderId)
+      .maybeSingle()
+      .then(({ data, error: targetError }) => {
+        if (new URLSearchParams(window.location.search).get('order') !== requestedOrderId) return
+        if (targetError || !data) {
+          setError('La commande liée à cette notification est introuvable ou n’est plus accessible.')
+          return
+        }
+        const target = data as OrderRow
+        setOrders((current) => [target, ...current.filter((item) => item.id !== target.id)])
+        setExpanded(target.id)
+      })
+  }, [loading, orders, requestedOrderId])
 
   const changeStatus = async (orderId: string, status: string) => {
     setBusy(true)
@@ -84,7 +137,7 @@ export default function AdminOrders() {
       setError(orderErrorMessage(rpcError.message, 'Impossible de modifier le statut.'))
       return
     }
-    await load()
+    await load(searchText)
   }
 
   const handleDelete = async (order: OrderRow) => {
@@ -101,7 +154,7 @@ export default function AdminOrders() {
       return
     }
     setDeleteError(null)
-    await load()
+    await load(searchText)
   }
 
   const hardDelete = async (order: OrderRow) => {
@@ -125,7 +178,7 @@ export default function AdminOrders() {
       )
       return
     }
-    await load()
+    await load(searchText)
   }
 
   const visible = (filter ? orders.filter((order) => order.status === filter) : orders).filter(
@@ -155,6 +208,18 @@ export default function AdminOrders() {
         </select>
       </div>
 
+      <label className="relative mb-6 block max-w-xl">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
+        <input
+          type="search"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          className="input-field pl-10"
+          placeholder="Rechercher par référence, nom ou téléphone…"
+          aria-label="Rechercher une commande par référence, nom ou téléphone"
+        />
+      </label>
+
       {error && (
         <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
           {error}
@@ -173,7 +238,7 @@ export default function AdminOrders() {
       ) : visible.length === 0 ? (
         <div className="admin-card py-16 text-center">
           <Package className="mx-auto mb-4 h-12 w-12 text-charcoal-500" />
-          <p className="text-charcoal-400">Aucune commande pour le moment.</p>
+          <p className="text-charcoal-400">{searchText.trim() ? 'Aucune commande ne correspond à la recherche.' : 'Aucune commande pour le moment.'}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -278,6 +343,11 @@ export default function AdminOrders() {
                       </div>
                     )}
 
+                    <button type="button" onClick={() => setPrintOrder(order)} className="btn-secondary">
+                      <Printer className="h-4 w-4" />
+                      Aperçu et impression
+                    </button>
+
                     {!order.archived_at && order.status !== 'delivered' && order.status !== 'shipped' && (
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -301,6 +371,15 @@ export default function AdminOrders() {
             )
           })}
         </div>
+      )}
+      {printOrder && (
+        <OrderPrintPreview
+          key={printOrder.id}
+          order={printOrder}
+          defaultFormat={printPreferences.defaultPrintFormat}
+          defaultWidth={printPreferences.thermalWidth}
+          onClose={() => setPrintOrder(null)}
+        />
       )}
     </div>
   )

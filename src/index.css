@@ -61,3 +61,115 @@
     border-radius: 3px;
   }
 }
+
+body.admin-order-printing .admin-order-print-sheet.thermal-58 {
+  width: 56mm;
+  max-width: 56mm;
+  padding: 1mm;
+  font-size: 9pt;
+}
+
+body.admin-order-printing .admin-order-print-sheet.thermal-80 {
+  width: 78mm;
+  max-width: 78mm;
+  padding: 1mm;
+  font-size: 9pt;
+}
+
+body.admin-order-printing .admin-order-print-sheet.thermal-58 .grid,
+body.admin-order-printing .admin-order-print-sheet.thermal-80 .grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body.admin-order-printing * {
+    visibility: hidden !important;
+  }
+
+  body.admin-order-printing > #root {
+    display: none !important;
+  }
+
+  body.admin-order-printing > .admin-order-print-dialog {
+    display: block !important;
+  }
+
+  body.admin-order-printing .admin-order-print-sheet,
+  body.admin-order-printing .admin-order-print-sheet * {
+    visibility: visible !important;
+  }
+
+  body.admin-order-printing .admin-order-print-dialog {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  body.admin-order-printing .admin-order-print-dialog > div {
+    display: contents !important;
+  }
+
+  body.admin-order-printing .admin-order-print-controls {
+    display: none !important;
+  }
+
+  body.admin-order-printing .admin-order-print-sheet {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    overflow-wrap: anywhere;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  body.admin-order-printing .admin-order-print-sheet.thermal-58 {
+    width: 56mm !important;
+    padding: 1mm !important;
+    font-size: 9pt !important;
+  }
+
+  body.admin-order-printing .admin-order-print-sheet.thermal-80 {
+    width: 78mm !important;
+    padding: 1mm !important;
+    font-size: 9pt !important;
+  }
+
+  body.admin-order-printing .admin-order-print-sheet.thermal-58 .grid,
+  body.admin-order-printing .admin-order-print-sheet.thermal-80 .grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 3mm !important;
+  }
+
+  body.admin-order-printing .admin-order-print-sheet table {
+    width: 100% !important;
+    table-layout: fixed;
+    font-size: 9pt;
+  }
+
+  body.admin-order-printing .admin-order-print-sheet th,
+  body.admin-order-printing .admin-order-print-sheet td {
+    overflow-wrap: anywhere;
+    padding: 1.5mm 1mm !important;
+  }
+
+  body.admin-order-printing .admin-order-print-sheet tr,
+  body.admin-order-printing .admin-order-print-sheet section,
+  body.admin-order-printing .admin-order-print-sheet footer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

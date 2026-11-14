@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, FileText, Loader2, Trash2, Upload } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import { orderErrorMessage } from '@/lib/checkout'
@@ -85,14 +86,19 @@ const QUOTE_STATUS_LABELS: Record<string, string> = {
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
+const REQUEST_SELECT = '*, custom_request_files(*), custom_quotes(*), delivery_wilaya:wilayas!custom_requests_delivery_wilaya_code_fkey(name_fr), delivery_commune:communes!custom_requests_delivery_commune_id_fkey(name_fr), delivery_pickup:pickup_points!custom_requests_delivery_pickup_point_id_fkey(name)'
 
 export default function AdminRequests() {
+  const [searchParams] = useSearchParams()
+  const [view, setView] = useState<'active' | 'approved'>(() => searchParams.get('view') === 'approved' ? 'approved' : 'active')
   const [requests, setRequests] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const handledRequestId = useRef<string | null>(null)
+  const requestLoadSequence = useRef(0)
 
   const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null)
   const [price, setPrice] = useState('')
@@ -115,30 +121,60 @@ export default function AdminRequests() {
   const [materials, setMaterials] = useState<{ name: string }[]>([])
 
   const load = useCallback(async () => {
+    const sequence = ++requestLoadSequence.current
     setLoading(true)
+    let requestQuery = supabase.from('custom_requests').select(REQUEST_SELECT)
+    requestQuery = view === 'approved'
+      ? requestQuery.eq('status', 'approved')
+      : requestQuery.neq('status', 'approved')
     const [{ data, error: queryError }, { data: mats }] = await Promise.all([
-      supabase
-        .from('custom_requests')
-        .select(
-          '*, custom_request_files(*), custom_quotes(*), delivery_wilaya:wilayas!custom_requests_delivery_wilaya_code_fkey(name_fr), delivery_commune:communes!custom_requests_delivery_commune_id_fkey(name_fr), delivery_pickup:pickup_points!custom_requests_delivery_pickup_point_id_fkey(name)'
-        )
-        .neq('status', 'approved')
-        .order('created_at', { ascending: false })
-        .limit(100),
+      requestQuery.order('created_at', { ascending: false }).limit(100),
       supabase.from('manufacturing_materials').select('name').eq('is_available', true).order('name'),
     ])
+    if (sequence !== requestLoadSequence.current) return
     if (queryError) {
       setError('Impossible de charger les demandes.')
+      setRequests([])
     } else {
+      setError(null)
       setRequests((data as RequestRow[]) ?? [])
     }
     setMaterials((mats as { name: string }[]) ?? [])
     setLoading(false)
-  }, [])
+  }, [view])
 
   useEffect(() => {
     load()
   }, [load])
+
+  const requestedRequestId = searchParams.get('request')
+  useEffect(() => {
+    if (!requestedRequestId || loading || handledRequestId.current === requestedRequestId) return
+    const existing = requests.find((request) => request.id === requestedRequestId)
+    handledRequestId.current = requestedRequestId
+    if (existing) {
+      setExpanded(existing.id)
+      return
+    }
+
+    void supabase
+      .from('custom_requests')
+      .select(REQUEST_SELECT)
+      .eq('id', requestedRequestId)
+      .maybeSingle()
+      .then(({ data, error: targetError }) => {
+        if (new URLSearchParams(window.location.search).get('request') !== requestedRequestId) return
+        if (targetError || !data) {
+          setError('La demande liée à cette notification est introuvable ou n’est plus accessible.')
+          return
+        }
+        const target = data as RequestRow
+        if (target.status === 'approved' && view !== 'approved') setView('approved')
+        else if (target.status !== 'approved' && view === 'approved') setView('active')
+        setRequests((current) => [target, ...current.filter((item) => item.id !== target.id)])
+        setExpanded(target.id)
+      })
+  }, [loading, requests, requestedRequestId, view])
 
   const openNewQuote = (request: RequestRow) => {
     setQuoteRequestId(request.id)
@@ -360,6 +396,15 @@ export default function AdminRequests() {
         et n’est pas requise pour l’approbation propriétaire. Un nouveau devis expire la version précédente.
       </p>
 
+      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filtrer les demandes">
+        <button type="button" aria-pressed={view === 'active'} onClick={() => setView('active')} className={view === 'active' ? 'btn-primary' : 'btn-secondary'}>
+          Demandes actives
+        </button>
+        <button type="button" aria-pressed={view === 'approved'} onClick={() => setView('approved')} className={view === 'approved' ? 'btn-primary' : 'btn-secondary'}>
+          Approuvées — historique
+        </button>
+      </div>
+
       {error && (
         <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
           {error}
@@ -378,7 +423,7 @@ export default function AdminRequests() {
       ) : requests.length === 0 ? (
         <div className="admin-card py-16 text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-charcoal-500" />
-          <p className="text-charcoal-400">Aucune demande pour le moment.</p>
+          <p className="text-charcoal-400">{view === 'approved' ? 'Aucune demande approuvée dans l’historique.' : 'Aucune demande active pour le moment.'}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -523,7 +568,9 @@ export default function AdminRequests() {
                                 </div>
                                 <p className="mt-1 text-charcoal-400">
                                   Valable jusqu'au {new Date(quote.valid_until).toLocaleDateString('fr-DZ')}
-                                  {quote.order_id ? ' · commande créée' : ''}
+                                  {quote.order_id ? (
+                                    <> · <Link to={`/admin/commandes?order=${encodeURIComponent(quote.order_id)}`} className="text-brand-red-light underline underline-offset-2">Ouvrir la commande liée</Link></>
+                                  ) : null}
                                 </p>
                                 {quote.breakdown?.lines && quote.breakdown.lines.length > 0 && (
                                   <ul className="mt-2 space-y-0.5">
@@ -585,7 +632,11 @@ export default function AdminRequests() {
                       )}
                     </div>
 
-                    {autoRequestId === request.id ? (
+                    {request.status === 'approved' ? (
+                      <p className="rounded-lg border border-green-600/20 bg-green-600/5 p-3 text-xs text-charcoal-300">
+                        Demande approuvée : ses détails et devis restent conservés dans cet historique. La commande associée est accessible depuis le devis.
+                      </p>
+                    ) : autoRequestId === request.id ? (
                       <div className="space-y-3 rounded-lg border border-charcoal-400/15 p-3">
                         <div className="grid gap-3 sm:grid-cols-3">
                           <label className="block">

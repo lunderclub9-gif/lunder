@@ -40,7 +40,7 @@ const cards: { label: string; key: keyof Stats; icon: typeof Package; to: string
   { label: 'Demandes sur mesure', key: 'requests_total', icon: FileText, to: '/admin/demandes' },
   { label: 'Nouvelles demandes', key: 'requests_new', icon: FileText, to: '/admin/demandes' },
   { label: 'Demandes en étude', key: 'requests_reviewing', icon: FileText, to: '/admin/demandes' },
-  { label: 'Demandes approuvées', key: 'requests_approved', icon: CheckCircle2, to: '/admin/demandes' },
+  { label: 'Demandes approuvées', key: 'requests_approved', icon: CheckCircle2, to: '/admin/demandes?view=approved' },
   { label: 'Demandes refusées', key: 'requests_rejected', icon: Archive, to: '/admin/demandes' },
   { label: 'Devis émis', key: 'quotes_issued', icon: FileText, to: '/admin/demandes' },
   { label: 'Devis en attente', key: 'quotes_pending', icon: FileText, to: '/admin/demandes' },
@@ -103,6 +103,27 @@ export default function AdminDashboard() {
           <button type="button" onClick={retry} className="btn-secondary">Réessayer</button>
         </div>
       )}
+
+      <section aria-label="Éléments à traiter" className="mb-6">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-charcoal-400">À traiter</h2>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            { label: 'Commandes en attente', key: 'orders_pending' as const, to: '/admin/commandes', icon: ShoppingBag },
+            { label: 'Nouvelles demandes', key: 'requests_new' as const, to: '/admin/demandes', icon: FileText },
+            { label: 'Devis en attente', key: 'quotes_pending' as const, to: '/admin/demandes', icon: FileText },
+          ].map((item) => (
+            <Link key={item.key} to={item.to} className="flex items-center justify-between gap-3 rounded-lg border border-charcoal-400/15 bg-charcoal-800 px-4 py-3 transition-colors hover:border-brand-red/30">
+              <span className="flex items-center gap-3 text-sm text-charcoal-200">
+                <item.icon className="h-4 w-4 text-brand-red-light" />
+                {item.label}
+              </span>
+              <span className="text-xl font-bold text-offwhite">
+                {loading ? '…' : stats ? stats[item.key].toLocaleString('fr-DZ') : '—'}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
         {cards.map((card) => (

@@ -122,6 +122,7 @@ export default function AdminRequests() {
         .select(
           '*, custom_request_files(*), custom_quotes(*), delivery_wilaya:wilayas!custom_requests_delivery_wilaya_code_fkey(name_fr), delivery_commune:communes!custom_requests_delivery_commune_id_fkey(name_fr), delivery_pickup:pickup_points!custom_requests_delivery_pickup_point_id_fkey(name)'
         )
+        .neq('status', 'approved')
         .order('created_at', { ascending: false })
         .limit(100),
       supabase.from('manufacturing_materials').select('name').eq('is_available', true).order('name'),

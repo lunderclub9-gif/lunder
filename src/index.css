@@ -623,6 +623,7 @@
     position: static !important;
     inset: auto !important;
     display: block !important;
+    visibility: visible !important;
     width: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
@@ -634,7 +635,11 @@
     display: contents !important;
   }
 
-  body.admin-order-printing .admin-order-print-controls,
+  /* Hidden controls must leave the print layout entirely; visibility:hidden keeps their space. */
+  body.admin-order-printing .admin-order-print-controls {
+    display: none !important;
+  }
+
   body.admin-order-printing .admin-order-print-preview-scroll {
     display: contents !important;
   }

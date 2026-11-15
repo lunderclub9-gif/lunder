@@ -659,9 +659,9 @@
     background: #fff !important;
     overflow: hidden !important;
     break-inside: avoid-page !important;
-    break-after: avoid-page !important;
+    break-after: auto !important;
     page-break-inside: avoid !important;
-    page-break-after: avoid !important;
+    page-break-after: auto !important;
   }
 
   body.admin-order-printing .admin-order-print-sheet.thermal-58 {

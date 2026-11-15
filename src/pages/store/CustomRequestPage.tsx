@@ -505,6 +505,7 @@ export default function CustomRequestPage() {
             automatiquement de la boîte englobante, de la matière et des hypothèses du studio : ce
             sont des estimations, pas des mesures issues du fichier 3D.
           </p>
+          {productSpecs.length === 0 && (
           <div className="grid gap-4 sm:grid-cols-3">
             {(
               [
@@ -577,6 +578,7 @@ export default function CustomRequestPage() {
             </label>
           </div>
 
+          )}
           <div className="mt-4 flex flex-wrap gap-3 text-xs text-charcoal-300">
             {(
               [
@@ -610,6 +612,69 @@ export default function CustomRequestPage() {
             </label>
           </div>
         </div>
+
+        {productSpecs.length > 0 && (
+          <div className="admin-card space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-offwhite">Vos modèles 3D et dimensions souhaitées</h2>
+              <p className="mt-1 text-xs text-charcoal-400">Le fichier est analysé comme référence. Vous pouvez conserver sa taille ou choisir une nouvelle taille. Les estimations sont recalculées pour chaque modèle.</p>
+            </div>
+            {productSpecs.map((product, index) => (
+              <div key={product.id} className="rounded-xl border border-charcoal-400/20 bg-charcoal-900/50 p-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-offwhite">Produit {index + 1} · {product.fileName}</p>
+                    <p className="mt-1 text-xs text-charcoal-400">Original : {product.original.length} × {product.original.width} × {product.original.height} mm · {product.analysis.triangleCount.toLocaleString('fr-FR')} triangles</p>
+                    {product.analysis.meshVolumeCm3 !== null && <p className="text-xs text-charcoal-400">Volume géométrique du maillage : {product.analysis.meshVolumeCm3} cm³</p>}
+                  </div>
+                  <button type="button" onClick={() => void removeFile(product.filePath)} disabled={uploading} className="btn-ghost text-xs">Retirer ce produit</button>
+                </div>
+                <label className="block">
+                  <span className="label-text">Rôle du fichier</span>
+                  <select className="input-field" value={product.mode} onChange={(event) => updateProduct(product.id, { mode: event.target.value as ProductSpec['mode'] })}>
+                    <option value="reference">Exemple / même forme, taille au choix</option>
+                    <option value="exact">Fabriquer exactement à la taille du fichier</option>
+                    <option value="modify">Modifier le modèle avant fabrication</option>
+                    <option value="inspiration">Inspiration seulement, création similaire</option>
+                  </select>
+                </label>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {(['length', 'width', 'height'] as const).map((axis) => (
+                    <label key={axis} className="block">
+                      <span className="label-text">{axis === 'length' ? 'Longueur' : axis === 'width' ? 'Largeur' : 'Hauteur'} souhaitée (mm)</span>
+                      <input type="number" min="1" max="2000" step="0.1" className="input-field" value={product.target[axis]} disabled={product.mode === 'exact'} onChange={(event) => updateProductDimension(product, axis, event.target.value)} />
+                    </label>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-2 text-xs text-charcoal-300">
+                    <input type="checkbox" checked={product.preserveRatio} disabled={product.mode === 'exact'} onChange={(event) => updateProduct(product.id, { preserveRatio: event.target.checked })} className="accent-brand-red" />
+                    Conserver les proportions
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-charcoal-300">
+                    Quantité
+                    <input type="number" min="1" max="100" value={product.quantity} onChange={(event) => updateProduct(product.id, { quantity: Math.max(1, Math.min(100, Number(event.target.value) || 1)) })} className="input-field w-24" />
+                  </label>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="label-text">Matière pour ce produit</span>
+                    <select className="input-field" value={product.material} onChange={(event) => updateProduct(product.id, { material: event.target.value })}>
+                      {materials.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="label-text">Couleur</span>
+                    <input className="input-field" value={product.color} onChange={(event) => updateProduct(product.id, { color: event.target.value })} placeholder="Couleur souhaitée" />
+                  </label>
+                </div>
+                {product.analysis.warnings.length > 0 && <ul className="space-y-1 text-xs text-amber-300">{product.analysis.warnings.map((warning) => <li key={warning}>• {warning}</li>)}</ul>}
+                {product.mode === 'modify' && <p className="text-xs text-charcoal-400">Les modifications demandées doivent être décrites dans le champ Description ; le studio validera leur faisabilité.</p>}
+                {product.mode === 'inspiration' && <p className="text-xs text-charcoal-400">Ce fichier sert de référence visuelle. Décrivez précisément le nouveau modèle souhaité.</p>}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="admin-card">
           <h2 className="mb-2 text-lg font-semibold text-offwhite">Estimation automatique</h2>
@@ -676,8 +741,9 @@ export default function CustomRequestPage() {
           <p className="mb-4 text-xs text-charcoal-400">
             Photos et fichiers 3D sont stockés dans un espace privé, accessibles uniquement au
             studio. Formats acceptés : JPG, PNG, WebP, AVIF (5 Mo), GLB, GLTF, STL, OBJ (25 Mo).
-            Seul le GLB/GLTF peut être prévisualisé dans le navigateur ; STL et OBJ sont étudiés par
-            le studio sans aperçu en ligne.
+            Les fichiers 3D autonomes sont analysés pour extraire leurs dimensions et, lorsque possible,
+            le volume du maillage. Les mesures STL/OBJ supposent des millimètres ; le client peut ensuite
+            choisir les dimensions finales. Le temps et le poids de filament restent indicatifs sans G-code.
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2">

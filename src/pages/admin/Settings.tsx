@@ -5,7 +5,10 @@ import { useAuth } from '@/lib/auth'
 import {
   canUseBrowserNotifications,
   playAdminNotificationSound,
+  readAdminPreferences,
   requestBrowserNotificationPermission,
+  writeAdminPreferences,
+  type AdminPreferences,
 } from '@/lib/admin-preferences'
 
 type Setting = { key: string; value: string | null; is_public: boolean }
@@ -52,6 +55,7 @@ export default function AdminSettings() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [preferences, setPreferences] = useState<AdminPreferences>(() => readAdminPreferences(profile?.id ?? null))
   const [preferenceMessage, setPreferenceMessage] = useState<string | null>(null)
 
 
@@ -69,29 +73,58 @@ export default function AdminSettings() {
     load()
   }, [load])
 
+  useEffect(() => {
+    setPreferences(readAdminPreferences(profile?.id ?? null))
+  }, [profile?.id])
+
+  const updatePreference = <Key extends keyof AdminPreferences,>(key: Key, value: AdminPreferences[Key]) => {
+    setPreferences((current) => {
+      const next = { ...current, [key]: value }
+      if (profile?.id) writeAdminPreferences(profile.id, next)
+      return next
+    })
+  }
+
   const toggleBrowserNotifications = async () => {
     setPreferenceMessage(null)
+    if (preferences.browserNotifications) {
+      updatePreference('browserNotifications', false)
+      setPreferenceMessage('Les notifications du navigateur sont désactivées.')
+      return
+    }
     if (!canUseBrowserNotifications()) {
       setPreferenceMessage('Ce navigateur ne prend pas en charge les notifications système.')
       return
     }
     if (window.Notification.permission === 'granted') {
-      setPreferenceMessage('Les notifications du navigateur sont déjà autorisées.')
+      updatePreference('browserNotifications', true)
+      setPreferenceMessage('Les notifications du navigateur sont activées pendant que l’application est ouverte.')
       return
     }
     if (window.Notification.permission === 'denied') {
-      setPreferenceMessage('Le navigateur a bloqué les notifications. Autorisez-les dans les paramètres du site.')
+      setPreferenceMessage('Le navigateur a bloqué les notifications. Autorisez-les dans les paramètres du site, puis réessayez.')
       return
     }
+    if (preferences.browserPermissionPrompted) {
+      setPreferenceMessage('La demande a déjà été présentée. Modifiez l’autorisation dans les paramètres du navigateur pour l’activer.')
+      return
+    }
+    let permission: NotificationPermission | 'unsupported'
     try {
-      const permission = await requestBrowserNotificationPermission()
-      if (permission === 'granted') {
-        setPreferenceMessage('Les notifications du navigateur sont autorisées. Elles peuvent être activées depuis les préférences de notification.')
-      } else {
-        setPreferenceMessage('Aucune autorisation n’a été accordée.')
-      }
+      permission = await requestBrowserNotificationPermission()
     } catch {
-      setPreferenceMessage('Le navigateur n’a pas pu présenter la demande. Vérifiez ses paramètres de site.')
+      updatePreference('browserPermissionPrompted', true)
+      setPreferenceMessage('Le navigateur n’a pas pu présenter la demande. Vérifiez ses paramètres de site pour activer les notifications.')
+      return
+    }
+    updatePreference('browserPermissionPrompted', true)
+    if (permission === 'granted') {
+      updatePreference('browserNotifications', true)
+      setPreferenceMessage('Les notifications du navigateur sont activées pendant que l’application est ouverte.')
+    } else if (permission === 'denied') {
+      setPreferenceMessage('Autorisation refusée. Vous pourrez la modifier dans les paramètres du navigateur.')
+    } else {
+      setPreferenceMessage('Aucune autorisation n’a été accordée. La demande ne sera pas répétée automatiquement.')
     }
   }
 

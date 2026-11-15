@@ -1,10 +1,14 @@
 @media print {
   body.admin-order-printing .admin-order-print-sheet {
     box-sizing: border-box !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
+    height: var(--print-page-height) !important;
+    min-height: var(--print-page-height) !important;
+    max-height: var(--print-page-height) !important;
+    overflow: hidden !important;
+    break-inside: avoid-page !important;
+    break-after: avoid-page !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
   }
 
   body.admin-order-printing .delivery-note-content-frame {

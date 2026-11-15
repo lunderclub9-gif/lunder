@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import JsBarcode from 'jsbarcode'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, Loader2, MapPin, Package } from 'lucide-react'
+import { CheckCircle2, Download, Loader2, MapPin, Package, Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import {
@@ -16,6 +17,7 @@ export default function OrderConfirmationPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const barcodeRef = useRef<SVGSVGElement>(null)
 
   useEffect(() => {
     if (!token) {
@@ -32,6 +34,25 @@ export default function OrderConfirmationPage() {
       setLoading(false)
     })
   }, [token])
+
+  useEffect(() => {
+    if (!order || !barcodeRef.current) return
+    try {
+      JsBarcode(barcodeRef.current, order.order_number, {
+        format: 'CODE128',
+        lineColor: '#111827',
+        width: 1.4,
+        height: 48,
+        displayValue: false,
+        margin: 4,
+        background: '#ffffff',
+      })
+    } catch {
+      barcodeRef.current.innerHTML = ''
+    }
+  }, [order])
+
+  const printTicket = () => window.print()
 
   if (loading) {
     return (
@@ -56,6 +77,41 @@ export default function OrderConfirmationPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <style>{`
+        @media print {
+          @page { size: A5 portrait; margin: 10mm; }
+          body * { visibility: hidden !important; }
+          .customer-order-ticket, .customer-order-ticket * { visibility: visible !important; }
+          .customer-order-ticket { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; margin: 0 !important; box-shadow: none !important; border: 1px solid #d1d5db !important; background: #fff !important; color: #111827 !important; }
+          .customer-order-ticket button, .customer-order-ticket a { display: none !important; }
+        }
+      `}</style>
+      <div className="customer-order-ticket mb-6 rounded-xl border border-charcoal-400/20 bg-white p-5 text-slate-900 shadow-sm">
+        <div className="text-center">
+          <p className="text-lg font-black tracking-widest">LUNDER 3D</p>
+          <p className="mt-1 text-xs text-slate-500">TICKET DE COMMANDE</p>
+          <p className="mt-3 text-sm font-semibold text-green-700">Commande bien enregistrée</p>
+        </div>
+        <div className="my-4 border-t border-dashed border-slate-300" />
+        <p className="text-xs text-slate-500">NUMÉRO DE COMMANDE</p>
+        <p className="mt-1 break-all font-mono text-2xl font-bold">{order.order_number}</p>
+        <p className="mt-3 text-xs text-slate-500">TÉLÉPHONE</p>
+        <p className="mt-1 text-lg font-semibold">{order.phone}</p>
+        <div className="mt-4 flex justify-center rounded-lg bg-white p-2">
+          <svg ref={barcodeRef} role="img" aria-label={`Code-barres de la commande ${order.order_number}`} />
+        </div>
+        <p className="text-center font-mono text-xs text-slate-500">{order.order_number}</p>
+        <div className="mt-4 rounded-lg bg-slate-100 p-3 text-center">
+          <p className="text-xs text-slate-500">STATUT ACTUEL</p>
+          <p className="mt-1 font-semibold">{orderStatusLabel(order.status)}</p>
+        </div>
+        <p className="mt-3 text-center text-xs text-slate-500">Gardez ce ticket pour retrouver et suivre votre commande.</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <button type="button" onClick={printTicket} className="btn-primary"><Download className="h-4 w-4" /> Télécharger PDF / Imprimer</button>
+          <Link to="/boutique/suivi" className="btn-secondary">Suivre ma commande</Link>
+        </div>
+      </div>
+
       <div className="mb-6 flex items-start gap-3">
         <CheckCircle2 className="mt-0.5 h-6 w-6 flex-shrink-0 text-green-500" />
         <div>

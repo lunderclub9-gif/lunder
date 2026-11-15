@@ -6,9 +6,9 @@
     max-height: var(--print-page-height) !important;
     overflow: hidden !important;
     break-inside: avoid-page !important;
-    break-after: avoid-page !important;
+    break-after: auto !important;
     page-break-inside: avoid !important;
-    page-break-after: avoid !important;
+    page-break-after: auto !important;
   }
 
   body.admin-order-printing .delivery-note-content-frame {

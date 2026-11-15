@@ -190,7 +190,7 @@ export default function ManufacturingPricingPage() {
   }
 
   const deleteMaterial = async (id: string) => {
-    if (!confirm('Supprimer cette matière ?')) return
+    if (!(await confirmAction({ title: 'Supprimer cette matière de fabrication ?', description: 'Cette matière sera retirée du catalogue de fabrication. Les devis déjà créés conservent leurs instantanés de tarification.', confirmLabel: 'Supprimer la matière', tone: 'danger' }))) return
     const { error: deleteError } = await supabase.from('manufacturing_materials').delete().eq('id', id)
     if (deleteError) {
       setError('Impossible de supprimer cette matière.')

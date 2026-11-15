@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, Download, Loader2, MapPin, Package } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
+import { downloadTicketPdf } from '@/lib/ticketPdf'
 import {
   DELIVERY_METHOD_LABELS,
   orderErrorMessage,
@@ -52,7 +53,6 @@ export default function OrderConfirmationPage() {
     }
   }, [order])
 
-  const printTicket = () => window.print()
 
   if (loading) {
     return (
@@ -107,8 +107,7 @@ export default function OrderConfirmationPage() {
         </div>
         <p className="mt-3 text-center text-xs text-slate-500">Gardez ce ticket pour retrouver et suivre votre commande.</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <button type="button" onClick={printTicket} className="btn-primary"><Download className="h-4 w-4" /> Télécharger le ticket (PDF)</button>
-          <Link to="/boutique/suivi" className="btn-secondary">Suivre ma commande</Link>
+<button type="button" onClick={() => void downloadTicketPdf({ kind: 'COMMANDE', number: order.order_number, phone: order.phone, status: orderStatusLabel(order.status), barcodeSvg: barcodeRef.current?.outerHTML })} className="btn-primary"><Download className="h-4 w-4" /> Télécharger le ticket PDF</button>
         </div>
       </div>
 

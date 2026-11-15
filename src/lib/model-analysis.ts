@@ -162,7 +162,7 @@ async function analyzeGltfDocument(document: Record<string, any>, buffers: Uint8
   const bounds = emptyBounds()
   let vertexCount = 0
   let triangleCount = 0
-  const warnings = ['glTF геометрия измерена в локальных координатах мешей; трансформации сцены могут влиять на итоговый габарит.']
+  const warnings = ['La géométrie glTF est mesurée dans les coordonnées locales des maillages ; les transformations de scène peuvent modifier les dimensions finales.']
   for (const mesh of document.meshes ?? []) {
     for (const primitive of mesh.primitives ?? []) {
       const accessorIndex = primitive.attributes?.POSITION

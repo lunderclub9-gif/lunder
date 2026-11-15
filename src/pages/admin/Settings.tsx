@@ -292,9 +292,9 @@ export default function AdminSettings() {
         <section className="admin-card">
           <div className="mb-2 flex items-center gap-2">
             <Printer className="h-5 w-5 text-brand-red-light" />
-            <h2 className="text-lg font-semibold text-offwhite">Impression des commandes</h2>
+            <h2 className="text-lg font-semibold text-offwhite">Préférences d’impression par défaut</h2>
           </div>
-          <p className="mb-4 text-xs text-charcoal-400">Les préférences sont locales à ce navigateur. Un aperçu de la commande est toujours affiché avant l’ouverture de la boîte d’impression.</p>
+          <p className="mb-4 text-xs text-charcoal-400">Ces réglages locaux servent de valeurs de départ pour chaque impression. Le format, l’orientation, les marges et la mise en page restent modifiables dans l’aperçu de chaque document avant l’impression.</p>
           <fieldset>
             <legend className="label-text">Format par défaut</legend>
             <div className="flex flex-wrap gap-4">

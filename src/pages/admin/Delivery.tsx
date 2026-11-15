@@ -163,7 +163,7 @@ export default function AdminDelivery() {
   }
 
   const deleteRate = async (id: string) => {
-    if (!confirm('Supprimer ce tarif de livraison ?')) return
+    if (!(await confirmAction({ title: 'Supprimer ce tarif ?', description: 'Ce tarif de livraison sera supprimé.', confirmLabel: 'Supprimer le tarif', tone: 'danger' }))) return
     const { error: deleteError } = await supabase.from('delivery_rates').delete().eq('id', id)
     if (deleteError) {
       setError('Impossible de supprimer ce tarif.')

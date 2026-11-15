@@ -51,7 +51,7 @@
   .admin-shell .btn-secondary:disabled, .admin-shell .btn-ghost:disabled {
     cursor: not-allowed; opacity: 0.5; pointer-events: none;
   }
-  .admin-shell .btn-danger {
+  .btn-danger {
     @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-red px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark disabled:pointer-events-none disabled:opacity-50;
   }
   .admin-shell .btn-icon-danger {

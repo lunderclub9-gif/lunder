@@ -62,29 +62,526 @@
   }
 }
 
-body.admin-order-printing .admin-order-print-sheet.thermal-58 {
-  width: 56mm;
-  max-width: 56mm;
-  padding: 1mm;
-  font-size: 9pt;
+/* LUNDER 3D delivery-note identity and on-screen paper preview. */
+.admin-order-print-sheet {
+  box-sizing: border-box;
+  color: #111827;
+  font-family: Arial, Inter, sans-serif;
+  font-size: 10pt;
+  line-height: 1.38;
+  overflow-wrap: anywhere;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
 }
 
-body.admin-order-printing .admin-order-print-sheet.thermal-80 {
-  width: 78mm;
-  max-width: 78mm;
-  padding: 1mm;
-  font-size: 9pt;
+.admin-order-print-sheet .delivery-note-topline {
+  height: 2.2mm;
+  margin: -1mm 0 5mm;
+  background: #dc2626;
 }
 
-body.admin-order-printing .admin-order-print-sheet.thermal-58 .grid,
-body.admin-order-printing .admin-order-print-sheet.thermal-80 .grid {
-  grid-template-columns: minmax(0, 1fr);
+.admin-order-print-sheet .delivery-note-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 5mm;
+  padding-bottom: 4mm;
+  border-bottom: .35mm solid #d1d5db;
+}
+
+.delivery-note-brand {
+  display: flex;
+  align-items: center;
+  gap: 2.5mm;
+  min-width: 0;
+}
+
+.delivery-note-mark {
+  width: 13mm;
+  height: 13mm;
+  flex: 0 0 auto;
+}
+
+.delivery-note-wordmark {
+  font-size: 16pt;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.delivery-note-wordmark span,
+.delivery-note-footer-brand > span {
+  color: #dc2626;
+}
+
+.delivery-note-brand-caption {
+  margin-top: 1.5mm;
+  color: #6b7280;
+  font-size: 6.5pt;
+  font-weight: 700;
+  letter-spacing: .12em;
+  white-space: nowrap;
+}
+
+.delivery-note-title-block {
+  text-align: right;
+}
+
+.delivery-note-kicker,
+.delivery-note-label {
+  display: block;
+  color: #6b7280;
+  font-size: 7pt;
+  font-weight: 800;
+  letter-spacing: .11em;
+}
+
+.delivery-note-title-block h1 {
+  margin-top: 1mm;
+  color: #111827;
+  font-size: 19pt;
+  font-weight: 800;
+  letter-spacing: .015em;
+  line-height: 1.05;
+}
+
+.delivery-note-issued {
+  margin-top: 1.5mm;
+  color: #4b5563;
+  font-size: 8pt;
+}
+
+.delivery-note-reference-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
   gap: 3mm;
+  margin: 4mm 0;
+}
+
+.delivery-note-reference {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3mm 4mm;
+  border-left: 1.5mm solid #dc2626;
+  background: #f3f4f6;
+}
+
+.delivery-note-reference > strong {
+  margin-top: 1mm;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 19pt;
+  font-weight: 800;
+  line-height: 1.1;
+  word-break: break-all;
+}
+
+.delivery-note-small {
+  margin-top: 1mm;
+  color: #6b7280;
+  font-size: 7pt;
+}
+
+.delivery-note-wilaya-badge {
+  display: flex;
+  min-width: 25mm;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2mm 3mm;
+  border: .4mm solid #dc2626;
+  color: #991b1b;
+  text-align: center;
+}
+
+.delivery-note-wilaya-badge > span {
+  font-size: 7pt;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.delivery-note-wilaya-badge > strong {
+  font-size: 25pt;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.delivery-note-wilaya-badge > small {
+  margin-top: 1mm;
+  font-size: 7pt;
+}
+
+.delivery-note-parties {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3mm;
+}
+
+.delivery-note-panel {
+  min-width: 0;
+  padding: 3mm;
+  border: .25mm solid #e5e7eb;
+  border-top: .8mm solid #4b5563;
+  background: #fafafa;
+  font-size: 8.5pt;
+}
+
+.delivery-note-panel.delivery-note-recipient {
+  border-top-color: #dc2626;
+}
+
+.delivery-note-panel h2,
+.delivery-note-items h2 {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  margin-bottom: 2mm;
+  color: #374151;
+  font-size: 7.5pt;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.delivery-note-panel h2 svg,
+.delivery-note-items h2 svg {
+  width: 3.5mm;
+  height: 3.5mm;
+  color: #dc2626;
+}
+
+.delivery-note-panel p + p {
+  margin-top: .7mm;
+}
+
+.delivery-note-person-name {
+  font-size: 11pt;
+  font-weight: 800;
+}
+
+.delivery-note-location {
+  display: flex;
+  align-items: flex-start;
+  gap: 1mm;
+  margin-top: 1.5mm !important;
+  font-weight: 700;
+}
+
+.delivery-note-location svg {
+  width: 3.5mm;
+  height: 3.5mm;
+  flex: 0 0 auto;
+  margin-top: .2mm;
+  color: #dc2626;
+}
+
+.delivery-note-address {
+  white-space: pre-wrap;
+}
+
+.delivery-note-muted {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.delivery-note-shipping-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4mm;
+  margin: 3mm 0 4mm;
+  padding: 2.5mm 3mm;
+  border: .25mm solid #e5e7eb;
+}
+
+.delivery-note-shipping-row > div {
+  min-width: 0;
+}
+
+.delivery-note-shipping-row strong {
+  display: block;
+  margin-top: .8mm;
+  font-size: 9pt;
+}
+
+.delivery-note-items {
+  margin-top: 3mm;
+}
+
+.delivery-note-items h2 {
+  margin-bottom: 1.5mm;
+}
+
+.delivery-note-items table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 8.5pt;
+}
+
+.delivery-note-items th {
+  padding: 2mm 1.5mm;
+  border-top: .4mm solid #111827;
+  border-bottom: .4mm solid #111827;
+  font-size: 7.5pt;
+  font-weight: 800;
+  text-align: left;
+}
+
+.delivery-note-items td {
+  padding: 2.2mm 1.5mm;
+  border-bottom: .2mm solid #d1d5db;
+  vertical-align: top;
+}
+
+.delivery-note-items tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.delivery-note-items .delivery-note-quantity {
+  width: 12mm;
+  text-align: center;
+}
+
+.delivery-note-items .delivery-note-money {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.delivery-note-variant,
+.delivery-note-unit {
+  display: block;
+  margin-top: .5mm;
+  color: #6b7280;
+  font-size: 7.5pt;
+}
+
+.delivery-note-totals {
+  width: min(100%, 92mm);
+  margin: 3mm 0 0 auto;
+  font-size: 8.5pt;
+}
+
+.delivery-note-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 4mm;
+  padding: 1mm 0;
+}
+
+.delivery-note-totals .delivery-note-total {
+  margin-top: 1mm;
+  padding-top: 2mm;
+  border-top: .5mm solid #111827;
+  font-size: 11pt;
+  font-weight: 800;
+}
+
+.delivery-note-totals .delivery-note-collect {
+  margin-top: 1.5mm;
+  padding: 2.5mm 3mm;
+  border: .7mm solid #dc2626;
+  background: #fff5f5;
+  color: #7f1d1d;
+  font-size: 10pt;
+  font-weight: 800;
+}
+
+.delivery-note-collect strong {
+  white-space: nowrap;
+}
+
+.delivery-note-bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 4mm;
+  align-items: center;
+  margin-top: 4mm;
+  padding: 3mm 0;
+  border-top: .25mm solid #d1d5db;
+  border-bottom: .25mm solid #d1d5db;
+}
+
+.delivery-note-barcode-block,
+.delivery-note-payment {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.delivery-note-barcode {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 14mm;
+  margin-top: 1mm;
+}
+
+.delivery-note-barcode-value {
+  margin-top: .6mm;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+
+.delivery-note-payment > strong {
+  margin-top: 1mm;
+  font-size: 9pt;
+}
+
+.delivery-note-note {
+  margin-top: 3mm;
+  padding: 2.5mm 3mm;
+  border-left: 1mm solid #9ca3af;
+  background: #f3f4f6;
+  font-size: 8.5pt;
+  break-inside: avoid;
+}
+
+.delivery-note-note > strong {
+  display: block;
+  margin-bottom: 1mm;
+  font-size: 7.5pt;
+  letter-spacing: .06em;
+}
+
+.delivery-note-note p {
+  white-space: pre-wrap;
+}
+
+.delivery-note-footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.2fr);
+  gap: 4mm;
+  margin-top: 6mm;
+  padding-top: 3mm;
+  border-top: .25mm solid #d1d5db;
+}
+
+.delivery-note-signature {
+  display: flex;
+  min-height: 15mm;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #4b5563;
+  font-size: 7pt;
+}
+
+.delivery-note-signature i {
+  display: block;
+  border-bottom: .25mm solid #9ca3af;
+}
+
+.delivery-note-footer-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  font-size: 10pt;
+  font-weight: 800;
+  text-align: right;
+}
+
+.delivery-note-footer-brand small {
+  color: #6b7280;
+  font-size: 7pt;
+  font-weight: 400;
+}
+
+.admin-order-print-sheet.thermal-58,
+.admin-order-print-sheet.thermal-80 {
+  font-size: 8.5pt;
+}
+
+.admin-order-print-sheet.thermal-58 .delivery-note-header,
+.admin-order-print-sheet.thermal-80 .delivery-note-header {
+  flex-direction: column;
+  gap: 3mm;
+}
+
+.admin-order-print-sheet.thermal-58 .delivery-note-title-block,
+.admin-order-print-sheet.thermal-80 .delivery-note-title-block {
+  text-align: left;
+}
+
+.admin-order-print-sheet.thermal-58 .delivery-note-title-block h1,
+.admin-order-print-sheet.thermal-80 .delivery-note-title-block h1 {
+  font-size: 14pt;
+}
+
+.admin-order-print-sheet.thermal-58 .delivery-note-parties,
+.admin-order-print-sheet.thermal-80 .delivery-note-parties,
+.admin-order-print-sheet.thermal-58 .delivery-note-bottom-grid,
+.admin-order-print-sheet.thermal-80 .delivery-note-bottom-grid,
+.admin-order-print-sheet.thermal-58 .delivery-note-footer,
+.admin-order-print-sheet.thermal-80 .delivery-note-footer {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-order-print-sheet.thermal-58 .delivery-note-reference-row,
+.admin-order-print-sheet.thermal-80 .delivery-note-reference-row {
+  flex-direction: column;
+}
+
+.admin-order-print-sheet.thermal-58 .delivery-note-wilaya-badge,
+.admin-order-print-sheet.thermal-80 .delivery-note-wilaya-badge {
+  min-height: 17mm;
+}
+
+.admin-order-print-sheet.thermal-58 .delivery-note-footer-brand,
+.admin-order-print-sheet.thermal-80 .delivery-note-footer-brand {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.admin-order-print-sheet.thermal-58 .delivery-note-signature,
+.admin-order-print-sheet.thermal-80 .delivery-note-signature {
+  min-height: 12mm;
+}
+
+.admin-order-print-sheet.document-compact {
+  font-size: 8.5pt;
+}
+
+.admin-order-print-sheet.document-compact .delivery-note-panel,
+.admin-order-print-sheet.document-compact .delivery-note-items td {
+  padding-top: 1.3mm;
+  padding-bottom: 1.3mm;
+}
+
+.admin-order-print-sheet.print-monochrome {
+  filter: grayscale(1);
+}
+
+@media (max-width: 640px) {
+  .delivery-note-header {
+    flex-direction: column;
+  }
+
+  .delivery-note-title-block {
+    text-align: left;
+  }
+
+  .delivery-note-parties,
+  .delivery-note-bottom-grid,
+  .delivery-note-footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media print {
   html,
   body {
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: #fff !important;
     color: #000 !important;
   }
@@ -98,18 +595,11 @@ body.admin-order-printing .admin-order-print-sheet.thermal-80 .grid {
   }
 
   body.admin-order-printing > .admin-order-print-dialog {
-    display: block !important;
-  }
-
-  body.admin-order-printing .admin-order-print-sheet,
-  body.admin-order-printing .admin-order-print-sheet * {
-    visibility: visible !important;
-  }
-
-  body.admin-order-printing .admin-order-print-dialog {
     position: static !important;
     inset: auto !important;
     display: block !important;
+    width: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
     padding: 0 !important;
     background: transparent !important;
@@ -119,56 +609,49 @@ body.admin-order-printing .admin-order-print-sheet.thermal-80 .grid {
     display: contents !important;
   }
 
-  body.admin-order-printing .admin-order-print-controls {
-    display: none !important;
+  body.admin-order-printing .admin-order-print-controls,
+  body.admin-order-printing .admin-order-print-preview-scroll {
+    display: contents !important;
+  }
+
+  body.admin-order-printing .admin-order-print-sheet,
+  body.admin-order-printing .admin-order-print-sheet * {
+    visibility: visible !important;
   }
 
   body.admin-order-printing .admin-order-print-sheet {
     position: static !important;
-    inset: auto !important;
-    width: 100% !important;
+    display: block !important;
+    width: auto !important;
     max-width: none !important;
     margin: 0 !important;
     border: 0 !important;
     box-shadow: none !important;
-    overflow-wrap: anywhere;
-    color: #000 !important;
+    color: #111827 !important;
     background: #fff !important;
+    overflow: visible !important;
+    break-after: auto;
+    page-break-after: auto;
   }
 
   body.admin-order-printing .admin-order-print-sheet.thermal-58 {
-    width: 56mm !important;
-    padding: 1mm !important;
-    font-size: 9pt !important;
+    width: 58mm !important;
   }
 
   body.admin-order-printing .admin-order-print-sheet.thermal-80 {
-    width: 78mm !important;
-    padding: 1mm !important;
-    font-size: 9pt !important;
+    width: 80mm !important;
   }
 
-  body.admin-order-printing .admin-order-print-sheet.thermal-58 .grid,
-  body.admin-order-printing .admin-order-print-sheet.thermal-80 .grid {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 3mm !important;
+  body.admin-order-printing .delivery-note-panel,
+  body.admin-order-printing .delivery-note-reference-row,
+  body.admin-order-printing .delivery-note-shipping-row,
+  body.admin-order-printing .delivery-note-bottom-grid,
+  body.admin-order-printing .delivery-note-footer {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
-  body.admin-order-printing .admin-order-print-sheet table {
-    width: 100% !important;
-    table-layout: fixed;
-    font-size: 9pt;
-  }
-
-  body.admin-order-printing .admin-order-print-sheet th,
-  body.admin-order-printing .admin-order-print-sheet td {
-    overflow-wrap: anywhere;
-    padding: 1.5mm 1mm !important;
-  }
-
-  body.admin-order-printing .admin-order-print-sheet tr,
-  body.admin-order-printing .admin-order-print-sheet section,
-  body.admin-order-printing .admin-order-print-sheet footer {
+  body.admin-order-printing .delivery-note-items tr {
     break-inside: avoid;
     page-break-inside: avoid;
   }

@@ -22,6 +22,7 @@ type OrderRow = {
   customer_name: string
   phone: string
   email: string | null
+  wilaya_code: number
   wilaya_name: string
   commune_name: string
   delivery_method: string
@@ -33,7 +34,7 @@ type OrderRow = {
   address: string | null
   pickup_point_snapshot: string | null
   note: string | null
-  order_items: { id: string; product_name: string; variant_label: string | null; quantity: number; line_total_dzd: number }[]
+  order_items: { id: string; product_name: string; variant_label: string | null; quantity: number; unit_price_dzd: number; line_total_dzd: number }[]
 }
 
 const NEXT_ACTIONS: Record<string, { status: string; label: string; danger?: boolean }[]> = {

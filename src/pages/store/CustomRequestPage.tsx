@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import JsBarcode from 'jsbarcode'
 import { Link } from 'react-router-dom'
-import { AlertCircle, CheckCircle2, Loader2, Paperclip, Upload, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Download, Loader2, Paperclip, Upload, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { validateCustomFile } from '@/lib/media'
 import { DELIVERY_METHOD_LABELS, normalizeAlgerianPhone, orderErrorMessage } from '@/lib/checkout'
@@ -66,6 +67,7 @@ export default function CustomRequestPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [created, setCreated] = useState<CreatedRequest | null>(null)
+  const ticketBarcodeRef = useRef<SVGSVGElement>(null)
 
   const folder = useRef<string>(
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`
@@ -315,25 +317,42 @@ export default function CustomRequestPage() {
     setCreated(data as CreatedRequest)
   }
 
+  useEffect(() => {
+    if (!created || !ticketBarcodeRef.current) return
+    try {
+      JsBarcode(ticketBarcodeRef.current, created.request_number, {
+        format: 'CODE128', lineColor: '#111827', width: 1.4, height: 48,
+        displayValue: false, margin: 4, background: '#ffffff',
+      })
+    } catch {
+      ticketBarcodeRef.current.innerHTML = ''
+    }
+  }, [created])
+
   if (created) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
-        <CheckCircle2 className="mb-4 h-8 w-8 text-green-500" />
-        <h1 className="text-2xl font-bold text-offwhite">Demande envoyée</h1>
-        <p className="mt-2 text-sm text-charcoal-300">
-          Votre demande <span className="font-mono text-offwhite">{created.request_number}</span> a
-          bien été enregistrée avec votre acceptation de l’estimation. Le studio doit maintenant
-          vérifier le fichier et approuver la fabrication avant toute création de commande.
-        </p>
-        <p className="mt-2 text-sm text-charcoal-300">
-          Conservez ce lien pour suivre votre demande et consulter vos devis.
-        </p>
-        <Link
-          to={`/boutique/sur-mesure/suivi?token=${created.tracking_token}`}
-          className="btn-primary mt-6"
-        >
-          Suivre ma demande
-        </Link>
+      <div className="mx-auto max-w-xl px-4 py-12 sm:px-6">
+        <style>{`@media print { @page { size: A5 portrait; margin: 10mm; } body * { visibility: hidden !important; } .customer-request-ticket, .customer-request-ticket * { visibility: visible !important; } .customer-request-ticket { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; margin: 0 !important; box-shadow: none !important; border: 1px solid #d1d5db !important; background: #fff !important; color: #111827 !important; } .customer-request-ticket button, .customer-request-ticket a { display: none !important; } }`}</style>
+        <div className="customer-request-ticket rounded-xl border border-charcoal-400/20 bg-white p-5 text-slate-900 shadow-sm">
+          <div className="text-center">
+            <p className="text-lg font-black tracking-widest">LUNDER 3D</p>
+            <p className="mt-1 text-xs text-slate-500">TICKET DE DEMANDE SUR MESURE</p>
+            <p className="mt-3 text-sm font-semibold text-green-700">Demande bien enregistrée</p>
+          </div>
+          <div className="my-4 border-t border-dashed border-slate-300" />
+          <p className="text-xs text-slate-500">NUMÉRO DE DEMANDE</p>
+          <p className="mt-1 break-all font-mono text-2xl font-bold">{created.request_number}</p>
+          <p className="mt-3 text-xs text-slate-500">TÉLÉPHONE</p>
+          <p className="mt-1 text-lg font-semibold">{normalizeAlgerianPhone(phone) ?? phone}</p>
+          <div className="mt-4 flex justify-center rounded-lg bg-white p-2"><svg ref={ticketBarcodeRef} role="img" aria-label={`Code-barres de la demande ${created.request_number}`} /></div>
+          <p className="text-center font-mono text-xs text-slate-500">{created.request_number}</p>
+          <p className="mt-4 text-center text-xs text-slate-500">Gardez ce ticket pour retrouver et suivre votre demande.</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <button type="button" onClick={() => window.print()} className="btn-primary"><Download className="h-4 w-4" /> Télécharger PDF / Imprimer</button>
+            <Link to={`/boutique/sur-mesure/suivi?token=${created.tracking_token}`} className="btn-secondary">Suivre ma demande</Link>
+          </div>
+        </div>
+        <p className="mt-4 text-center text-xs text-charcoal-400">Le studio vérifiera votre fichier et la faisabilité avant toute création de commande.</p>
       </div>
     )
   }

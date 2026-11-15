@@ -1,35 +1,32 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
-  Printer,
-  LayoutDashboard,
-  Package,
-  Tag,
-  LogOut,
-  Menu,
-  X,
-  ShoppingBag,
-  Truck,
-  ClipboardList,
-  Settings,
-  History,
-  Calculator,
+  Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X,
+  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { AdminNotificationsProvider } from '@/components/admin/AdminNotificationsProvider'
 import NotificationCenter from '@/components/admin/NotificationCenter'
+import { AdminConfirmProvider } from '@/components/admin/AdminConfirmProvider'
 
-const navItems = [
-  { to: '/admin/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-  { to: '/admin/produits', label: 'Produits', icon: Package },
-  { to: '/admin/categories', label: 'Catégories', icon: Tag },
-  { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },
-  { to: '/admin/livraison', label: 'Livraison', icon: Truck },
-  { to: '/admin/demandes', label: 'Demandes sur mesure', icon: ClipboardList },
-  { to: '/admin/tarification', label: 'Tarification fabrication', icon: Calculator },
-  { to: '/admin/parametres', label: 'Paramètres', icon: Settings },
-  { to: '/admin/historique', label: 'Historique', icon: History },
+const navGroups = [
+  { label: 'Vue d’ensemble', items: [{ to: '/admin/dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
+  { label: 'Ventes et opérations', items: [
+    { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },
+    { to: '/admin/livraison', label: 'Livraison', icon: Truck },
+    { to: '/admin/demandes', label: 'Demandes sur mesure', icon: ClipboardList },
+  ] },
+  { label: 'Catalogue', items: [
+    { to: '/admin/produits', label: 'Produits', icon: Package },
+    { to: '/admin/categories', label: 'Catégories', icon: Tag },
+  ] },
+  { label: 'Tarification', items: [
+    { to: '/admin/couts-produits', label: 'Coûts des produits', icon: Coins },
+    { to: '/admin/tarification', label: 'Fabrication sur mesure', icon: Calculator },
+  ] },
+  { label: 'Configuration', items: [{ to: '/admin/parametres', label: 'Paramètres du magasin', icon: Settings }] },
+  { label: 'Suivi', items: [{ to: '/admin/historique', label: 'Historique', icon: History }] },
 ]
 
 export default function AdminLayout() {
@@ -66,8 +63,9 @@ export default function AdminLayout() {
   }
 
   return (
+    <AdminConfirmProvider>
     <AdminNotificationsProvider ownerId={profile?.id ?? null} navigate={navigate}>
-    <div className="flex h-screen overflow-hidden bg-charcoal-950">
+    <div className="admin-shell flex h-screen overflow-hidden bg-charcoal-950">
       {sidebarOpen && (
         <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
@@ -89,26 +87,24 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        <nav className="flex flex-col gap-1 overflow-y-auto p-3 pb-24">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-brand-red/10 text-brand-red' : 'text-charcoal-300 hover:bg-charcoal-800 hover:text-offwhite'
-                }`
-              }
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-              {item.to === '/admin/demandes' && newRequests > 0 && (
-                <span className="ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white">
-                  {newRequests}
-                </span>
-              )}
-            </NavLink>
+        <nav className="flex flex-col gap-5 overflow-y-auto p-3 pb-24">
+          {navGroups.map((group) => (
+            <section key={group.label} aria-label={group.label}>
+              <h2 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-charcoal-500">{group.label}</h2>
+              <div className="flex flex-col gap-1">
+                {group.items.map((item) => (
+                  <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                      isActive ? 'bg-brand-red/10 text-brand-red' : 'text-charcoal-300 hover:bg-charcoal-800 hover:text-offwhite'
+                    }`
+                  }>
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                    {item.to === '/admin/demandes' && newRequests > 0 && <span className="ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white">{newRequests}</span>}
+                  </NavLink>
+                ))}
+              </div>
+            </section>
           ))}
         </nav>
 
@@ -138,5 +134,6 @@ export default function AdminLayout() {
       </div>
     </div>
     </AdminNotificationsProvider>
+    </AdminConfirmProvider>
   )
 }

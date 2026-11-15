@@ -1,5 +1,5 @@
 import { Link, Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { Printer, Menu, X, ShoppingCart, Search } from 'lucide-react'
+import { Printer, Menu, X, ShoppingCart, Search, Phone, MessageCircle, Mail, Instagram, Facebook, Music2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useCart } from '@/lib/cart'
 import { supabase } from '@/lib/supabase'
@@ -201,11 +201,16 @@ export default function StoreLayout() {
             </div>
             <p className="text-xs text-charcoal-400">DESIGN · PRINT · CREATE — From Imagination to Reality</p>
             <p className="text-xs text-charcoal-500">Algérie · Paiement à la livraison</p>
-            {(telHref || whatsappHref || mailHref) && (
-              <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+            {(telHref || whatsappHref || mailHref || socials.length > 0) && (
+              <div className="flex flex-wrap items-center justify-center gap-3" aria-label="Contact et réseaux sociaux">
                 {telHref && (
-                  <a href={telHref} className="text-charcoal-300 underline-offset-4 hover:text-offwhite hover:underline">
-                    {settings.phone}
+                  <a
+                    href={telHref}
+                    aria-label={`Appeler ${settings.phone}`}
+                    title={`Téléphone : ${settings.phone}`}
+                    className="flex h-11 w-11 items-center justify-center rounded-full border border-charcoal-400/20 bg-charcoal-900 text-charcoal-200 transition hover:border-brand-red hover:bg-brand-red hover:text-white"
+                  >
+                    <Phone className="h-5 w-5" aria-hidden="true" />
                   </a>
                 )}
                 {whatsappHref && (
@@ -213,31 +218,43 @@ export default function StoreLayout() {
                     href={whatsappHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-charcoal-300 underline-offset-4 hover:text-offwhite hover:underline"
+                    aria-label="Contacter sur WhatsApp"
+                    title="WhatsApp"
+                    className="flex h-11 w-11 items-center justify-center rounded-full border border-charcoal-400/20 bg-charcoal-900 text-charcoal-200 transition hover:border-brand-red hover:bg-brand-red hover:text-white"
                   >
-                    WhatsApp
+                    <MessageCircle className="h-5 w-5" aria-hidden="true" />
                   </a>
                 )}
                 {mailHref && (
-                  <a href={mailHref} className="text-charcoal-300 underline-offset-4 hover:text-offwhite hover:underline">
-                    {settings.email}
+                  <a
+                    href={mailHref}
+                    aria-label={`Envoyer un email à ${settings.email}`}
+                    title={`Email : ${settings.email}`}
+                    className="flex h-11 w-11 items-center justify-center rounded-full border border-charcoal-400/20 bg-charcoal-900 text-charcoal-200 transition hover:border-brand-red hover:bg-brand-red hover:text-white"
+                  >
+                    <Mail className="h-5 w-5" aria-hidden="true" />
                   </a>
                 )}
-              </div>
-            )}
-            {socials.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-4">
-                {socials.map((social) => (
-                  <a
-                    key={social.key}
-                    href={social.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-charcoal-300 underline-offset-4 hover:text-offwhite hover:underline"
-                  >
-                    {social.label}
-                  </a>
-                ))}
+                {socials.map((social) => {
+                  const Icon = social.key === 'instagram_url'
+                    ? Instagram
+                    : social.key === 'facebook_url'
+                      ? Facebook
+                      : Music2
+                  return (
+                    <a
+                      key={social.key}
+                      href={social.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Visiter ${social.label}`}
+                      title={social.label}
+                      className="flex h-11 w-11 items-center justify-center rounded-full border border-charcoal-400/20 bg-charcoal-900 text-charcoal-200 transition hover:border-brand-red hover:bg-brand-red hover:text-white"
+                    >
+                      <Icon className="h-5 w-5" aria-hidden="true" />
+                    </a>
+                  )
+                })}
               </div>
             )}
             <div className="flex flex-wrap justify-center gap-4">

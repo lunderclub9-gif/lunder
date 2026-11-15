@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import JsBarcode from 'jsbarcode'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, Download, Loader2, MapPin, Package, Printer } from 'lucide-react'
+import { CheckCircle2, Download, Loader2, MapPin, Package } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import {

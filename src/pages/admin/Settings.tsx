@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Bell, Loader2, Printer, Save, Volume2 } from 'lucide-react'
+import { Bell, Loader2, Save, Volume2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import {
@@ -289,37 +289,7 @@ export default function AdminSettings() {
           {preferenceMessage && <p role="status" className="mt-3 text-xs text-charcoal-200">{preferenceMessage}</p>}
         </section>
 
-        <section className="admin-card">
-          <div className="mb-2 flex items-center gap-2">
-            <Printer className="h-5 w-5 text-brand-red-light" />
-            <h2 className="text-lg font-semibold text-offwhite">Préférences d’impression par défaut</h2>
-          </div>
-          <p className="mb-4 text-xs text-charcoal-400">Ces réglages locaux servent de valeurs de départ pour chaque impression. Le format, l’orientation, les marges et la mise en page restent modifiables dans l’aperçu de chaque document avant l’impression.</p>
-          <fieldset>
-            <legend className="label-text">Format par défaut</legend>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 text-sm text-charcoal-200">
-                <input type="radio" name="default-print-format" checked={preferences.defaultPrintFormat === 'a4'} onChange={() => updatePreference('defaultPrintFormat', 'a4')} className="accent-brand-red" />
-                A4
-              </label>
-              <label className="flex items-center gap-2 text-sm text-charcoal-200">
-                <input type="radio" name="default-print-format" checked={preferences.defaultPrintFormat === 'thermal'} onChange={() => updatePreference('defaultPrintFormat', 'thermal')} className="accent-brand-red" />
-                Thermique
-              </label>
-            </div>
-          </fieldset>
-          <fieldset className="mt-4" disabled={preferences.defaultPrintFormat !== 'thermal'}>
-            <legend className="label-text">Largeur thermique par défaut</legend>
-            <div className="flex flex-wrap gap-4">
-              {([58, 80] as const).map((width) => (
-                <label key={width} className={`flex items-center gap-2 text-sm ${preferences.defaultPrintFormat === 'thermal' ? 'text-charcoal-200' : 'text-charcoal-500'}`}>
-                  <input type="radio" name="default-thermal-width" checked={preferences.thermalWidth === width} onChange={() => updatePreference('thermalWidth', width)} className="accent-brand-red" />
-                  {width} mm
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </section>
+
 
 
         <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">

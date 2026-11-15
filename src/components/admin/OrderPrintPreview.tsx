@@ -224,10 +224,10 @@ export default function OrderPrintPreview({
     frame.style.width = `${availableWidthPx * printScale}px`
     frame.style.height = `${contentHeightPx * printScale}px`
     sheet.style.width = `${dimensions.widthMm}mm`
-    sheet.style.minHeight = '0'
-    sheet.style.height = 'auto'
-
     const printHeight = dimensions.heightMm ?? getThermalPageHeightMm(contentHeightPx, printScale, marginMm)
+    sheet.style.minHeight = `${printHeight}mm`
+    sheet.style.height = `${printHeight}mm`
+    sheet.style.setProperty('--print-page-height', `${printHeight}mm`)
     let pageStyle = document.getElementById('admin-order-print-page') as HTMLStyleElement | null
     if (!pageStyle) {
       pageStyle = document.createElement('style')
@@ -260,6 +260,7 @@ export default function OrderPrintPreview({
       sheet.style.width = `${dimensions.widthMm}mm`
       sheet.style.minHeight = thermal ? '' : `${dimensions.heightMm}mm`
       sheet.style.height = ''
+      sheet.style.removeProperty('--print-page-height')
       delete sheet.dataset.printScale
     }
   }

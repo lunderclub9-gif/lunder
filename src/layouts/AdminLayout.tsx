@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X,
-  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins,
+  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -22,7 +22,7 @@ const navGroups = [
     { to: '/admin/categories', label: 'Catégories', icon: Tag },
   ] },
   { label: 'Tarification', items: [
-    { to: '/admin/couts-produits', label: 'Coûts des produits', icon: Coins },
+    { to: '/admin/couts-produits', label: 'Matières premières', icon: Coins },
     { to: '/admin/tarification', label: 'Fabrication sur mesure', icon: Calculator },
   ] },
   { label: 'Configuration', items: [{ to: '/admin/parametres', label: 'Paramètres du magasin', icon: Settings }] },
@@ -31,6 +31,7 @@ const navGroups = [
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [newRequests, setNewRequests] = useState(0)
   const { signOut, profile } = useAuth()
   const navigate = useNavigate()
@@ -71,7 +72,7 @@ export default function AdminLayout() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform border-r border-charcoal-400/10 bg-charcoal-900 transition-transform md:relative md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 transform border-r border-charcoal-400/10 bg-charcoal-900 transition-all duration-200 md:relative md:translate-x-0 ${sidebarCollapsed ? 'md:w-[4.75rem]' : 'md:w-64'} ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -80,27 +81,36 @@ export default function AdminLayout() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-red">
               <Printer className="h-4 w-4 text-white" />
             </div>
-            <span className="text-xs font-bold tracking-wide text-offwhite">LUNDER'S 3D</span>
+            <span className={`text-xs font-bold tracking-wide text-offwhite ${sidebarCollapsed ? "md:hidden" : ""}`}>LUNDER'S 3D</span>
           </Link>
           <button className="md:hidden" onClick={() => setSidebarOpen(false)} aria-label="Fermer">
             <X className="h-5 w-5 text-charcoal-300" />
+          </button>
+          <button
+            type="button"
+            className="hidden rounded-lg p-2 text-charcoal-300 transition-colors hover:bg-charcoal-800 hover:text-offwhite md:inline-flex"
+            onClick={() => setSidebarCollapsed((current) => !current)}
+            aria-label={sidebarCollapsed ? "Développer la navigation" : "Réduire la navigation"}
+            title={sidebarCollapsed ? "Développer la navigation" : "Réduire la navigation"}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
         </div>
 
         <nav className="flex flex-col gap-5 overflow-y-auto p-3 pb-24">
           {navGroups.map((group) => (
             <section key={group.label} aria-label={group.label}>
-              <h2 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-charcoal-500">{group.label}</h2>
+              <h2 className={`mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-charcoal-500 ${sidebarCollapsed ? "md:sr-only" : ""}`}>{group.label}</h2>
               <div className="flex flex-col gap-1">
                 {group.items.map((item) => (
-                  <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} title={sidebarCollapsed ? item.label : undefined} aria-label={sidebarCollapsed ? item.label : undefined} className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${sidebarCollapsed ? "md:justify-center md:px-2 md:relative" : ""} ${
                       isActive ? 'bg-brand-red/10 text-brand-red' : 'text-charcoal-300 hover:bg-charcoal-800 hover:text-offwhite'
                     }`
                   }>
                     <item.icon className="h-4 w-4 shrink-0" />
-                    <span>{item.label}</span>
-                    {item.to === '/admin/demandes' && newRequests > 0 && <span className="ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white">{newRequests}</span>}
+                    <span className={sidebarCollapsed ? "md:hidden" : ""}>{item.label}</span>
+                    {item.to === '/admin/demandes' && newRequests > 0 && <span className={`ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white ${sidebarCollapsed ? "md:absolute md:right-1 md:top-1" : ""}`}>{newRequests}</span>}
                   </NavLink>
                 ))}
               </div>
@@ -111,10 +121,10 @@ export default function AdminLayout() {
         <div className="absolute bottom-0 left-0 right-0 border-t border-charcoal-400/10 p-3">
           <button
             onClick={handleSignOut}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-charcoal-300 transition-colors hover:bg-charcoal-800 hover:text-offwhite"
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-charcoal-300 transition-colors hover:bg-charcoal-800 hover:text-offwhite ${sidebarCollapsed ? "md:justify-center md:px-2" : ""}`} title={sidebarCollapsed ? "Déconnexion" : undefined}
           >
             <LogOut className="h-4 w-4" />
-            Déconnexion
+            <span className={sidebarCollapsed ? "md:hidden" : ""}>Déconnexion</span>
           </button>
         </div>
       </aside>

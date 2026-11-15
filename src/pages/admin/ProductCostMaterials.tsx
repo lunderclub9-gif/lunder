@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Plus, Trash2, Coins } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDzd } from '@/lib/format'
 import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 
 type Material = { id: string; name: string; cost_per_kg_dzd: number; is_active: boolean }
@@ -69,15 +68,15 @@ export default function ProductCostMaterialsPage() {
       <header className="admin-page-header">
         <div>
           <p className="admin-eyebrow">Tarification</p>
-          <h1 className="text-2xl font-bold text-offwhite">Coûts des produits</h1>
-          <p className="mt-2 max-w-2xl text-sm text-charcoal-400">Matières d’achat utilisées pour estimer le coût interne des produits. Les montants sont exprimés en DA par kilogramme et ne sont jamais affichés aux clients.</p>
+          <h1 className="text-2xl font-bold text-offwhite">Matières premières</h1>
+          <p className="mt-2 max-w-2xl text-sm text-charcoal-400">Gérez ici les matières et leur coût d’achat au kilogramme. Elles alimentent le calcul du coût de production dans chaque fiche produit.</p>
         </div>
       </header>
       {error && <div role="alert" className="admin-feedback admin-feedback-error">{error}</div>}
       <section className="admin-card">
         <div className="mb-4 flex items-center gap-2">
           <Coins className="h-5 w-5 text-brand-red-light" />
-          <div><h2 className="text-lg font-semibold text-offwhite">Matières de coût produit</h2><p className="text-xs text-charcoal-400">Catalogue interne · coût d’achat par kg</p></div>
+          <div><h2 className="text-lg font-semibold text-offwhite">Catalogue des matières</h2><p className="text-xs text-charcoal-400">Catalogue interne · coût d’achat par kg</p></div>
         </div>
         {loading ? <div className="flex justify-center py-10"><Loader2 className="h-7 w-7 animate-spin text-brand-red" /></div> :
           materials.length === 0 ? <p className="py-6 text-sm text-charcoal-400">Aucune matière enregistrée.</p> :
@@ -97,7 +96,6 @@ export default function ProductCostMaterialsPage() {
           <label className="block"><span className="label-text">Coût (DA / kg)</span><input type="number" min={0} step={1} value={materialCost} onChange={(event) => setMaterialCost(event.target.value)} className="input-field" placeholder="Ex. 2500" required /></label>
           <div className="flex items-end"><button type="submit" disabled={busy} className="btn-primary w-full sm:w-auto">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Ajouter</button></div>
         </form>
-        {materials.length > 0 && <p className="mt-4 text-xs text-charcoal-500">Exemple actuel : {materials[0].name} à {formatDzd(materials[0].cost_per_kg_dzd)} le kilo.</p>}
       </section>
     </div>
   )

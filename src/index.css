@@ -646,6 +646,9 @@
 
   body.admin-order-printing .admin-order-print-sheet {
     position: static !important;
+    height: var(--print-page-height) !important;
+    min-height: var(--print-page-height) !important;
+    max-height: var(--print-page-height) !important;
     display: block !important;
     width: auto !important;
     max-width: none !important;
@@ -654,9 +657,11 @@
     box-shadow: none !important;
     color: #111827 !important;
     background: #fff !important;
-    overflow: visible !important;
-    break-after: auto;
-    page-break-after: auto;
+    overflow: hidden !important;
+    break-inside: avoid-page !important;
+    break-after: avoid-page !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
   }
 
   body.admin-order-printing .admin-order-print-sheet.thermal-58 {

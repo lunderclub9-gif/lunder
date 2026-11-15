@@ -654,7 +654,11 @@
     box-shadow: none !important;
     color: #111827 !important;
     background: #fff !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+    break-inside: avoid-page !important;
+    break-after: avoid-page !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
     break-after: auto;
     page-break-after: auto;
   }

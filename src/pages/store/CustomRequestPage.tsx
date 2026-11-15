@@ -7,8 +7,22 @@ import { validateCustomFile } from '@/lib/media'
 import { DELIVERY_METHOD_LABELS, normalizeAlgerianPhone, orderErrorMessage } from '@/lib/checkout'
 import { formatDzd } from '@/lib/format'
 import { downloadTicketImage } from '@/lib/ticketImage'
+import { analyze3DModel, type ModelAnalysis } from '@/lib/model-analysis'
 
 type UploadedFile = { path: string; name: string; mime: string; size: number; kind: 'image' | 'model' }
+type ProductSpec = {
+  id: string
+  filePath: string
+  fileName: string
+  mode: 'reference' | 'exact' | 'modify' | 'inspiration'
+  original: ModelAnalysis['dimensionsMm']
+  target: ModelAnalysis['dimensionsMm']
+  analysis: ModelAnalysis
+  preserveRatio: boolean
+  quantity: number
+  material: string
+  color: string
+}
 type CreatedRequest = { request_number: string; tracking_token: string }
 type Material = { name: string; colors: string[] }
 type Wilaya = { code: number; name_fr: string }
@@ -64,6 +78,7 @@ export default function CustomRequestPage() {
   const [pickupId, setPickupId] = useState('')
 
   const [files, setFiles] = useState<UploadedFile[]>([])
+  const [productSpecs, setProductSpecs] = useState<ProductSpec[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -125,44 +140,59 @@ export default function CustomRequestPage() {
   }, [wilayaCode])
 
   const runEstimate = useCallback(async () => {
-    const l = Number(lengthMm)
-    const w = Number(widthMm)
-    const h = Number(heightMm)
-    const qty = Number(quantity) || 1
-    if (!material || !Number.isFinite(l) || l <= 0 || !Number.isFinite(w) || w <= 0 || !Number.isFinite(h) || h <= 0) {
+    const activeProducts = productSpecs
+    const fallback = {
+      length: Number(lengthMm), width: Number(widthMm), height: Number(heightMm),
+      quantity: Number(quantity) || 1, material,
+    }
+    if (!activeProducts.length && (!fallback.material || !Number.isFinite(fallback.length) || fallback.length <= 0 || !Number.isFinite(fallback.width) || fallback.width <= 0 || !Number.isFinite(fallback.height) || fallback.height <= 0)) {
       setEstimate(null)
       setEstimateError(null)
       return
     }
-    setEstimateLoading(true)
-    setEstimateError(null)
-    const { data, error: rpcError } = await supabase.rpc('estimate_manufacturing_dimensions', {
-      p_length_mm: l,
-      p_width_mm: w,
-      p_height_mm: h,
-      p_material_name: material,
-      p_quantity: qty,
-      p_options: options,
-      p_rush: rush,
-    })
-    setEstimateLoading(false)
-    if (rpcError || !data) {
+    if (activeProducts.some((product) => !product.material || Object.values(product.target).some((value) => !Number.isFinite(value) || value <= 0 || value > 2000))) {
       setEstimate(null)
-      setEstimateError(orderErrorMessage(rpcError?.message, 'Estimation impossible pour ces dimensions.'))
+      setEstimateError('Vérifiez les dimensions et la matière de chaque modèle.')
       return
     }
-    const d = data as Record<string, unknown>
+    setEstimateLoading(true)
+    setEstimateError(null)
+    const inputs = activeProducts.length ? activeProducts.map((product) => ({
+      length: product.target.length, width: product.target.width, height: product.target.height,
+      quantity: product.quantity, material: product.material,
+    })) : [fallback]
+    const results = await Promise.all(inputs.map((item) => supabase.rpc('estimate_manufacturing_dimensions', {
+      p_length_mm: item.length, p_width_mm: item.width, p_height_mm: item.height,
+      p_material_name: item.material, p_quantity: item.quantity, p_options: options, p_rush: rush,
+    })))
+    setEstimateLoading(false)
+    const failed = results.find((result) => result.error || !result.data)
+    if (failed) {
+      setEstimate(null)
+      setEstimateError(orderErrorMessage(failed.error?.message, 'Estimation impossible pour un ou plusieurs modèles.'))
+      return
+    }
+    const rows = results.map((result) => result.data as Record<string, unknown>)
+    const totalQuantity = inputs.reduce((sum, item) => sum + item.quantity, 0)
+    const lines = rows.flatMap((row, index) => [
+      ...(activeProducts.length ? [{ label: activeProducts[index].fileName, amountDzd: 0, detail: `Produit ${index + 1} · ${inputs[index].quantity} pièce(s)` }] : []),
+      ...(((row.lines as Estimate['lines']) ?? []).map((line) => ({ ...line, label: activeProducts.length ? `${activeProducts[index].fileName} — ${line.label}` : line.label }))),
+    ])
     setEstimate({
-      lines: (d.lines as Estimate['lines']) ?? [],
-      totalDzd: Number(d.totalDzd ?? 0),
-      quantity: Number(d.quantity ?? qty),
-      discountPercent: Number(d.discountPercent ?? 0),
-      discountDzd: Number(d.discountDzd ?? 0),
-      rushFeeDzd: Number(d.rushFeeDzd ?? 0),
-      assumptions: (d.assumptions as string[]) ?? [],
-      estimates: d.estimates as Estimate['estimates'],
+      lines,
+      totalDzd: rows.reduce((sum, row) => sum + Number(row.totalDzd ?? 0), 0),
+      quantity: totalQuantity,
+      discountPercent: 0,
+      discountDzd: rows.reduce((sum, row) => sum + Number(row.discountDzd ?? 0), 0),
+      rushFeeDzd: rows.reduce((sum, row) => sum + Number(row.rushFeeDzd ?? 0), 0),
+      assumptions: [...new Set(rows.flatMap((row) => (row.assumptions as string[]) ?? []))],
+      estimates: {
+        grams: rows.reduce((sum, row) => sum + Number((row.estimates as Record<string, unknown> | undefined)?.grams ?? 0), 0),
+        printHours: Math.round(rows.reduce((sum, row) => sum + Number((row.estimates as Record<string, unknown> | undefined)?.printHours ?? 0), 0) * 10) / 10,
+        method: activeProducts.length ? 'multiple_model_bounding_box_estimates' : String((rows[0].estimates as Record<string, unknown> | undefined)?.method ?? ''),
+      },
     })
-  }, [lengthMm, widthMm, heightMm, material, quantity, options, rush])
+  }, [lengthMm, widthMm, heightMm, material, quantity, options, rush, productSpecs])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -175,7 +205,29 @@ export default function CustomRequestPage() {
   // client doit accepter le nouveau montant estimé.
   useEffect(() => {
     setEstimateAccepted(false)
-  }, [lengthMm, widthMm, heightMm, material, quantity, options, rush])
+  }, [lengthMm, widthMm, heightMm, material, quantity, options, rush, productSpecs])
+
+  const updateProduct = (id: string, patch: Partial<ProductSpec>) => {
+    setProductSpecs((current) => current.map((product) => product.id === id ? { ...product, ...patch } : product))
+  }
+
+  const updateProductDimension = (product: ProductSpec, axis: keyof ProductSpec['target'], rawValue: string) => {
+    const value = Number(rawValue)
+    if (!Number.isFinite(value) || value <= 0) {
+      updateProduct(product.id, { target: { ...product.target, [axis]: 0 } })
+      return
+    }
+    if (!product.preserveRatio) {
+      updateProduct(product.id, { target: { ...product.target, [axis]: value } })
+      return
+    }
+    const ratio = value / product.original[axis]
+    updateProduct(product.id, { target: {
+      length: Math.round(product.original.length * ratio * 100) / 100,
+      width: Math.round(product.original.width * ratio * 100) / 100,
+      height: Math.round(product.original.height * ratio * 100) / 100,
+    } })
+  }
 
   const acceptEstimate = () => {
     setError(null)
@@ -203,6 +255,12 @@ export default function CustomRequestPage() {
         if (kind === 'model' && !isModel) throw new Error(`« ${file.name} » n'est pas un fichier 3D.`)
 
         const path = `${folder.current}/${Date.now()}-${uploadedCount}.${check.extension}`
+        let modelAnalysis: ModelAnalysis | null = null
+        if (isModel) {
+          try { modelAnalysis = await analyze3DModel(file) } catch (analysisError) {
+            setEstimateError(analysisError instanceof Error ? analysisError.message : 'Analyse géométrique indisponible pour ce fichier.')
+          }
+        }
         const { error: uploadError } = await supabase.storage
           .from('custom-requests')
           .upload(path, file, { contentType: check.contentType, upsert: false })
@@ -212,6 +270,20 @@ export default function CustomRequestPage() {
           ...current,
           { path, name: file.name, mime: check.contentType, size: file.size, kind },
         ])
+        if (isModel && modelAnalysis) {
+          const id = `${Date.now()}-${uploadedCount}`
+          setProductSpecs((current) => [...current, {
+            id, filePath: path, fileName: file.name, mode: 'reference',
+            original: modelAnalysis!.dimensionsMm, target: { ...modelAnalysis!.dimensionsMm },
+            analysis: modelAnalysis!, preserveRatio: true, quantity: 1,
+            material: material || materials[0]?.name || '', color,
+          }])
+          if (uploadedCount === 0 && !lengthMm && !widthMm && !heightMm) {
+            setLengthMm(String(Math.round(modelAnalysis.dimensionsMm.length)))
+            setWidthMm(String(Math.round(modelAnalysis.dimensionsMm.width)))
+            setHeightMm(String(Math.round(modelAnalysis.dimensionsMm.height)))
+          }
+        }
         uploadedCount += 1
       }
     } catch (uploadError) {
@@ -231,6 +303,7 @@ export default function CustomRequestPage() {
       return
     }
     setFiles((current) => current.filter((file) => file.path !== path))
+    setProductSpecs((current) => current.filter((product) => product.filePath !== path))
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -277,14 +350,27 @@ export default function CustomRequestPage() {
         title: title.trim(),
         description: description.trim(),
         intended_use: intendedUse.trim() || null,
-        dimensions: `${lengthMm} x ${widthMm} x ${heightMm}`,
+        dimensions: productSpecs.length ? productSpecs.map((p) => `${p.fileName}: ${p.target.length} x ${p.target.width} x ${p.target.height} mm`).join(' | ') : `${lengthMm} x ${widthMm} x ${heightMm}`,
         dimension_unit: 'mm',
-        dim_length_mm: Number(lengthMm),
-        dim_width_mm: Number(widthMm),
-        dim_height_mm: Number(heightMm),
-        material_preference: material,
+        dim_length_mm: productSpecs[0]?.target.length ?? Number(lengthMm),
+        dim_width_mm: productSpecs[0]?.target.width ?? Number(widthMm),
+        dim_height_mm: productSpecs[0]?.target.height ?? Number(heightMm),
+        material_preference: productSpecs[0]?.material ?? material,
         color_preference: color.trim() || null,
-        quantity: Number(quantity) || 1,
+        quantity: productSpecs.length ? productSpecs.reduce((sum, product) => sum + product.quantity, 0) : Number(quantity) || 1,
+        product_specs: productSpecs.map((product) => ({
+          id: product.id, file_path: product.filePath, file_name: product.fileName,
+          mode: product.mode, original_dimensions_mm: product.original,
+          target_dimensions_mm: product.target, quantity: product.quantity,
+          material_name: product.material, color: product.color,
+          preserve_ratio: product.preserveRatio,
+          geometry: {
+            format: product.analysis.format, mesh_volume_cm3: product.analysis.meshVolumeCm3,
+            bounding_box_volume_cm3: product.analysis.boundingBoxVolumeCm3,
+            triangle_count: product.analysis.triangleCount, vertex_count: product.analysis.vertexCount,
+            warnings: product.analysis.warnings,
+          },
+        })),
         manufacturing_options: options,
         rush,
         estimate_accepted: true,

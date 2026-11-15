@@ -332,7 +332,7 @@ export default function CustomRequestPage() {
   if (created) {
     return (
       <div className="mx-auto max-w-xl px-4 py-12 sm:px-6">
-        <style>{`@media print { @page { size: A5 portrait; margin: 10mm; } body * { display: none !important; } .customer-request-ticket, .customer-request-ticket * { display: block !important; } .customer-request-ticket { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; margin: 0 !important; box-shadow: none !important; border: 1px solid #d1d5db !important; background: #fff !important; color: #111827 !important; } .customer-request-ticket button, .customer-request-ticket a { display: none !important; } .customer-request-ticket svg { margin: 8px auto; max-width: 100%; } }`}</style>
+        <style>{`@media print { @page { size: 80mm 120mm; margin: 0; } body * { display: none !important; } .customer-request-ticket, .customer-request-ticket * { display: block !important; } .customer-request-ticket { position: absolute !important; inset: 0 auto auto 0 !important; box-sizing: border-box !important; width: 80mm !important; min-height: 0 !important; margin: 0 !important; padding: 6mm !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; color: #111827 !important; } .customer-request-ticket button, .customer-request-ticket a { display: none !important; } .customer-request-ticket svg { margin: 8px auto; max-width: 100%; } }`}</style>
         <div className="customer-request-ticket rounded-xl border border-charcoal-400/20 bg-white p-5 text-slate-900 shadow-sm">
           <div className="text-center">
             <p className="text-lg font-black tracking-widest">LUNDER 3D</p>
@@ -348,7 +348,7 @@ export default function CustomRequestPage() {
           <p className="text-center font-mono text-xs text-slate-500">{created.request_number}</p>
           <p className="mt-4 text-center text-xs text-slate-500">Gardez ce ticket pour retrouver et suivre votre demande.</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <button type="button" onClick={() => window.print()} className="btn-primary"><Download className="h-4 w-4" /> Télécharger PDF / Imprimer</button>
+            <button type="button" onClick={() => window.print()} className="btn-primary"><Download className="h-4 w-4" /> Télécharger le ticket (PDF)</button>
             <Link to={`/boutique/sur-mesure/suivi?token=${created.tracking_token}`} className="btn-secondary">Suivre ma demande</Link>
           </div>
         </div>

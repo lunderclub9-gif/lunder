@@ -22,7 +22,7 @@ const navGroups = [
     { to: '/admin/categories', label: 'Catégories', icon: Tag },
   ] },
   { label: 'Tarification', items: [
-    { to: '/admin/couts-produits', label: 'Coûts des produits', icon: Coins },
+    { to: '/admin/couts-produits', label: 'Matières premières', icon: Coins },
     { to: '/admin/tarification', label: 'Fabrication sur mesure', icon: Calculator },
   ] },
   { label: 'Configuration', items: [{ to: '/admin/parametres', label: 'Paramètres du magasin', icon: Settings }] },
@@ -81,7 +81,7 @@ export default function AdminLayout() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-red">
               <Printer className="h-4 w-4 text-white" />
             </div>
-            <span className="text-xs font-bold tracking-wide text-offwhite">LUNDER'S 3D</span>
+            <span className={`text-xs font-bold tracking-wide text-offwhite ${sidebarCollapsed ? "md:hidden" : ""}`}>LUNDER'S 3D</span>
           </Link>
           <button className="md:hidden" onClick={() => setSidebarOpen(false)} aria-label="Fermer">
             <X className="h-5 w-5 text-charcoal-300" />
@@ -104,7 +104,7 @@ export default function AdminLayout() {
               <div className="flex flex-col gap-1">
                 {group.items.map((item) => (
                   <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} title={sidebarCollapsed ? item.label : undefined} aria-label={sidebarCollapsed ? item.label : undefined} className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${sidebarCollapsed ? "md:justify-center md:px-2" : ""} ${
+                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${sidebarCollapsed ? "md:justify-center md:px-2 md:relative" : ""} ${
                       isActive ? 'bg-brand-red/10 text-brand-red' : 'text-charcoal-300 hover:bg-charcoal-800 hover:text-offwhite'
                     }`
                   }>

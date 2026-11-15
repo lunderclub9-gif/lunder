@@ -245,7 +245,7 @@ export default function AdminProductEdit() {
 
   const deleteOption = async (optionId: string) => {
     if (!id) return
-    if (!confirm('Supprimer cette option et ses valeurs ? Les variantes concernées perdront ce choix.')) return
+    if (!(await confirmAction({ title: 'Supprimer cette option et ses valeurs ?', description: 'Les variantes concernées perdront ce choix.', confirmLabel: 'Supprimer l’option', tone: 'danger' }))) return
     const { error: deleteError } = await supabase.from('product_options').delete().eq('id', optionId)
     if (deleteError) {
       setError("Impossible de supprimer cette option.")

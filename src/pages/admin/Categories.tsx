@@ -58,7 +58,7 @@ export default function AdminCategories() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer cette catégorie ?')) return
+    if (!(await confirmAction({ title: 'Supprimer cette catégorie ?', description: 'Cette catégorie sera supprimée. Vérifiez les produits qui lui sont associés avant de continuer.', confirmLabel: 'Supprimer la catégorie', tone: 'danger' }))) return
     const { error } = await supabase.from('categories').delete().eq('id', id)
     if (error) return
     if (isPostHogEnabled) posthog.capture('category_deleted', { category_id: id })

@@ -5,13 +5,23 @@
     min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
+    break-before: avoid-page !important;
+    break-after: avoid-page !important;
+    break-inside: avoid-page !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   body.admin-order-printing .delivery-note-content-frame {
     position: relative !important;
     display: block !important;
     overflow: visible !important;
-    break-inside: avoid !important;
+    break-before: avoid-page !important;
+    break-after: avoid-page !important;
+    break-inside: avoid-page !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
     page-break-inside: avoid !important;
   }
 

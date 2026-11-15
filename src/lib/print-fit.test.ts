@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculatePrintScale, getThermalPageHeightMm } from './print-fit'
+import { calculatePrintScale, getGuardedPrintableArea, getThermalPageHeightMm } from './print-fit'
 
 describe('print fitting', () => {
   it('does not enlarge content that already fits', () => {
@@ -12,10 +12,17 @@ describe('print fitting', () => {
     expect(scale).toBeLessThan(1)
   })
 
-  it('fits width-only thermal media and computes page length after scaling', () => {
-    const scale = calculatePrintScale(600, 2400, 56, null)
+  it('reserves a small inset on finite pages to avoid pagination rounding overflow', () => {
+    expect(getGuardedPrintableArea(186, 273)).toEqual({ widthMm: 184.5, heightMm: 271.5 })
+    expect(getGuardedPrintableArea(56, null)).toEqual({ widthMm: 54.5, heightMm: null })
+  })
+
+  it('fits width-only thermal media and rounds the page length up after scaling', () => {
+    const scale = calculatePrintScale(600, 2400, 54.5, null)
+    const pageHeight = getThermalPageHeightMm(2400, scale, 1)
     expect(scale).toBeLessThan(1)
-    expect(getThermalPageHeightMm(2400, scale, 1)).toBeGreaterThan(60)
+    expect(pageHeight).toBeGreaterThan(60)
+    expect(Number.isInteger(pageHeight)).toBe(true)
   })
 
   it('retains the minimum thermal page length for short notes', () => {

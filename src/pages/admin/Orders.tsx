@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { ChevronDown, Loader2, Package, Printer, Search, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -52,6 +53,7 @@ const NEXT_ACTIONS: Record<string, { status: string; label: string; danger?: boo
 }
 
 export default function AdminOrders() {
+  const confirmAction = useAdminConfirm()
   const { profile } = useAuth()
   const [searchParams] = useSearchParams()
   const [orders, setOrders] = useState<OrderRow[]>([])
@@ -143,7 +145,7 @@ export default function AdminOrders() {
 
   const handleDelete = async (order: OrderRow) => {
     setDeleteError(null)
-    if (!confirm(`Archiver la commande ${order.order_number} ? Elle restera consultable dans les archives.`)) return
+    if (!(await confirmAction({ title: 'Archiver cette commande ?', description: `La commande ${order.order_number} restera consultable dans les archives.`, confirmLabel: 'Archiver', tone: 'danger' }))) return
     setDeletingId(order.id)
     const { error: rpcError } = await supabase.rpc('delete_order', {
       p_order_id: order.id,
@@ -160,11 +162,7 @@ export default function AdminOrders() {
 
   const hardDelete = async (order: OrderRow) => {
     setDeleteError(null)
-    if (
-      !confirm(
-        `Supprimer DÉFINITIVEMENT la commande ${order.order_number} ?\n\nCette action est irréversible et supprime aussi ses articles, son historique et ses fichiers. Seule une trace d'audit est conservée.`
-      )
-    ) {
+    if (!(await confirmAction({ title: 'Supprimer définitivement cette commande ?', description: `La commande ${order.order_number}, ses articles, son historique et ses fichiers seront supprimés. Cette action est irréversible ; seule une trace d’audit sera conservée.`, confirmLabel: 'Supprimer définitivement', tone: 'danger' }))) {
       return
     }
     setDeletingId(order.id)
@@ -222,12 +220,12 @@ export default function AdminOrders() {
       </label>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
+        <div role="alert" className="admin-feedback admin-feedback-error mb-4">
           {error}
         </div>
       )}
       {deleteError && (
-        <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
+        <div role="alert" className="admin-feedback admin-feedback-error mb-4">
           {deleteError}
         </div>
       )}

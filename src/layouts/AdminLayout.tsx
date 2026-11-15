@@ -72,11 +72,11 @@ export default function AdminLayout() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform border-r border-charcoal-400/10 bg-charcoal-900 transition-all duration-200 md:relative md:translate-x-0 ${sidebarCollapsed ? 'md:w-[4.75rem]' : 'md:w-64'} ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-screen w-64 flex-col transform overflow-hidden border-r border-charcoal-400/10 bg-charcoal-900 transition-all duration-200 md:relative md:translate-x-0 ${sidebarCollapsed ? 'md:w-[4.75rem]' : 'md:w-64'} ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex h-16 items-center justify-between border-b border-charcoal-400/10 px-4">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-charcoal-400/10 px-4">
           <Link to="/admin/dashboard" className="flex items-center gap-2.5" onClick={() => setSidebarOpen(false)}>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-red">
               <Printer className="h-4 w-4 text-white" />
@@ -97,7 +97,7 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        <nav className="flex flex-col gap-5 overflow-y-auto p-3 pb-24">
+        <nav aria-label="Navigation administrative" className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 pb-4 scrollbar-thin">
           {navGroups.map((group) => (
             <section key={group.label} aria-label={group.label}>
               <h2 className={`mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-charcoal-500 ${sidebarCollapsed ? "md:sr-only" : ""}`}>{group.label}</h2>
@@ -118,7 +118,7 @@ export default function AdminLayout() {
           ))}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t border-charcoal-400/10 p-3">
+        <div className="shrink-0 border-t border-charcoal-400/10 bg-charcoal-900 p-3">
           <button
             onClick={handleSignOut}
             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-charcoal-300 transition-colors hover:bg-charcoal-800 hover:text-offwhite ${sidebarCollapsed ? "md:justify-center md:px-2" : ""}`} title={sidebarCollapsed ? "Déconnexion" : undefined}

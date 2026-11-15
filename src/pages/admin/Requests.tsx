@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { ChevronDown, FileText, Loader2, Trash2, Upload } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -89,6 +90,7 @@ const today = () => new Date().toISOString().slice(0, 10)
 const REQUEST_SELECT = '*, custom_request_files(*), custom_quotes(*), delivery_wilaya:wilayas!custom_requests_delivery_wilaya_code_fkey(name_fr), delivery_commune:communes!custom_requests_delivery_commune_id_fkey(name_fr), delivery_pickup:pickup_points!custom_requests_delivery_pickup_point_id_fkey(name)'
 
 export default function AdminRequests() {
+  const confirmAction = useAdminConfirm()
   const [searchParams] = useSearchParams()
   const [view, setView] = useState<'active' | 'approved'>(() => searchParams.get('view') === 'approved' ? 'approved' : 'active')
   const [requests, setRequests] = useState<RequestRow[]>([])
@@ -294,7 +296,7 @@ export default function AdminRequests() {
 
   const approveQuote = async (quote: Quote) => {
     setError(null)
-    if (!confirm(`Approuver le devis v${quote.version} et créer la commande ?`)) return
+    if (!(await confirmAction({ title: 'Approuver le devis', description: `Approuver le devis v${quote.version} et créer la commande correspondante ?`, confirmLabel: 'Approuver et créer' }))) return
     setBusy(true)
     const { error: rpcError } = await supabase.rpc('owner_approve_custom_request', {
       p_quote_id: quote.id,
@@ -310,7 +312,7 @@ export default function AdminRequests() {
   const rejectRequest = async (request: RequestRow) => {
     setError(null)
     const reason = prompt('Motif du refus (optionnel) :') ?? ''
-    if (!confirm(`Refuser la demande ${request.request_number} ?`)) return
+    if (!(await confirmAction({ title: 'Refuser cette demande ?', description: `La demande ${request.request_number} sera marquée comme refusée.`, confirmLabel: 'Refuser', tone: 'danger' }))) return
     setBusy(true)
     const { error: rpcError } = await supabase.rpc('owner_reject_custom_request', {
       p_request_id: request.id,
@@ -342,7 +344,7 @@ export default function AdminRequests() {
     const confirmation = request.deletion_started_at
       ? `Reprendre la suppression de la demande ${request.request_number} ?`
       : `Supprimer définitivement la demande ${request.request_number} ? Cette action est réservée aux demandes sans devis ni commande.`
-    if (!confirm(confirmation)) return
+    if (!(await confirmAction({ title: 'Confirmer la suppression de la demande ?', description: confirmation, confirmLabel: 'Continuer la suppression', tone: 'danger' }))) return
 
     setBusy(true)
     const { data, error: beginError } = await supabase.rpc('begin_custom_request_deletion', {
@@ -406,12 +408,12 @@ export default function AdminRequests() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
+        <div role="alert" className="admin-feedback admin-feedback-error mb-4">
           {error}
         </div>
       )}
       {notice && (
-        <div className="mb-4 rounded-lg border border-green-600/30 bg-green-600/10 px-4 py-3 text-sm text-green-400">
+        <div role="status" className="admin-feedback admin-feedback-success mb-4">
           {notice}
         </div>
       )}

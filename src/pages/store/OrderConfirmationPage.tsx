@@ -80,10 +80,10 @@ export default function OrderConfirmationPage() {
       <style>{`
         @media print {
           @page { size: A5 portrait; margin: 10mm; }
-          body * { visibility: hidden !important; }
-          .customer-order-ticket, .customer-order-ticket * { visibility: visible !important; }
+          body * { display: none !important; }
+          .customer-order-ticket, .customer-order-ticket * { display: block !important; }
           .customer-order-ticket { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; margin: 0 !important; box-shadow: none !important; border: 1px solid #d1d5db !important; background: #fff !important; color: #111827 !important; }
-          .customer-order-ticket button, .customer-order-ticket a { display: none !important; }
+          .customer-order-ticket button, .customer-order-ticket a { display: none !important; } .customer-order-ticket svg { margin: 8px auto; max-width: 100%; }
         }
       `}</style>
       <div className="customer-order-ticket mb-6 rounded-xl border border-charcoal-400/20 bg-white p-5 text-slate-900 shadow-sm">

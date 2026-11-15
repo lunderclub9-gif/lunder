@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { Plus, Trash2, Pencil, Tag, X, Loader2 } from 'lucide-react'
 import { supabase, type Category } from '@/lib/supabase'
 import { slugify } from '@/lib/format'
 import posthog, { isPostHogEnabled } from '@/lib/posthog'
 
 export default function AdminCategories() {
+  const confirmAction = useAdminConfirm()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)

@@ -77,15 +77,7 @@ export default function OrderConfirmationPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <style>{`
-        @media print {
-          @page { size: 80mm 120mm; margin: 0; }
-          body * { display: none !important; }
-          .customer-order-ticket, .customer-order-ticket * { display: block !important; }
-          .customer-order-ticket { position: absolute !important; inset: 0 auto auto 0 !important; box-sizing: border-box !important; width: 80mm !important; min-height: 0 !important; margin: 0 !important; padding: 6mm !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; color: #111827 !important; }
-          .customer-order-ticket button, .customer-order-ticket a { display: none !important; } .customer-order-ticket svg { margin: 8px auto; max-width: 100%; }
-        }
-      `}</style>
+
       <div className="customer-order-ticket mb-6 rounded-xl border border-charcoal-400/20 bg-white p-5 text-slate-900 shadow-sm">
         <div className="text-center">
           <p className="text-lg font-black tracking-widest">LUNDER 3D</p>
@@ -101,11 +93,7 @@ export default function OrderConfirmationPage() {
           <svg ref={barcodeRef} role="img" aria-label={`Code-barres de la commande ${order.order_number}`} />
         </div>
         <p className="text-center font-mono text-xs text-slate-500">{order.order_number}</p>
-        <div className="mt-4 rounded-lg bg-slate-100 p-3 text-center">
-          <p className="text-xs text-slate-500">STATUT ACTUEL</p>
-          <p className="mt-1 font-semibold">{orderStatusLabel(order.status)}</p>
-        </div>
-        <p className="mt-3 text-center text-xs text-slate-500">Gardez ce ticket pour retrouver et suivre votre commande.</p>
+<p className="mt-3 text-center text-xs text-slate-500">Gardez ce ticket pour retrouver et suivre votre commande.</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
 <button type="button" onClick={() => void downloadTicketPdf({ kind: 'COMMANDE', number: order.order_number, phone: order.phone, status: orderStatusLabel(order.status), barcodeSvg: barcodeRef.current?.outerHTML })} className="btn-primary"><Download className="h-4 w-4" /> Télécharger le ticket PDF</button>
         </div>

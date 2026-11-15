@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -58,6 +59,7 @@ const emptyPricing: MfgPricing = {
 }
 
 export default function ManufacturingPricingPage() {
+  const confirmAction = useAdminConfirm()
   const [materials, setMaterials] = useState<MfgMaterial[]>([])
   const [pricing, setPricing] = useState<MfgPricing>(emptyPricing)
   const [discountsText, setDiscountsText] = useState('[]')
@@ -247,12 +249,12 @@ export default function ManufacturingPricingPage() {
       </p>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
+        <div role="alert" className="admin-feedback admin-feedback-error mb-4">
           {error}
         </div>
       )}
       {saved && (
-        <div className="mb-4 rounded-lg border border-green-600/30 bg-green-600/10 px-4 py-3 text-sm text-green-400">
+        <div role="status" className="admin-feedback admin-feedback-success mb-4">
           Tarification enregistrée.
         </div>
       )}

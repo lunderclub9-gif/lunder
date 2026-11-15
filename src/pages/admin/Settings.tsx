@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Bell, Loader2, Plus, Printer, Save, Trash2, Volume2 } from 'lucide-react'
+import { Bell, Loader2, Printer, Save, Volume2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDzd } from '@/lib/format'
 import { useAuth } from '@/lib/auth'
 import {
   canUseBrowserNotifications,
@@ -13,7 +12,6 @@ import {
 } from '@/lib/admin-preferences'
 
 type Setting = { key: string; value: string | null; is_public: boolean }
-type Material = { id: string; name: string; cost_per_kg_dzd: number; is_active: boolean }
 
 const GROUPS: { title: string; keys: { key: string; label: string; type: 'text' | 'tel' | 'email' | 'url' | 'textarea'; help?: string }[] }[] = [
   {
@@ -60,21 +58,14 @@ export default function AdminSettings() {
   const [preferences, setPreferences] = useState<AdminPreferences>(() => readAdminPreferences(profile?.id ?? null))
   const [preferenceMessage, setPreferenceMessage] = useState<string | null>(null)
 
-  const [materials, setMaterials] = useState<Material[]>([])
-  const [materialName, setMaterialName] = useState('')
-  const [materialCost, setMaterialCost] = useState('')
 
   const load = useCallback(async () => {
-    const [{ data: settings }, { data: mats }] = await Promise.all([
-      supabase.from('store_settings').select('key, value, is_public').order('key'),
-      supabase.from('materials').select('id, name, cost_per_kg_dzd, is_active').order('name'),
-    ])
+    const { data: settings } = await supabase.from('store_settings').select('key, value, is_public').order('key')
     const next: Record<string, string> = {}
     ;((settings as Setting[]) ?? []).forEach((row) => {
       next[row.key] = row.value ?? ''
     })
     setValues(next)
-    setMaterials((mats as Material[]) ?? [])
     setLoading(false)
   }, [])
 
@@ -176,49 +167,6 @@ export default function AdminSettings() {
     setSaved(true)
   }
 
-  const addMaterial = async () => {
-    setError(null)
-    const cost = Number(materialCost)
-    if (!materialName.trim() || !Number.isFinite(cost) || cost < 0) {
-      setError('Renseignez un nom de matière et un coût au kilo valide.')
-      return
-    }
-    const { error: insertError } = await supabase.from('materials').insert({
-      name: materialName.trim(),
-      cost_per_kg_dzd: Math.round(cost),
-    })
-    if (insertError) {
-      setError('Impossible d’ajouter cette matière (nom déjà utilisé ?).')
-      return
-    }
-    setMaterialName('')
-    setMaterialCost('')
-    await load()
-  }
-
-  const updateMaterialCost = async (material: Material, cost: string) => {
-    const parsed = Number(cost)
-    if (!Number.isFinite(parsed) || parsed < 0) return
-    const { error: updateError } = await supabase
-      .from('materials')
-      .update({ cost_per_kg_dzd: Math.round(parsed) })
-      .eq('id', material.id)
-    if (updateError) {
-      setError('Impossible de mettre à jour ce coût.')
-      return
-    }
-    await load()
-  }
-
-  const deleteMaterial = async (id: string) => {
-    if (!confirm('Supprimer cette matière ? Les fiches de coût associées perdront leur matière.')) return
-    const { error: deleteError } = await supabase.from('materials').delete().eq('id', id)
-    if (deleteError) {
-      setError('Impossible de supprimer cette matière.')
-      return
-    }
-    await load()
-  }
 
   if (loading) {
     return (
@@ -230,7 +178,7 @@ export default function AdminSettings() {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="mb-2 text-2xl font-bold text-offwhite">Paramètres</h1>
+      <header className="admin-page-header mb-6"><div><p className="admin-eyebrow">Configuration</p><h1 className="text-2xl font-bold text-offwhite">Paramètres du magasin</h1></div></header>
       <p className="mb-6 text-sm text-charcoal-400">
         Ces informations sont publiques et affichées sur la boutique lorsqu'elles sont renseignées.
         Les liens vides sont masqués. Les clés d'API et secrets ne doivent jamais être saisis ici :
@@ -238,12 +186,12 @@ export default function AdminSettings() {
       </p>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
+        <div role="alert" className="admin-feedback admin-feedback-error mb-4">
           {error}
         </div>
       )}
       {saved && (
-        <div className="mb-4 rounded-lg border border-green-600/30 bg-green-600/10 px-4 py-3 text-sm text-green-400">
+        <div role="status" className="admin-feedback admin-feedback-success mb-4">
           Paramètres enregistrés.
         </div>
       )}
@@ -373,74 +321,6 @@ export default function AdminSettings() {
           </fieldset>
         </section>
 
-        <section className="admin-card">
-          <h2 className="mb-1 text-lg font-semibold text-offwhite">Matières et coûts</h2>
-          <p className="mb-4 text-xs text-charcoal-400">
-            Coût d'achat réel au kilogramme. Ces valeurs alimentent l'estimation de coût de chaque
-            produit ; elles ne sont jamais visibles par les clients.
-          </p>
-
-          {materials.length === 0 ? (
-            <p className="mb-4 text-sm text-charcoal-400">Aucune matière enregistrée.</p>
-          ) : (
-            <ul className="mb-4 space-y-2">
-              {materials.map((material) => (
-                <li
-                  key={material.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-charcoal-400/15 px-3 py-2"
-                >
-                  <span className="text-sm text-offwhite">{material.name}</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      defaultValue={material.cost_per_kg_dzd}
-                      onBlur={(event) => updateMaterialCost(material, event.target.value)}
-                      className="input-field w-28 py-1.5 text-sm"
-                      aria-label={`Coût au kilo de ${material.name}`}
-                    />
-                    <span className="text-xs text-charcoal-400">DA / kg</span>
-                    <button
-                      type="button"
-                      onClick={() => deleteMaterial(material.id)}
-                      className="text-charcoal-400 hover:text-brand-red"
-                      aria-label={`Supprimer ${material.name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              type="text"
-              value={materialName}
-              onChange={(event) => setMaterialName(event.target.value)}
-              className="input-field"
-              placeholder="Nom (ex: PLA noir)"
-            />
-            <input
-              type="number"
-              min={0}
-              value={materialCost}
-              onChange={(event) => setMaterialCost(event.target.value)}
-              className="input-field sm:w-40"
-              placeholder="DA / kg"
-            />
-            <button type="button" onClick={addMaterial} className="btn-secondary">
-              <Plus className="h-4 w-4" />
-              Ajouter
-            </button>
-          </div>
-          {materials.length > 0 && (
-            <p className="mt-3 text-xs text-charcoal-500">
-              Exemple : {materials[0].name} à {formatDzd(materials[0].cost_per_kg_dzd)} le kilo.
-            </p>
-          )}
-        </section>
 
         <button type="button" onClick={save} disabled={saving} className="btn-primary w-full sm:w-auto">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

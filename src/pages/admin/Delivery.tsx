@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { Loader2, Plus, Trash2, Truck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
@@ -31,6 +32,7 @@ const emptyRate = {
 }
 
 export default function AdminDelivery() {
+  const confirmAction = useAdminConfirm()
   const [wilayas, setWilayas] = useState<Wilaya[]>([])
   const [wilayaCode, setWilayaCode] = useState('')
   const [communes, setCommunes] = useState<Commune[]>([])
@@ -250,7 +252,7 @@ export default function AdminDelivery() {
       </p>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">
+        <div role="alert" className="admin-feedback admin-feedback-error mb-4">
           {error}
         </div>
       )}

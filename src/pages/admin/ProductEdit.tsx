@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Loader2, Upload, X, Star, Plus, Trash2 } from 'lucide-react'
 import {
@@ -15,6 +16,7 @@ import ProductCostCard from '@/components/admin/ProductCostCard'
 import posthog, { isPostHogEnabled } from '@/lib/posthog'
 
 export default function AdminProductEdit() {
+  const confirmAction = useAdminConfirm()
   const { id } = useParams()
   const isNew = !id || id === 'nouveau'
   const navigate = useNavigate()

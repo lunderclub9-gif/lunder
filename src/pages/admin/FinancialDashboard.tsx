@@ -111,8 +111,8 @@ export default function FinancialDashboardPage() {
       supabase.from('orders')
         .select('id, order_number, status, subtotal_dzd, delivery_dzd, total_dzd, delivered_at, order_items(id, product_id, product_name, quantity, line_total_dzd, unit_cost_dzd, cost_status)')
         .eq('status', 'delivered')
-        .gte('delivered_at', period.from + 'T00:00:00')
-        .lt('delivered_at', period.nextDay + 'T00:00:00')
+        .gte('delivered_at', dateStartIso(period.from))
+        .lt('delivered_at', dateStartIso(period.nextDay))
         .order('delivered_at', { ascending: false }),
       supabase.from('business_expenses')
         .select('id, category, description, amount_dzd, expense_date, order_id')
@@ -122,8 +122,8 @@ export default function FinancialDashboardPage() {
       supabase.from('orders')
         .select('total_dzd')
         .in('status', ['pending', 'confirmed', 'shipped'])
-        .gte('created_at', period.from + 'T00:00:00')
-        .lt('created_at', period.nextDay + 'T00:00:00'),
+        .gte('created_at', dateStartIso(period.from))
+        .lt('created_at', dateStartIso(period.nextDay))\n        .is('archived_at', null),
     ])
 
     if (ordersError || expensesError || pendingError) {

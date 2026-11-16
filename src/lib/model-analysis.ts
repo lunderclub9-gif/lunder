@@ -67,6 +67,7 @@ function finish(
   const boxMm3 = dimensions[0] * dimensions[1] * dimensions[2]
   const meshCm3 = signedVolume === null ? null : Math.abs(signedVolume) * scale ** 3 / 1000
   if (meshCm3 === null) warnings.push('Le volume réel du maillage n’a pas pu être calculé ; seule la boîte englobante est disponible.')
+  else warnings.push('Le volume suppose un maillage fermé et correctement orienté. Les surfaces ouvertes ou les normales incohérentes peuvent fausser cette mesure.')
   if (meshCm3 !== null && meshCm3 > boxMm3 / 1000 * 1.05) {
     warnings.push('Le volume du maillage dépasse sa boîte englobante ; vérifiez les unités ou l’intégrité du fichier.')
   }

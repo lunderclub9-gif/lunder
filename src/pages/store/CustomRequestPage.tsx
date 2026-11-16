@@ -549,16 +549,22 @@ export default function CustomRequestPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <div className="overflow-hidden rounded-2xl border border-brand-red/20 bg-gradient-to-br from-charcoal-800 via-charcoal-900 to-black p-5 shadow-xl sm:p-7">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-9">
+      <div className="relative overflow-hidden rounded-3xl border border-brand-red/25 bg-gradient-to-br from-charcoal-800 via-charcoal-900 to-black p-5 shadow-2xl sm:p-8">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-brand-red/10 blur-3xl" />
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-brand-red/30 bg-brand-red/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-red-light">LUNDER 3D · Atelier personnalisé</span>
           <span className="rounded-full border border-charcoal-400/20 px-3 py-1 text-[10px] text-charcoal-300">Jusqu’à 10 fichiers</span>
         </div>
-        <h1 className="mt-4 text-3xl font-bold text-offwhite sm:text-4xl">Créons votre pièce sur mesure</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-charcoal-300">
-          Envoyez un modèle ou une simple inspiration, choisissez la taille finale et la quantité. Chaque produit est estimé séparément selon sa matière et les paramètres de fabrication de l’atelier.
+        <h1 className="relative mt-4 max-w-2xl text-3xl font-black leading-tight text-offwhite sm:text-4xl">Votre idée. Votre style. Notre atelier.</h1>
+        <p className="relative mt-3 max-w-2xl text-sm leading-6 text-charcoal-300 sm:text-base">
+          Une pièce personnalisée en quelques étapes simples. Ajoutez une photo ou un modèle 3D, choisissez ce que vous voulez et découvrez une estimation avant d’envoyer votre demande.
         </p>
+        <div className="relative mt-5 flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full bg-white/10 px-3 py-1.5 text-charcoal-200">✦ Personnalisation</span>
+          <span className="rounded-full bg-white/10 px-3 py-1.5 text-charcoal-200">↗ Aperçu 3D selon le fichier</span>
+          <span className="rounded-full bg-white/10 px-3 py-1.5 text-charcoal-200">✓ Estimation avant envoi</span>
+        </div>
         <div className="mt-5 grid gap-2 sm:grid-cols-3">
           {[
             ['01', 'Projet et fichiers', 'Décrivez votre besoin et joignez vos références.'],
@@ -582,8 +588,8 @@ export default function CustomRequestPage() {
       )}
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-        <div className="admin-card">
-          <h2 className="mb-4 text-lg font-semibold text-offwhite">Votre projet</h2>
+        <div className="admin-card rounded-2xl">
+          <div className="mb-5 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red/15 text-sm font-black text-brand-red-light">01</span><div><h2 className="text-lg font-bold text-offwhite">Parlez-nous de votre idée</h2><p className="mt-0.5 text-xs text-charcoal-400">Un titre et quelques détails suffisent pour commencer.</p></div></div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block sm:col-span-2">
               <span className="label-text">Titre de la demande *</span>
@@ -620,8 +626,8 @@ export default function CustomRequestPage() {
           </div>
         </div>
 
-        <div className="admin-card">
-          <h2 className="mb-2 text-lg font-semibold text-offwhite">Fichiers</h2>
+        <div className="admin-card rounded-2xl">
+          <div className="mb-4 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red/15 text-sm font-black text-brand-red-light">02</span><div><h2 className="text-lg font-bold text-offwhite">Ajoutez vos photos ou fichiers 3D</h2><p className="mt-0.5 text-xs text-charcoal-400">Vous pouvez aussi continuer sans fichier en saisissant les dimensions.</p></div></div>
           <p className="mb-4 text-xs text-charcoal-400">
             Photos et fichiers 3D sont stockés dans un espace privé, accessibles uniquement au
             studio. Formats acceptés : JPG, PNG, WebP, AVIF (5 Mo), GLB, GLTF, STL, OBJ (25 Mo).
@@ -631,8 +637,8 @@ export default function CustomRequestPage() {
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="btn-secondary cursor-pointer justify-center">
-              <Upload className="h-4 w-4" />
+            <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-charcoal-400/30 bg-charcoal-900/40 px-4 py-4 text-sm font-semibold text-charcoal-100 transition hover:border-brand-red/60 hover:bg-brand-red/5">
+              <Upload className="h-5 w-5 text-brand-red-light" />
               Ajouter des photos
               <input
                 type="file"
@@ -643,8 +649,8 @@ export default function CustomRequestPage() {
                 onChange={(event) => handleFiles(event.target.files, 'image')}
               />
             </label>
-            <label className="btn-secondary cursor-pointer justify-center">
-              <Paperclip className="h-4 w-4" />
+            <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-charcoal-400/30 bg-charcoal-900/40 px-4 py-4 text-sm font-semibold text-charcoal-100 transition hover:border-brand-red/60 hover:bg-brand-red/5">
+              <Paperclip className="h-5 w-5 text-brand-red-light" />
               Ajouter un fichier 3D
               <input
                 type="file"
@@ -690,8 +696,8 @@ export default function CustomRequestPage() {
             </ul>
           )}
         </div>
-        <div className="admin-card">
-          <h2 className="mb-2 text-lg font-semibold text-offwhite">Dimensions et matière</h2>
+        <div className="admin-card rounded-2xl">
+          <div className="mb-4 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red/15 text-sm font-black text-brand-red-light">03</span><div><h2 className="text-lg font-bold text-offwhite">Choisissez la taille et la matière</h2><p className="mt-0.5 text-xs text-charcoal-400">Nous adaptons les questions selon les fichiers ajoutés.</p></div></div>
           <p className="mb-4 text-xs text-charcoal-400">
             Si vous ne joignez pas de modèle 3D, saisissez ses dimensions ici. Si vous joignez un ou plusieurs modèles analysables, leurs dimensions seront extraites automatiquement et vous pourrez définir la taille souhaitée pour chaque produit.
           </p>
@@ -806,13 +812,10 @@ export default function CustomRequestPage() {
         </div>
 
         {productSpecs.length > 0 && (
-          <div className="admin-card space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-offwhite">Vos modèles 3D et dimensions souhaitées</h2>
-              <p className="mt-1 text-xs text-charcoal-400">Le fichier est analysé comme référence. Vous pouvez conserver sa taille ou choisir une nouvelle taille. Les estimations sont recalculées pour chaque modèle.</p>
-            </div>
+          <div className="admin-card space-y-4 rounded-2xl">
+            <div className="mb-2 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red/15 text-sm font-black text-brand-red-light">04</span><div><h2 className="text-lg font-bold text-offwhite">Personnalisez chaque modèle</h2><p className="mt-1 text-xs text-charcoal-400">Chaque modèle possède ses propres dimensions, matière, couleur et quantité. Le calcul se met à jour automatiquement.</p></div></div>
             {productSpecs.map((product, index) => (
-              <div key={product.id} className="rounded-xl border border-charcoal-400/20 bg-charcoal-900/50 p-4 space-y-3">
+              <div key={product.id} className="space-y-4 rounded-2xl border border-charcoal-400/20 bg-gradient-to-br from-charcoal-900/80 to-black/30 p-4 shadow-lg sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-semibold text-offwhite">Produit {index + 1} · {product.fileName}</p>
@@ -891,8 +894,8 @@ export default function CustomRequestPage() {
           </div>
         )}
 
-        <div className="admin-card">
-          <h2 className="mb-2 text-lg font-semibold text-offwhite">Estimation automatique</h2>
+        <div className="admin-card rounded-2xl border border-brand-red/20">
+          <div className="mb-4 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red/15 text-sm font-black text-brand-red-light">05</span><div><h2 className="text-lg font-bold text-offwhite">Votre estimation</h2><p className="mt-0.5 text-xs text-charcoal-400">Le montant se recalcule selon vos choix.</p></div></div>
           <p className="mb-4 text-xs text-charcoal-400">
             Estimation indicative calculée séparément pour chaque produit, avec sa taille finale, sa matière, sa quantité et les paramètres de fabrication du studio. Elle ne constitue pas un devis ferme : le propriétaire vérifie la faisabilité et peut ajuster le prix.
           </p>
@@ -913,7 +916,7 @@ export default function CustomRequestPage() {
                   </li>
                 ))}
               </ul>
-              <div className="mt-2 flex justify-between border-t border-charcoal-400/15 pt-2 text-sm font-semibold text-offwhite">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-red/25 bg-brand-red/10 px-4 py-4 text-base font-bold text-offwhite">
                 <span>Total estimé ({estimate.quantity} pièce(s))</span>
                 <span>{formatDzd(estimate.totalDzd)}</span>
               </div>
@@ -959,8 +962,8 @@ export default function CustomRequestPage() {
 
         {estimateAccepted && (
           <>
-            <div className="admin-card">
-              <h2 className="mb-4 text-lg font-semibold text-offwhite">Vos coordonnées</h2>
+            <div className="admin-card rounded-2xl">
+              <div className="mb-5 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red/15 text-sm font-black text-brand-red-light">06</span><div><h2 className="text-lg font-bold text-offwhite">Comment vous contacter ?</h2><p className="mt-0.5 text-xs text-charcoal-400">Vos coordonnées restent liées à cette demande.</p></div></div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block">
                   <span className="label-text">Nom et prénom *</span>
@@ -998,8 +1001,8 @@ export default function CustomRequestPage() {
               </div>
             </div>
 
-            <div className="admin-card">
-              <h2 className="mb-4 text-lg font-semibold text-offwhite">Livraison</h2>
+            <div className="admin-card rounded-2xl">
+              <div className="mb-5 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red/15 text-sm font-black text-brand-red-light">07</span><div><h2 className="text-lg font-bold text-offwhite">Où souhaitez-vous recevoir votre pièce ?</h2><p className="mt-0.5 text-xs text-charcoal-400">Choisissez votre wilaya, commune et mode de livraison.</p></div></div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block">
                   <span className="label-text">Wilaya *</span>
@@ -1094,7 +1097,7 @@ export default function CustomRequestPage() {
               )}
             </div>
 
-            <button type="submit" disabled={submitting || uploading} className="btn-primary w-full">
+            <button type="submit" disabled={submitting || uploading} className="btn-primary min-h-12 w-full justify-center rounded-xl text-base font-bold shadow-lg shadow-brand-red/15">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Envoyer ma demande complète'}
             </button>
           </>

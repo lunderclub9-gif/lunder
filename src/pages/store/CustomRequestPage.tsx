@@ -815,7 +815,7 @@ export default function CustomRequestPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-semibold text-offwhite">Produit {index + 1} · {product.fileName}</p>
-                    <p className="mt-1 text-xs text-charcoal-400">Original : {product.original.length} × {product.original.width} × {product.original.height} mm · {product.analysis.triangleCount.toLocaleString('fr-FR')} triangles</p>
+                    <p className="mt-1 text-xs text-charcoal-400">Original : {product.original.length} × {product.original.width} × {product.original.height} mm · {product.analysis.triangleCount.toLocaleString('fr-FR')} triangles · {product.analysis.componentCount ?? '—'} élément(s) détecté(s)</p>
                     {product.analysis.meshVolumeCm3 !== null && <p className="text-xs text-charcoal-400">Volume géométrique du maillage : {product.analysis.meshVolumeCm3} cm³</p>}
                   </div>
                   <button type="button" onClick={() => void removeFile(product.filePath)} disabled={uploading} className="btn-ghost text-xs">Retirer ce produit</button>

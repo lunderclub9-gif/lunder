@@ -1,4 +1,4 @@
--- 014 — Finance analytics, immutable order cost snapshots and owner expenses.
+-- 015 — Finance analytics, immutable order cost snapshots and owner expenses.
 -- All figures remain estimates unless the owner records verified actual expenses.
 -- This migration is code-only until explicitly applied to the Supabase project.
 

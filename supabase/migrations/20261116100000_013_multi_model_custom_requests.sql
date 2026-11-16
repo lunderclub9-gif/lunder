@@ -203,6 +203,7 @@ BEGIN
   UPDATE public.custom_requests
   SET product_specs = v_saved,
       quantity = v_total_quantity,
+      estimate_accepted_at = coalesce(estimate_accepted_at, now()),
       estimate_price_dzd = v_total,
       estimate_breakdown = jsonb_build_object(
         'lines', v_lines,

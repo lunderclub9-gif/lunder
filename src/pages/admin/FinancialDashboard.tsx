@@ -174,7 +174,7 @@ export default function FinancialDashboardPage() {
       current.revenue += Number(item.line_total_dzd)
       current.quantity += Number(item.quantity)
       if (item.cost_status === 'complete' && item.unit_cost_dzd != null) current.cost += Number(item.unit_cost_dzd) * Number(item.quantity)
-      else current.missing = true
+      else if (!manuallyCostedOrders.has(order.id)) current.missing = true
       map.set(item.product_name, current)
     }))
     return [...map.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 6)
@@ -251,7 +251,7 @@ export default function FinancialDashboardPage() {
         <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Chiffre encaissé" value={formatDzd(summary.revenueDzd)} detail={summary.deliveredOrders + ' commande(s) livrée(s)'} icon={CircleDollarSign} />
-            <MetricCard label="Coûts de production connus" value={formatDzd(summary.estimatedProductionCostDzd)} detail="Estimations figées sur les lignes suivies" icon={ShoppingBag} />
+            <MetricCard label="Coûts de production connus" value={formatDzd(summary.estimatedProductionCostDzd + summary.manualProductionCostDzd)} detail="Estimations produits + coûts sur mesure saisis" icon={ShoppingBag} />
             <MetricCard label="Dépenses enregistrées" value={formatDzd(summary.operatingExpensesDzd)} detail={summary.recordedExpenses + ' dépense(s) ajoutée(s)'} icon={Wallet} />
             <MetricCard label="Résultat provisoire" value={formatDzd(summary.provisionalProfitDzd)} detail="Encaissements − coûts connus − dépenses" icon={summary.provisionalProfitDzd >= 0 ? TrendingUp : TrendingDown} tone={summary.provisionalProfitDzd >= 0 ? 'positive' : 'negative'} />
           </section>

@@ -8,7 +8,12 @@ import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 type Range = '7' | '30' | '90' | '365'
 type TrendPoint = { key: string; label: string; revenue: number; profit: number }
 
-function dateStartIso(value: string) {\n  const parts = value.split('-').map(Number)\n  return new Date(parts[0], parts[1] - 1, parts[2]).toISOString()\n}\n\nfunction getPeriod(range: Range) {
+function dateStartIso(value: string) {
+  const parts = value.split('-').map(Number)
+  return new Date(parts[0], parts[1] - 1, parts[2]).toISOString()
+}
+
+function getPeriod(range: Range) {
   const end = new Date()
   const start = new Date(end)
   start.setDate(start.getDate() - Number(range) + 1)

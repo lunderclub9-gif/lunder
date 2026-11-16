@@ -176,6 +176,8 @@ have been reconciled. Later files depend on `public.is_owner()` and earlier tabl
 | `20261116180000_020_custom_upload_storage_limits.sql` | server-side custom-upload folder path, file-count and aggregate-size limits | 019 |
 | `20261116190000_021_rls_performance_and_fk_indexes.sql` | consolidate overlapping read policies, cache auth identity in RLS, and index uncovered foreign keys | 020 |
 
+A post-migration privilege regression script is provided at `supabase/tests/security_regression.sql`.
+
 Treat migrations as **apply-once, in timestamp order**. Some operations are idempotent, but the chain
 as a whole is not advertised as safe to replay manually. Never mark a migration applied or skip one
 without comparing the live schema and its migration history.

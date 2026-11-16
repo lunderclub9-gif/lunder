@@ -19,6 +19,33 @@ const order = (overrides: Partial<FinanceOrder> = {}): FinanceOrder => ({
     cost_status: 'complete',
   }],
   ...overrides,
+  it('treats a custom order as cost-covered when its production expense is linked', () => {
+    const custom = order({
+      id: 'custom-order',
+      order_items: [{
+        id: 'custom-line',
+        product_id: null,
+        product_name: 'Custom print',
+        quantity: 1,
+        line_total_dzd: 8000,
+        unit_cost_dzd: null,
+        cost_status: 'not_configured',
+      }],
+    })
+    const linkedProductionCost: FinanceExpense = {
+      id: 'production-cost',
+      category: 'production',
+      description: 'Coût réel fabrication',
+      amount_dzd: 3500,
+      expense_date: '2026-11-15',
+      order_id: 'custom-order',
+    }
+    const result = summarizeFinances([custom], [linkedProductionCost])
+    expect(result.manualProductionCostDzd).toBe(3500)
+    expect(result.uncostedItems).toBe(0)
+    expect(result.isIncomplete).toBe(false)
+  })
+
 })
 
 const expense = (amount_dzd: number): FinanceExpense => ({

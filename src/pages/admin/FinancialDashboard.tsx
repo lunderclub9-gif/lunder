@@ -259,7 +259,7 @@ export default function FinancialDashboardPage() {
 
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,0.8fr)]">
             <div className="admin-card min-w-0">
-              <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="font-bold text-offwhite">Évolution de l’activité</h2><p className="mt-1 text-xs text-charcoal-500">Encaissements et résultat avant frais non saisis</p></div><ChartNoAxesCombined className="h-5 w-5 text-brand-red-light" /></div>
+              <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="font-bold text-offwhite">Évolution de l’activité</h2><p className="mt-1 text-xs text-charcoal-500">Encaissements et résultat avant frais non saisis</p></div><BarChart3 className="h-5 w-5 text-brand-red-light" /></div>
               <TrendChart points={trend} />
             </div>
             <div className="admin-card">

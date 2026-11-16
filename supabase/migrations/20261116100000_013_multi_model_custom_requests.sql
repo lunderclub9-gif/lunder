@@ -38,6 +38,9 @@ DECLARE
   v_length numeric;
   v_width numeric;
   v_height numeric;
+  v_original_length numeric;
+  v_original_width numeric;
+  v_original_height numeric;
   v_quantity integer;
   v_volume_cm3 numeric;
   v_mesh_volume_cm3 numeric;
@@ -104,12 +107,27 @@ BEGIN
     v_length := nullif(v_product->'target_dimensions_mm'->>'length', '')::numeric;
     v_width := nullif(v_product->'target_dimensions_mm'->>'width', '')::numeric;
     v_height := nullif(v_product->'target_dimensions_mm'->>'height', '')::numeric;
+    v_original_length := nullif(v_product->'original_dimensions_mm'->>'length', '')::numeric;
+    v_original_width := nullif(v_product->'original_dimensions_mm'->>'width', '')::numeric;
+    v_original_height := nullif(v_product->'original_dimensions_mm'->>'height', '')::numeric;
     v_quantity := coalesce(nullif(v_product->>'quantity', '')::integer, 1);
 
     IF v_length IS NULL OR v_width IS NULL OR v_height IS NULL
        OR v_length <= 0 OR v_width <= 0 OR v_height <= 0
        OR v_length > 2000 OR v_width > 2000 OR v_height > 2000 THEN
       RAISE EXCEPTION 'DIMENSIONS_PRODUIT_INVALIDES';
+    END IF;
+    IF v_original_length IS NULL OR v_original_width IS NULL OR v_original_height IS NULL
+       OR v_original_length <= 0 OR v_original_width <= 0 OR v_original_height <= 0
+       OR v_original_length > 100000 OR v_original_width > 100000 OR v_original_height > 100000 THEN
+      RAISE EXCEPTION 'DIMENSIONS_ORIGINALES_INVALIDES';
+    END IF;
+    IF v_mode = 'exact' AND (
+      abs(v_length - v_original_length) > 0.01 OR
+      abs(v_width - v_original_width) > 0.01 OR
+      abs(v_height - v_original_height) > 0.01
+    ) THEN
+      RAISE EXCEPTION 'MODE_EXACT_DIMENSIONS_MODIFIEES';
     END IF;
     IF v_quantity < 1 OR v_quantity > 100 THEN RAISE EXCEPTION 'QUANTITE_PRODUIT_INVALIDE'; END IF;
 

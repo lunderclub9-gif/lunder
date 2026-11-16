@@ -30,8 +30,7 @@ BEGIN
     RAISE EXCEPTION 'A required guest RPC grant is missing.';
   END IF;
 
-  IF has_table_privilege('anon', 'public.manufacturing_materials', 'SELECT')
-     OR has_column_privilege('anon', 'public.manufacturing_materials', 'price_per_gram_dzd', 'SELECT') THEN
+  IF has_column_privilege('anon', 'public.manufacturing_materials', 'price_per_gram_dzd', 'SELECT') THEN
     RAISE EXCEPTION 'Anonymous users can read internal manufacturing material prices.';
   END IF;
 

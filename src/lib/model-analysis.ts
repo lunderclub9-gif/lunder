@@ -26,7 +26,16 @@ type GltfAccessor = {
 }
 type GltfBufferView = { buffer?: number; byteOffset?: number; byteStride?: number }
 type GltfPrimitive = { attributes?: Record<string, number>; indices?: number; mode?: number }
+type GltfNode = {
+  mesh?: number
+  children?: number[]
+  matrix?: number[]
+  translation?: number[]
+  rotation?: number[]
+  scale?: number[]
+}
 type GltfDocument = {
+  nodes?: GltfNode[]
   buffers?: { uri?: string; byteLength?: number }[]
   bufferViews?: GltfBufferView[]
   accessors?: GltfAccessor[]
@@ -65,14 +74,19 @@ function finish(
     throw new Error('Les dimensions du modèle sont nulles ou anormalement grandes.')
   }
   const boxMm3 = dimensions[0] * dimensions[1] * dimensions[2]
-  const meshCm3 = signedVolume === null ? null : Math.abs(signedVolume) * scale ** 3 / 1000
-  if (meshCm3 === null) warnings.push('Le volume réel du maillage n’a pas pu être calculé ; seule la boîte englobante est disponible.')
-  else warnings.push('Le volume suppose un maillage fermé et correctement orienté. Les surfaces ouvertes ou les normales incohérentes peuvent fausser cette mesure.')
-  if (meshCm3 !== null && meshCm3 > boxMm3 / 1000 * 1.05) {
-    warnings.push('Le volume du maillage dépasse sa boîte englobante ; vérifiez les unités ou l’intégrité du fichier.')
-  }
-  if (meshCm3 !== null && meshCm3 > 0 && meshCm3 < boxMm3 / 1000 * 0.001) {
-    warnings.push('Le volume calculé est très faible par rapport aux dimensions ; le maillage peut être ouvert, très fin ou mal orienté.')
+  let meshCm3 = signedVolume === null ? null : Math.abs(signedVolume) * scale ** 3 / 1000
+  if (meshCm3 === null || !Number.isFinite(meshCm3) || meshCm3 <= 0) {
+    meshCm3 = null
+    warnings.push('Le volume réel du maillage n’a pas pu être calculé ; seule la boîte englobante est disponible.')
+  } else {
+    warnings.push('Le volume suppose un maillage fermé et correctement orienté. Les surfaces ouvertes ou les normales incohérentes peuvent fausser cette mesure.')
+    if (meshCm3 > boxMm3 / 1000 * 1.05) {
+      warnings.push('Le volume du maillage dépasse sa boîte englobante ; vérifiez les unités ou l’intégrité du fichier.')
+      meshCm3 = null
+    } else if (meshCm3 < boxMm3 / 1000 * 0.001) {
+      warnings.push('Le volume calculé est très faible par rapport aux dimensions ; le maillage peut être ouvert, très fin ou mal orienté. La boîte englobante sera utilisée pour éviter une sous-estimation.')
+      meshCm3 = null
+    }
   }
   return {
     format, dimensionsMm: { length: round(dimensions[0]), width: round(dimensions[1]), height: round(dimensions[2]) },
@@ -179,6 +193,23 @@ function decodeDataUri(uri: string): Uint8Array {
 }
 
 async function analyzeGltfDocument(document: GltfDocument, buffers: Uint8Array[], format: 'glb' | 'gltf') {
+  const identityMatrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+  const nodes = document.nodes ?? []
+  const meshUses = new Map<number, number>()
+  for (const node of nodes) {
+    const identity = (values: number[] | undefined, expected: number[]) =>
+      values === undefined || (values.length === expected.length && values.every((value, index) => Math.abs(value - expected[index]) < 1e-8))
+    if (node.children?.length || !identity(node.matrix, identityMatrix) ||
+        !identity(node.translation, [0, 0, 0]) || !identity(node.rotation, [0, 0, 0, 1]) ||
+        !identity(node.scale, [1, 1, 1])) {
+      throw new Error('Ce modèle glTF utilise des transformations ou une hiérarchie de scène que l’analyse simplifiée ne peut pas mesurer correctement. Exportez-le en STL ou appliquez les transformations avant de réessayer.')
+    }
+    if (typeof node.mesh === 'number') meshUses.set(node.mesh, (meshUses.get(node.mesh) ?? 0) + 1)
+  }
+  if ([...meshUses.values()].some((count) => count > 1) ||
+      (nodes.length > 0 && (document.meshes ?? []).some((_, index) => !meshUses.has(index)))) {
+    throw new Error('Ce modèle glTF contient des instances ou des maillages non reliés à la scène principale. Exportez une version aplatie en GLB ou STL pour obtenir des dimensions fiables.')
+  }
   const bounds = emptyBounds()
   let vertexCount = 0
   let triangleCount = 0

@@ -335,6 +335,8 @@ Ordre d'exécution complet, du plus ancien au plus récent :
 18. `20261116160000_018_guest_api_rate_limits.sql`
 19. `20261116170000_019_public_view_and_function_privileges.sql`
 20. `20261116180000_020_custom_upload_storage_limits.sql`
+21. `20261116190000_021_rls_performance_and_fk_indexes.sql`
+22. `20261116200000_022_guest_estimate_rate_limits.sql`
 
 Après application, renseigner au moins une matière et les tarifs : la ligne
 unique de `manufacturing_pricing` est initialisée à zéro, un devis rendrait donc

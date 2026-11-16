@@ -647,7 +647,7 @@ export default function CustomRequestPage() {
                 multiple
                 disabled={uploading}
                 className="hidden"
-                onChange={(event) => handleFiles(event.target.files, 'image')}
+                onChange={(event) => { const selected = event.currentTarget.files; void handleFiles(selected, 'image'); event.currentTarget.value = '' }}
               />
             </label>
             <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-charcoal-400/30 bg-charcoal-900/40 px-4 py-4 text-sm font-semibold text-charcoal-100 transition hover:border-brand-red/60 hover:bg-brand-red/5">
@@ -659,7 +659,7 @@ export default function CustomRequestPage() {
                 multiple
                 disabled={uploading}
                 className="hidden"
-                onChange={(event) => handleFiles(event.target.files, 'model')}
+                onChange={(event) => { const selected = event.currentTarget.files; void handleFiles(selected, 'model'); event.currentTarget.value = '' }}
               />
             </label>
           </div>
@@ -852,6 +852,15 @@ export default function CustomRequestPage() {
                     <option value="modify">Modifier le modèle avant fabrication</option>
                     <option value="inspiration">Inspiration seulement, création similaire</option>
                   </select>
+                  <p className="mt-2 rounded-lg bg-black/20 px-3 py-2 text-xs leading-5 text-charcoal-300">
+                    {product.mode === 'exact'
+                      ? 'Le studio utilisera les dimensions détectées dans votre fichier.'
+                      : product.mode === 'modify'
+                        ? 'Décrivez les changements souhaités. Le studio vérifiera ce qui peut être modifié avant fabrication.'
+                        : product.mode === 'inspiration'
+                          ? 'Le fichier sert d’inspiration : décrivez la nouvelle pièce que vous imaginez.'
+                          : 'Le fichier sert de référence. Vous pouvez garder sa forme et choisir une autre taille.'}
+                  </p>
                 </label>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {(['length', 'width', 'height'] as const).map((axis) => (

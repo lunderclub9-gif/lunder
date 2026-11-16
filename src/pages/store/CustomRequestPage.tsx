@@ -524,11 +524,30 @@ export default function CustomRequestPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <h1 className="text-3xl font-bold text-offwhite">Demande sur mesure</h1>
-      <p className="mt-2 text-sm text-charcoal-400">
-        Décrivez votre projet, ajoutez un ou plusieurs modèles 3D si vous en avez, puis choisissez les dimensions finales et les options de fabrication. L’estimation est calculée produit par produit ; le studio vérifie ensuite la faisabilité avant toute fabrication.
-      </p>
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <div className="overflow-hidden rounded-2xl border border-brand-red/20 bg-gradient-to-br from-charcoal-800 via-charcoal-900 to-black p-5 shadow-xl sm:p-7">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-brand-red/30 bg-brand-red/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-red-light">LUNDER 3D · Atelier personnalisé</span>
+          <span className="rounded-full border border-charcoal-400/20 px-3 py-1 text-[10px] text-charcoal-300">Jusqu’à 10 fichiers</span>
+        </div>
+        <h1 className="mt-4 text-3xl font-bold text-offwhite sm:text-4xl">Créons votre pièce sur mesure</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-charcoal-300">
+          Envoyez un modèle ou une simple inspiration, choisissez la taille finale et la quantité. Chaque produit est estimé séparément selon sa matière et les paramètres de fabrication de l’atelier.
+        </p>
+        <div className="mt-5 grid gap-2 sm:grid-cols-3">
+          {[
+            ['01', 'Projet et fichiers', 'Décrivez votre besoin et joignez vos références.'],
+            ['02', 'Taille et estimation', 'Ajustez chaque modèle et consultez le calcul.'],
+            ['03', 'Coordonnées', 'Confirmez votre livraison après acceptation.'],
+          ].map(([number, label, detail], index) => (
+            <div key={number} className={`rounded-xl border p-3 ${(estimateAccepted ? index < 3 : estimate ? index < 2 : index === 0) ? 'border-brand-red/40 bg-brand-red/10' : 'border-charcoal-400/15 bg-black/20'}`}>
+              <p className="text-[10px] font-bold tracking-widest text-brand-red-light">{number}</p>
+              <p className="mt-1 text-sm font-semibold text-offwhite">{label}</p>
+              <p className="mt-1 text-xs leading-5 text-charcoal-400">{detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {error && (
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">

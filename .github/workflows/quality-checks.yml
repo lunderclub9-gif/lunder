@@ -22,6 +22,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Update npm to current stable
+        run: npm install --global npm@latest
       - name: Refresh compatible dependency lockfile
         run: npm update --package-lock-only --ignore-scripts
       - name: Install dependencies

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Package, Loader2, ShoppingCart, ShieldCheck, Truck } from 'lucide-react'
+import { ArrowLeft, Package, Loader2, ShoppingCart, ShieldCheck, Truck, AlertTriangle, Minus, Plus } from 'lucide-react'
 import {
   supabase,
   type Product,
@@ -19,8 +19,10 @@ export default function ProductDetailPage() {
   const [options, setOptions] = useState<ProductOption[]>([])
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [activeImage, setActiveImage] = useState<string | null>(null)
   const [selection, setSelection] = useState<Record<string, string>>({})
+  const [quantity, setQuantity] = useState(1)
   const [added, setAdded] = useState(false)
   const { add } = useCart()
 
@@ -31,61 +33,90 @@ export default function ProductDetailPage() {
   }, [product])
 
   useEffect(() => {
-    if (!slug) return
-    ;(async () => {
-      setLoading(true)
-      const { data } = await supabase
-        .from('products')
-        .select('*, category:categories(*)')
-        .eq('slug', slug)
-        .eq('status', 'published')
-        .maybeSingle()
+    let active = true
+    setLoading(true)
+    setLoadError(false)
+    setProduct(null)
+    setImages([])
+    setOptions([])
+    setVariants([])
+    setSelection({})
+    setQuantity(1)
+    setActiveImage(null)
 
-      if (!data) {
-        setLoading(false)
-        return
-      }
-
-      const p = data as Product
-      setProduct(p)
-
-      const [{ data: imgs }, { data: opts }, { data: vars }] = await Promise.all([
-        supabase.from('product_images').select('*').eq('product_id', p.id).order('sort_order'),
-        supabase
-          .from('product_options')
-          .select('*, values:product_option_values(*)')
-          .eq('product_id', p.id)
-          .order('sort_order'),
-        supabase
-          .from('product_variants')
-          .select('*, values:product_variant_values(option_value_id)')
-          .eq('product_id', p.id)
-          .eq('is_active', true),
-      ])
-
-      const imgList = (imgs as ProductImage[]) ?? []
-      setImages(imgList)
-      const primary = imgList.find((i) => i.is_primary) ?? imgList[0]
-      setActiveImage(primary?.image_url ?? null)
-
-      const optionList = ((opts as ProductOption[]) ?? []).map((option) => ({
-        ...option,
-        values: [...(option.values ?? [])]
-          .filter((value) => value.is_active)
-          .sort((a, b) => a.sort_order - b.sort_order || a.value.localeCompare(b.value)),
-      }))
-      setOptions(optionList)
-      setVariants((vars as ProductVariant[]) ?? [])
-
-      const initial: Record<string, string> = {}
-      optionList.forEach((option) => {
-        const first = option.values?.[0]
-        if (first) initial[option.id] = first.id
-      })
-      setSelection(initial)
-
+    if (!slug) {
       setLoading(false)
+      return () => { active = false }
+    }
+
+    void (async () => {
+      try {
+        const { data, error: productError } = await supabase
+          .from('products')
+          .select('*, category:categories(*)')
+          .eq('slug', slug)
+          .eq('status', 'published')
+          .maybeSingle()
+
+        if (!active) return
+        if (productError) throw productError
+        if (!data) {
+          setLoading(false)
+          return
+        }
+
+        const p = data as Product
+        const [imagesResult, optionsResult, variantsResult] = await Promise.all([
+          supabase.from('product_images').select('*').eq('product_id', p.id).order('sort_order'),
+          supabase
+            .from('product_options')
+            .select('*, values:product_option_values(*)')
+            .eq('product_id', p.id)
+            .order('sort_order'),
+          supabase
+            .from('product_variants')
+            .select('*, values:product_variant_values(option_value_id)')
+            .eq('product_id', p.id)
+            .eq('is_active', true),
+        ])
+
+        if (!active) return
+        if (imagesResult.error || optionsResult.error || variantsResult.error) {
+          throw imagesResult.error ?? optionsResult.error ?? variantsResult.error
+        }
+
+        const imgList = (imagesResult.data as ProductImage[]) ?? []
+        setImages(imgList)
+        const primary = imgList.find((i) => i.is_primary) ?? imgList[0]
+        setActiveImage(primary?.image_url ?? null)
+
+        const optionList = ((optionsResult.data as ProductOption[]) ?? []).map((option) => ({
+          ...option,
+          values: [...(option.values ?? [])]
+            .filter((value) => value.is_active)
+            .sort((a, b) => a.sort_order - b.sort_order || a.value.localeCompare(b.value)),
+        }))
+        setOptions(optionList)
+        setVariants((variantsResult.data as ProductVariant[]) ?? [])
+
+        const initial: Record<string, string> = {}
+        optionList.forEach((option) => {
+          const first = option.values?.[0]
+          if (first) initial[option.id] = first.id
+        })
+        setSelection(initial)
+        setProduct(p)
+        setLoading(false)
+      } catch (error) {
+        console.error('[LUNDER] chargement du produit impossible', error)
+        if (active) {
+          setLoadError(true)
+          setLoading(false)
+        }
+      }
     })()
+
+    return () => { active = false }
   }, [slug])
 
   const selectableOptions = useMemo(
@@ -117,12 +148,16 @@ export default function ProductDetailPage() {
   if (!product) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-24 text-center">
-        <Package className="mx-auto mb-4 h-12 w-12 text-charcoal-500" />
-        <h1 className="text-xl font-semibold text-offwhite">Produit introuvable</h1>
-        <Link to="/boutique/produits" className="btn-primary mt-6">
-          <ArrowLeft className="h-4 w-4" />
-          Retour à la boutique
-        </Link>
+        {loadError ? <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-brand-red" /> : <Package className="mx-auto mb-4 h-12 w-12 text-charcoal-500" />}
+        <h1 className="text-xl font-semibold text-offwhite">{loadError ? 'Chargement impossible' : 'Produit introuvable'}</h1>
+        <p className="mt-2 text-sm text-charcoal-400">{loadError ? 'Une erreur est survenue pendant le chargement de ce produit. Vérifiez votre connexion et réessayez.' : 'Ce produit n’est peut-être plus disponible.'}</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          {loadError && <button type="button" onClick={() => window.location.reload()} className="btn-secondary">Réessayer</button>}
+          <Link to="/boutique/produits" className="btn-primary">
+            <ArrowLeft className="h-4 w-4" />
+            Retour à la boutique
+          </Link>
+        </div>
       </div>
     )
   }
@@ -132,6 +167,7 @@ export default function ProductDetailPage() {
   const displayPrice = matchedVariant?.price_dzd ?? product.price_dzd
   const combinationAvailable = selectableOptions.length === 0 || matchedVariant !== null
   const inStock = combinationAvailable && (madeToOrder || stockQuantity > 0)
+  const maxQuantity = madeToOrder ? 10 : Math.min(10, Math.max(1, stockQuantity))
 
   const selectedVariantLabel = matchedVariant
     ? matchedVariant.label ??
@@ -152,7 +188,7 @@ export default function ProductDetailPage() {
       variantLabel: selectedVariantLabel || null,
       unitPriceDzd: displayPrice,
       imageUrl: activeImage,
-    })
+    }, quantity)
     setAdded(true)
     window.setTimeout(() => setAdded(false), 3000)
   }
@@ -296,6 +332,19 @@ export default function ProductDetailPage() {
           </div>
 
           <div className="flex flex-col gap-2">
+            {inStock && (
+              <div className="flex items-center justify-between rounded-xl border border-charcoal-400/15 bg-charcoal-800/50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-offwhite">Quantité</p>
+                  <p className="text-xs text-charcoal-500">Maximum {maxQuantity} par commande</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => setQuantity((value) => Math.max(1, value - 1))} disabled={quantity <= 1} aria-label="Diminuer la quantité" className="flex h-10 w-10 items-center justify-center rounded-lg border border-charcoal-400/20 text-charcoal-200 transition hover:border-brand-red disabled:cursor-not-allowed disabled:opacity-40"><Minus className="h-4 w-4" /></button>
+                  <span className="min-w-5 text-center text-sm font-bold tabular-nums text-offwhite" aria-live="polite">{quantity}</span>
+                  <button type="button" onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))} disabled={quantity >= maxQuantity} aria-label="Augmenter la quantité" className="flex h-10 w-10 items-center justify-center rounded-lg border border-charcoal-400/20 text-charcoal-200 transition hover:border-brand-red disabled:cursor-not-allowed disabled:opacity-40"><Plus className="h-4 w-4" /></button>
+                </div>
+              </div>
+            )}
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"

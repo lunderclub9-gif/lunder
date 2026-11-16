@@ -288,7 +288,7 @@ async function analyzeGltfDocument(document: GltfDocument, buffers: Uint8Array[]
 
       const indexAccessor = primitive.indices === undefined ? null : document.accessors?.[primitive.indices]
       const indexCount = indexAccessor ? (indexAccessor.count ?? 0) : count
-      if (!Number.isInteger(indexCount) || indexCount < 3 || indexCount > MAX_GLTF_INDICES) {
+      if (!Number.isInteger(indexCount) || indexCount < 3 || indexCount > MAX_GLTF_INDICES || triangleCount + Math.floor(indexCount / 3) > MAX_GLTF_INDICES / 3) {
         warnings.push('Une primitive glTF contient un nombre d’indices non pris en charge ; son volume est exclu.')
         continue
       }
@@ -342,6 +342,7 @@ async function analyzeGlb(file: File): Promise<ModelAnalysis> {
     if (type === 0x004e4942) binary = new Uint8Array(buffer, start, length)
     offset = start + length
   }
+  if (offset !== view.byteLength) throw new Error('Le conteneur GLB contient des données résiduelles invalides.')
   if (!document) throw new Error('Le fichier GLB ne contient pas de document JSON.')
   const buffers = (document.buffers ?? []).map((entry, index: number) => {
     if (typeof entry.uri === 'string') throw new Error('Le GLB référence une ressource externe non intégrée.')
@@ -359,7 +360,9 @@ async function analyzeGltf(file: File): Promise<ModelAnalysis> {
   const document = JSON.parse(await file.text()) as GltfDocument
   const buffers = (document.buffers ?? []).map((entry) => {
     if (typeof entry.uri !== 'string' || !entry.uri.startsWith('data:')) throw new Error('Ce glTF utilise des fichiers externes. Exportez-le en GLB autonome.')
-    return decodeDataUri(entry.uri)
+    const decoded = decodeDataUri(entry.uri)
+    if (!Number.isInteger(entry.byteLength) || (entry.byteLength as number) < 0 || decoded.byteLength < (entry.byteLength as number)) throw new Error('Une ressource binaire glTF est tronquée.')
+    return decoded.subarray(0, entry.byteLength)
   })
   return analyzeGltfDocument(document, buffers, 'gltf')
 }

@@ -17,6 +17,22 @@ export type ModelAnalysis = {
 
 type Bounds = { min: [number, number, number]; max: [number, number, number] }
 
+type GltfAccessor = {
+  bufferView?: number
+  byteOffset?: number
+  componentType?: number
+  count?: number
+  type?: string
+}
+type GltfBufferView = { buffer?: number; byteOffset?: number; byteStride?: number }
+type GltfPrimitive = { attributes?: Record<string, number>; indices?: number; mode?: number }
+type GltfDocument = {
+  buffers?: { uri?: string; byteLength?: number }[]
+  bufferViews?: GltfBufferView[]
+  accessors?: GltfAccessor[]
+  meshes?: { primitives?: GltfPrimitive[] }[]
+}
+
 const round = (value: number, digits = 2) => Math.round(value * 10 ** digits) / 10 ** digits
 
 function emptyBounds(): Bounds {
@@ -158,7 +174,7 @@ function decodeDataUri(uri: string): Uint8Array {
   return new TextEncoder().encode(decodeURIComponent(data))
 }
 
-async function analyzeGltfDocument(document: Record<string, any>, buffers: Uint8Array[], format: 'glb' | 'gltf') {
+async function analyzeGltfDocument(document: GltfDocument, buffers: Uint8Array[], format: 'glb' | 'gltf') {
   const bounds = emptyBounds()
   let vertexCount = 0
   let triangleCount = 0
@@ -167,8 +183,9 @@ async function analyzeGltfDocument(document: Record<string, any>, buffers: Uint8
   for (const mesh of document.meshes ?? []) {
     for (const primitive of mesh.primitives ?? []) {
       const accessorIndex = primitive.attributes?.POSITION
+      if (typeof accessorIndex !== 'number') continue
       const accessor = document.accessors?.[accessorIndex]
-      if (!accessor || accessor.type !== 'VEC3') continue
+      if (!accessor || accessor.type !== 'VEC3' || typeof accessor.bufferView !== 'number') continue
       const bufferView = document.bufferViews?.[accessor.bufferView]
       const data = buffers[bufferView?.buffer ?? 0]
       if (!bufferView || !data) continue
@@ -188,7 +205,7 @@ async function analyzeGltfDocument(document: Record<string, any>, buffers: Uint8
         }
       }
       const positions: number[][] = []
-      for (let i = 0; i < accessor.count; i += 1) {
+      for (let i = 0; i < (accessor.count ?? 0); i += 1) {
         const point = [0, 1, 2].map((axis) => read(offset + i * stride + axis * componentBytes))
         positions.push(point)
         if (point.every(Number.isFinite)) {
@@ -207,6 +224,10 @@ async function analyzeGltfDocument(document: Record<string, any>, buffers: Uint8
       const indexAccessor = primitive.indices === undefined ? null : document.accessors?.[primitive.indices]
       let indices: number[]
       if (indexAccessor) {
+        if (typeof indexAccessor.bufferView !== 'number') {
+          warnings.push('Une liste d’indices glTF ne référence pas de buffer exploitable ; volume incomplet.')
+          continue
+        }
         const indexView = document.bufferViews?.[indexAccessor.bufferView]
         const indexData = buffers[indexView?.buffer ?? 0]
         const indexBytes = ({ 5121: 1, 5123: 2, 5125: 4 } as Record<number, number>)[indexAccessor.componentType]
@@ -222,7 +243,7 @@ async function analyzeGltfDocument(document: Record<string, any>, buffers: Uint8
           : indexAccessor.componentType === 5123
             ? indexDataView.getUint16(position, true)
             : indexDataView.getUint8(position)
-        indices = Array.from({ length: indexAccessor.count }, (_, index) => readIndex(indexOffset + index * indexStride))
+        indices = Array.from({ length: indexAccessor.count ?? 0 }, (_, index) => readIndex(indexOffset + index * indexStride))
       } else {
         indices = Array.from({ length: positions.length }, (_, index) => index)
       }
@@ -246,19 +267,19 @@ async function analyzeGlb(file: File): Promise<ModelAnalysis> {
   const view = new DataView(buffer)
   if (view.byteLength < 20 || view.getUint32(0, true) !== 0x46546c67) throw new Error('En-tête GLB invalide.')
   let offset = 12
-  let document: Record<string, any> | null = null
+  let document: GltfDocument | null = null
   let binary: Uint8Array | null = null
   while (offset + 8 <= view.byteLength) {
     const length = view.getUint32(offset, true)
     const type = view.getUint32(offset + 4, true)
     const start = offset + 8
     if (start + length > view.byteLength) throw new Error('Chunk GLB tronqué.')
-    if (type === 0x4e4f534a) document = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, start, length)).replace(/\0+$/g, '').trim())
+    if (type === 0x4e4f534a) document = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, start, length)).replace(/\0+$/g, '').trim()) as GltfDocument
     if (type === 0x004e4942) binary = new Uint8Array(buffer, start, length)
     offset = start + length
   }
   if (!document) throw new Error('Le fichier GLB ne contient pas de document JSON.')
-  const buffers = (document.buffers ?? []).map((entry: Record<string, unknown>, index: number) => {
+  const buffers = (document.buffers ?? []).map((entry, index: number) => {
     if (typeof entry.uri === 'string') throw new Error('Le GLB référence une ressource externe non intégrée.')
     if (index === 0 && binary) return binary
     return new Uint8Array()
@@ -267,8 +288,8 @@ async function analyzeGlb(file: File): Promise<ModelAnalysis> {
 }
 
 async function analyzeGltf(file: File): Promise<ModelAnalysis> {
-  const document = JSON.parse(await file.text()) as Record<string, any>
-  const buffers = (document.buffers ?? []).map((entry: Record<string, unknown>) => {
+  const document = JSON.parse(await file.text()) as GltfDocument
+  const buffers = (document.buffers ?? []).map((entry) => {
     if (typeof entry.uri !== 'string' || !entry.uri.startsWith('data:')) throw new Error('Ce glTF utilise des fichiers externes. Exportez-le en GLB autonome.')
     return decodeDataUri(entry.uri)
   })

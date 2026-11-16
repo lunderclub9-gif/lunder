@@ -22,6 +22,7 @@ type ProductSpec = {
   quantity: number
   material: string
   color: string
+  instructions: string
 }
 type CreatedRequest = { request_number: string; tracking_token: string }
 type Material = { name: string; colors: string[] }
@@ -321,7 +322,7 @@ export default function CustomRequestPage() {
             id, filePath: path, fileName: file.name, mode: 'reference',
             original: modelAnalysis!.dimensionsMm, target: { ...modelAnalysis!.dimensionsMm },
             analysis: modelAnalysis!, preserveRatio: true, quantity: 1,
-            material: material || materials[0]?.name || '', color,
+            material: material || materials[0]?.name || '', color, instructions: '',
           }])
           if (uploadedCount === 0 && !lengthMm && !widthMm && !heightMm) {
             setLengthMm(String(Math.round(modelAnalysis.dimensionsMm.length)))
@@ -415,6 +416,7 @@ export default function CustomRequestPage() {
           target_dimensions_mm: product.target, quantity: product.quantity,
           material_name: product.material, color: product.color,
           preserve_ratio: product.preserveRatio,
+          instructions: product.instructions,
           geometry: {
             format: product.analysis.format, mesh_volume_cm3: product.analysis.meshVolumeCm3,
             bounding_box_volume_cm3: product.analysis.boundingBoxVolumeCm3,
@@ -839,6 +841,10 @@ export default function CustomRequestPage() {
                     <input className="input-field" value={product.color} onChange={(event) => updateProduct(product.id, { color: event.target.value })} placeholder="Couleur souhaitée" />
                   </label>
                 </div>
+                <label className="block">
+                  <span className="label-text">Détails ou modifications pour ce produit</span>
+                  <textarea rows={3} className="input-field resize-y" value={product.instructions} onChange={(event) => updateProduct(product.id, { instructions: event.target.value })} placeholder={product.mode === 'modify' ? 'Ex. ajouter une base, inscrire un prénom, retirer une partie, renforcer une zone…' : product.mode === 'inspiration' ? 'Décrivez le modèle que vous voulez créer en vous inspirant de ce fichier…' : 'Précisions propres à ce modèle (facultatif)…'} />
+                </label>
                 {product.analysis.warnings.length > 0 && <ul className="space-y-1 text-xs text-amber-300">{product.analysis.warnings.map((warning) => <li key={warning}>• {warning}</li>)}</ul>}
                 {product.mode === 'modify' && <p className="text-xs text-charcoal-400">Les modifications demandées doivent être décrites dans le champ Description ; le studio validera leur faisabilité.</p>}
                 {product.mode === 'inspiration' && <p className="text-xs text-charcoal-400">Ce fichier sert de référence visuelle. Décrivez précisément le nouveau modèle souhaité.</p>}

@@ -171,6 +171,7 @@ BEGIN
       'material_name', v_material.name,
       'color', nullif(btrim(coalesce(v_product->>'color', '')), ''),
       'preserve_ratio', coalesce((v_product->>'preserve_ratio')::boolean, true),
+      'instructions', nullif(btrim(coalesce(v_product->>'instructions', '')), ''),
       'geometry', coalesce(v_product->'geometry', '{}'::jsonb)
     ));
 
@@ -274,7 +275,8 @@ BEGIN
         'target_dimensions_mm', p->'target_dimensions_mm',
         'quantity', p->'quantity',
         'material_name', p->>'material_name',
-        'color', p->>'color'
+        'color', p->>'color',
+        'instructions', p->>'instructions'
       ))
       FROM jsonb_array_elements(coalesce(r.product_specs, '[]'::jsonb)) p
     ), '[]'::jsonb),

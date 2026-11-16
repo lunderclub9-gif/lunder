@@ -198,3 +198,6 @@ CREATE TRIGGER custom_request_products_update_rate_limit
   FOR EACH ROW
   WHEN (OLD.product_specs IS DISTINCT FROM NEW.product_specs)
   EXECUTE FUNCTION public.guard_custom_request_products_update_rate_limit();
+
+-- Refresh PostgREST so the new allow-listed RPC wrappers are visible immediately.
+NOTIFY pgrst, 'reload schema';

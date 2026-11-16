@@ -74,10 +74,6 @@ BEGIN
   IF v_request.status NOT IN ('new', 'reviewing') THEN
     RAISE EXCEPTION 'DEMANDE_NON_MODIFIABLE';
   END IF;
-  IF v_request.estimate_accepted_at IS NULL THEN
-    RAISE EXCEPTION 'ESTIMATION_NON_ACCEPTEE';
-  END IF;
-
   SELECT * INTO v_rules FROM public.manufacturing_pricing WHERE id = true;
   IF NOT FOUND THEN RAISE EXCEPTION 'TARIFICATION_INDISPONIBLE'; END IF;
 
@@ -181,6 +177,7 @@ BEGIN
   UPDATE public.custom_requests
   SET product_specs = v_saved,
       quantity = v_total_quantity,
+      estimate_accepted_at = coalesce(estimate_accepted_at, now()),
       estimate_price_dzd = v_total,
       estimate_breakdown = jsonb_build_object(
         'lines', v_lines,

@@ -17,6 +17,7 @@ describe('analyze3DModel', () => {
     expect(result.triangleCount).toBe(4)
     expect(result.meshVolumeCm3).toBeCloseTo(1 / 6, 2)
     expect(result.vertexCount).toBe(12)
+    expect(result.componentCount).toBe(1)
   })
 
   it('reads vertices and triangulates polygon faces in OBJ', async () => {
@@ -29,6 +30,7 @@ describe('analyze3DModel', () => {
     expect(result.dimensionsMm).toEqual({ length: 10, width: 10, height: 10 })
     expect(result.triangleCount).toBe(4)
     expect(result.meshVolumeCm3).toBeCloseTo(1 / 6, 2)
+    expect(result.componentCount).toBe(1)
   })
 
   it('rejects unsupported file extensions', async () => {

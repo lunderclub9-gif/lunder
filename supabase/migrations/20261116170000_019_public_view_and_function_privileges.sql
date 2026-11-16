@@ -73,6 +73,9 @@ REVOKE EXECUTE ON FUNCTION public.finish_custom_request_deletion(uuid, uuid, tex
 GRANT EXECUTE ON FUNCTION public.finish_custom_request_deletion(uuid, uuid, text[]) TO authenticated;
 
 -- Internal helpers and trigger functions are never RPC endpoints.
+REVOKE ALL ON FUNCTION public.next_order_number() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.customer_quote_breakdown(jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_updated_at() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.manufacturing_calculate_full(text, numeric, numeric, integer, jsonb, boolean)
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.audit_row() FROM PUBLIC, anon, authenticated;

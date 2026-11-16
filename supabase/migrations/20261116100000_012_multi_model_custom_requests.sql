@@ -210,3 +210,85 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.save_custom_request_products(uuid, jsonb, jsonb, boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.save_custom_request_products(uuid, jsonb, jsonb, boolean) TO anon, authenticated;
+
+
+-- Keep the customer's tracking page in sync with the new product-by-product request.
+CREATE OR REPLACE FUNCTION public.get_custom_request_by_token(p_token uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_result jsonb;
+BEGIN
+  IF p_token IS NULL THEN RAISE EXCEPTION 'DEMANDE_INTROUVABLE'; END IF;
+
+  UPDATE public.custom_quotes
+  SET status = 'expired', decided_at = now()
+  WHERE request_id = (SELECT id FROM public.custom_requests WHERE tracking_token = p_token)
+    AND status = 'sent' AND valid_until < current_date;
+
+  SELECT jsonb_build_object(
+    'request_number', r.request_number,
+    'status', r.status,
+    'created_at', r.created_at,
+    'title', r.title,
+    'description', r.description,
+    'quantity', r.quantity,
+    'dimensions', r.dimensions,
+    'dimension_unit', r.dimension_unit,
+    'material_preference', r.material_preference,
+    'color_preference', r.color_preference,
+    'customer_name', r.customer_name,
+    'product_specs', coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'id', p->>'id',
+        'file_name', p->>'file_name',
+        'mode', p->>'mode',
+        'original_dimensions_mm', p->'original_dimensions_mm',
+        'target_dimensions_mm', p->'target_dimensions_mm',
+        'quantity', p->'quantity',
+        'material_name', p->>'material_name',
+        'color', p->>'color'
+      ))
+      FROM jsonb_array_elements(coalesce(r.product_specs, '[]'::jsonb)) p
+    ), '[]'::jsonb),
+    'files', coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'kind', f.kind, 'original_name', f.original_name, 'mime_type', f.mime_type
+      ) ORDER BY f.created_at)
+      FROM public.custom_request_files f WHERE f.request_id = r.id
+    ), '[]'::jsonb),
+    'quotes', coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'version', q.version,
+        'public_token', q.public_token,
+        'price_dzd', q.price_dzd,
+        'production_lead_days', q.production_lead_days,
+        'valid_until', q.valid_until,
+        'terms', q.terms,
+        'status', q.status,
+        'source', q.source,
+        'breakdown', public.customer_quote_breakdown(q.breakdown),
+        'created_at', q.created_at
+      ) ORDER BY q.version DESC)
+      FROM public.custom_quotes q WHERE q.request_id = r.id
+    ), '[]'::jsonb),
+    'order_number', (
+      SELECT o.order_number
+      FROM public.custom_quotes q JOIN public.orders o ON o.id = q.order_id
+      WHERE q.request_id = r.id AND q.order_id IS NOT NULL
+      LIMIT 1
+    )
+  ) INTO v_result
+  FROM public.custom_requests r
+  WHERE r.tracking_token = p_token;
+
+  IF v_result IS NULL THEN RAISE EXCEPTION 'DEMANDE_INTROUVABLE'; END IF;
+  RETURN v_result;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.get_custom_request_by_token(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_custom_request_by_token(uuid) TO anon, authenticated;

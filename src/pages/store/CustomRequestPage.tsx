@@ -408,6 +408,7 @@ export default function CustomRequestPage() {
     }
     const createdRequest = data as CreatedRequest
     if (productSpecs.length > 0) {
+      setSubmitting(true)
       const { data: savedProducts, error: productSaveError } = await supabase.rpc('save_custom_request_products', {
         p_tracking_token: createdRequest.tracking_token,
         p_products: productSpecs.map((product) => ({
@@ -426,6 +427,7 @@ export default function CustomRequestPage() {
         p_options: options,
         p_rush: rush,
       })
+      setSubmitting(false)
       if (productSaveError || !savedProducts) {
         setError(orderErrorMessage(productSaveError?.message, 'La demande est créée, mais les détails des modèles n’ont pas pu être enregistrés. Réessayez pour terminer leur enregistrement.'))
         return

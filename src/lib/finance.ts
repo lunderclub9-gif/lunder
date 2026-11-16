@@ -38,9 +38,12 @@ export function summarizeFinances(orders: FinanceOrder[], expenses: FinanceExpen
 
   for (const order of orders) {
     for (const item of order.order_items ?? []) {
-      if (item.cost_status === 'complete' && item.unit_cost_dzd != null) {
+      if ((item.cost_status === 'complete' || item.cost_status === 'partial') && item.unit_cost_dzd != null) {
+        // Partial snapshots still contain known machine/labour/packaging costs.
+        // Subtract those known amounts while keeping the line outside full-cost coverage.
         estimatedProductionCostDzd += Number(item.unit_cost_dzd) * Number(item.quantity)
-        completeItems += Number(item.quantity)
+        if (item.cost_status === 'complete') completeItems += Number(item.quantity)
+        else uncostedItems += Number(item.quantity)
       } else {
         // A linked expense contributes to profit, but cannot prove every line is fully costed.
         uncostedItems += Number(item.quantity)

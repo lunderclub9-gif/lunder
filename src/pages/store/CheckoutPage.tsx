@@ -203,7 +203,7 @@ export default function CheckoutPage() {
         <h1 className="mt-2 text-3xl font-black tracking-tight text-offwhite">Presque à vous.</h1>
         <p className="mt-2 text-sm text-charcoal-400">Confirmez vos coordonnées et choisissez votre mode de livraison.</p>
         <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-4">
-          {[['01', 'Panier', true], ['02', 'Livraison', true], ['03', 'Confirmation', false]].map(([number, label, active]) => <div key={number} className="flex items-center gap-2"><span className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ' + (active ? 'bg-brand-red text-white' : 'bg-charcoal-700 text-charcoal-400')}>{number}</span><span className={'text-[11px] font-semibold sm:text-xs ' + (active ? 'text-offwhite' : 'text-charcoal-500')}>{label}</span></div>)}
+          {[{ number: '01', label: 'Panier', active: true }, { number: '02', label: 'Livraison', active: true }, { number: '03', label: 'Confirmation', active: false }].map((step) => <div key={step.number} className="flex items-center gap-2"><span className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ' + (step.active ? 'bg-brand-red text-white' : 'bg-charcoal-700 text-charcoal-400')}>{step.number}</span><span className={'text-[11px] font-semibold sm:text-xs ' + (step.active ? 'text-offwhite' : 'text-charcoal-500')}>{step.label}</span></div>)}
         </div>
       </div>
 

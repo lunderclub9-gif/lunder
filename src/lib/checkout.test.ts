@@ -36,6 +36,7 @@ describe('orderErrorMessage', () => {
   it('traduit les codes métier en français', () => {
     expect(orderErrorMessage('STOCK_INSUFFISANT', 'Erreur')).toContain('Stock insuffisant')
     expect(orderErrorMessage('LIVRAISON_INDISPONIBLE', 'Erreur')).toContain('livraison')
+    expect(orderErrorMessage('TROP_DEMANDES', 'Erreur')).toContain('quelques minutes')
     expect(orderErrorMessage('DIMENSIONS_INVALIDES', 'Erreur')).toContain('dimensions')
     expect(orderErrorMessage('COMMANDE_NON_LIVREE', 'Erreur')).toContain('livrée')
   })

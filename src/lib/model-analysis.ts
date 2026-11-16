@@ -18,14 +18,35 @@ export type ModelAnalysis = {
 
 type Bounds = { min: [number, number, number]; max: [number, number, number] }
 
-type GltfAccessor = {
-  bufferView?: number
-  byteOffset?: number
-  componentType?: number
-  count?: number
-  type?: string
+type GltfAccessor = { bufferView?: number; byteOffset?: number; componentType?: number; count?: number; type?: string }
+type GltfBufferView = { buffer?: number; byteOffset?: number; byteLength?: number; byteStride?: number }
+
+const MAX_GLTF_VERTICES = 250_000
+const MAX_GLTF_INDICES = 750_000
+
+function checkedBufferView(document: GltfDocument, buffers: Uint8Array[], viewIndex: number, accessorOffset: number, count: number, elementBytes: number, stride: number) {
+  const view = document.bufferViews?.[viewIndex]
+  const data = buffers[view?.buffer ?? 0]
+  const viewOffset = view?.byteOffset ?? 0
+  const viewLength = view?.byteLength
+  if (!view || !data || !Number.isInteger(viewOffset) || viewOffset < 0 ||
+      !Number.isInteger(viewLength) || (viewLength as number) <= 0 ||
+      viewOffset + (viewLength as number) > data.byteLength ||
+      !Number.isInteger(accessorOffset) || accessorOffset < 0 ||
+      !Number.isInteger(count) || count < 1 ||
+      !Number.isInteger(stride) || stride < elementBytes ||
+      accessorOffset + (count - 1) * stride + elementBytes > (viewLength as number)) {
+    throw new Error('Le fichier glTF contient des plages mémoire invalides ou tronquées.')
+  }
+  return { data, offset: viewOffset + accessorOffset }
 }
-type GltfBufferView = { buffer?: number; byteOffset?: number; byteStride?: number }
+
+function signedTetraVolumeFlat(points: Float64Array, a: number, b: number, c: number) {
+  const ax = points[a * 3], ay = points[a * 3 + 1], az = points[a * 3 + 2]
+  const bx = points[b * 3], by = points[b * 3 + 1], bz = points[b * 3 + 2]
+  const cx = points[c * 3], cy = points[c * 3 + 1], cz = points[c * 3 + 2]
+  return (ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)) / 6
+}
 type GltfPrimitive = { attributes?: Record<string, number>; indices?: number; mode?: number }
 type GltfNode = {
   mesh?: number
@@ -228,75 +249,75 @@ async function analyzeGltfDocument(document: GltfDocument, buffers: Uint8Array[]
       const accessorIndex = primitive.attributes?.POSITION
       if (typeof accessorIndex !== 'number') continue
       const accessor = document.accessors?.[accessorIndex]
-      if (!accessor || accessor.type !== 'VEC3' || typeof accessor.bufferView !== 'number') continue
-      const bufferView = document.bufferViews?.[accessor.bufferView]
-      const data = buffers[bufferView?.buffer ?? 0]
-      if (!bufferView || !data || typeof accessor.componentType !== 'number') continue
-      const componentBytes = ({ 5126: 4, 5123: 2, 5125: 4, 5122: 2, 5121: 1, 5120: 1 } as Record<number, number>)[accessor.componentType]
-      if (!componentBytes) continue
-      const stride = bufferView.byteStride ?? componentBytes * 3
-      const offset = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0)
-      const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength)
-      const read = (position: number) => {
-        switch (accessor.componentType) {
-          case 5126: return dataView.getFloat32(position, true)
-          case 5125: return dataView.getUint32(position, true)
-          case 5123: return dataView.getUint16(position, true)
-          case 5122: return dataView.getInt16(position, true)
-          case 5121: return dataView.getUint8(position)
-          default: return dataView.getInt8(position)
-        }
+      if (!accessor || accessor.type !== 'VEC3' || typeof accessor.bufferView !== 'number') {
+        warnings.push('Un attribut POSITION glTF est incomplet et a été ignoré.')
+        continue
       }
-      const positions: number[][] = []
-      for (let i = 0; i < (accessor.count ?? 0); i += 1) {
-        const point = [0, 1, 2].map((axis) => read(offset + i * stride + axis * componentBytes))
-        positions.push(point)
-        if (point.every(Number.isFinite)) {
-          addVertex(bounds, point[0], point[1], point[2])
-          vertexCount += 1
-        }
+      if (accessor.componentType !== 5126) {
+        warnings.push('Les positions glTF quantifiées ne sont pas prises en charge ; exportez les positions en FLOAT.')
+        continue
+      }
+      const count = accessor.count ?? 0
+      if (!Number.isInteger(count) || count < 1 || count > MAX_GLTF_VERTICES || vertexCount + count > MAX_GLTF_VERTICES) {
+        throw new Error('Ce modèle glTF contient trop de sommets pour une analyse sûre dans le navigateur. Exportez une version simplifiée.')
+      }
+      const bufferView = document.bufferViews?.[accessor.bufferView]
+      const stride = bufferView?.byteStride ?? 12
+      const positionBuffer = checkedBufferView(document, buffers, accessor.bufferView, accessor.byteOffset ?? 0, count, 12, stride)
+      const dataView = new DataView(positionBuffer.data.buffer, positionBuffer.data.byteOffset, positionBuffer.data.byteLength)
+      const positions = new Float64Array(count * 3)
+      for (let i = 0; i < count; i += 1) {
+        const base = positionBuffer.offset + i * stride
+        const x = dataView.getFloat32(base, true)
+        const y = dataView.getFloat32(base + 4, true)
+        const z = dataView.getFloat32(base + 8, true)
+        if (![x, y, z].every(Number.isFinite)) throw new Error('Le modèle glTF contient des coordonnées non finies.')
+        positions[i * 3] = x
+        positions[i * 3 + 1] = y
+        positions[i * 3 + 2] = z
+        addVertex(bounds, x, y, z)
+        vertexCount += 1
       }
 
-      // glTF primitive mode 4 is TRIANGLES (the default). Other modes are
-      // bounded, but are not converted into a volume estimate here.
+      // glTF primitive mode 4 is TRIANGLES (the default). Other modes are bounded,
+      // but are not converted into a volume estimate here.
       if (primitive.mode !== undefined && primitive.mode !== 4) {
         warnings.push('Certaines primitives ne sont pas des triangles simples ; leur volume géométrique est exclu du calcul.')
         continue
       }
 
       const indexAccessor = primitive.indices === undefined ? null : document.accessors?.[primitive.indices]
-      let indices: number[]
-      if (indexAccessor) {
-        if (typeof indexAccessor.componentType !== 'number' || typeof indexAccessor.bufferView !== 'number') {
-          warnings.push('Une liste d’indices glTF ne référence pas de buffer exploitable ; volume incomplet.')
-          continue
-        }
-        const indexView = document.bufferViews?.[indexAccessor.bufferView]
-        const indexData = buffers[indexView?.buffer ?? 0]
-        const indexBytes = ({ 5121: 1, 5123: 2, 5125: 4 } as Record<number, number>)[indexAccessor.componentType]
-        if (!indexView || !indexData || !indexBytes) {
-          warnings.push('Une liste d’indices glTF n’a pas pu être lue ; volume incomplet.')
-          continue
-        }
-        const indexDataView = new DataView(indexData.buffer, indexData.byteOffset, indexData.byteLength)
-        const indexStride = indexView.byteStride ?? indexBytes
-        const indexOffset = (indexView.byteOffset ?? 0) + (indexAccessor.byteOffset ?? 0)
-        const readIndex = (position: number) => indexAccessor.componentType === 5125
-          ? indexDataView.getUint32(position, true)
-          : indexAccessor.componentType === 5123
-            ? indexDataView.getUint16(position, true)
-            : indexDataView.getUint8(position)
-        indices = Array.from({ length: indexAccessor.count ?? 0 }, (_, index) => readIndex(indexOffset + index * indexStride))
-      } else {
-        indices = Array.from({ length: positions.length }, (_, index) => index)
+      const indexCount = indexAccessor ? (indexAccessor.count ?? 0) : count
+      if (!Number.isInteger(indexCount) || indexCount < 3 || indexCount > MAX_GLTF_INDICES) {
+        warnings.push('Une primitive glTF contient un nombre d’indices non pris en charge ; son volume est exclu.')
+        continue
       }
-      for (let index = 0; index + 2 < indices.length; index += 3) {
-        const a = positions[indices[index]]
-        const b = positions[indices[index + 1]]
-        const c = positions[indices[index + 2]]
-        if (!a || !b || !c) continue
+      if (indexAccessor && (indexAccessor.type !== 'SCALAR' || ![5121, 5123, 5125].includes(indexAccessor.componentType ?? 0) || typeof indexAccessor.bufferView !== 'number')) {
+        warnings.push('Une liste d’indices glTF utilise un format non pris en charge ; son volume est exclu.')
+        continue
+      }
+      const indexBytes = indexAccessor ? ({ 5121: 1, 5123: 2, 5125: 4 } as Record<number, number>)[indexAccessor.componentType as number] : 0
+      const indexView = indexAccessor ? document.bufferViews?.[indexAccessor.bufferView as number] : null
+      const indexStride = indexAccessor ? (indexView?.byteStride ?? indexBytes) : 0
+      const indexBuffer = indexAccessor
+        ? checkedBufferView(document, buffers, indexAccessor.bufferView as number, indexAccessor.byteOffset ?? 0, indexCount, indexBytes, indexStride)
+        : null
+      const indexDataView = indexBuffer ? new DataView(indexBuffer.data.buffer, indexBuffer.data.byteOffset, indexBuffer.data.byteLength) : null
+      const readIndex = (position: number) => {
+        if (!indexAccessor || !indexBuffer || !indexDataView) return position
+        const offset = indexBuffer.offset + position * indexStride
+        if (indexAccessor.componentType === 5125) return indexDataView.getUint32(offset, true)
+        if (indexAccessor.componentType === 5123) return indexDataView.getUint16(offset, true)
+        return indexDataView.getUint8(offset)
+      }
+      if (indexCount % 3 !== 0) warnings.push('Le nombre d’indices glTF n’est pas divisible par trois ; les derniers indices sont ignorés.')
+      for (let index = 0; index + 2 < indexCount; index += 3) {
+        const a = readIndex(index)
+        const b = readIndex(index + 1)
+        const c = readIndex(index + 2)
+        if (a >= count || b >= count || c >= count) throw new Error('Le modèle glTF contient un indice de sommet hors limites.')
         triangleCount += 1
-        volume += signedTetraVolume(a, b, c)
+        volume += signedTetraVolumeFlat(positions, a, b, c)
       }
     }
   }
@@ -308,7 +329,7 @@ async function analyzeGltfDocument(document: GltfDocument, buffers: Uint8Array[]
 async function analyzeGlb(file: File): Promise<ModelAnalysis> {
   const buffer = await file.arrayBuffer()
   const view = new DataView(buffer)
-  if (view.byteLength < 20 || view.getUint32(0, true) !== 0x46546c67) throw new Error('En-tête GLB invalide.')
+  if (view.byteLength < 20 || view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== view.byteLength) throw new Error('En-tête GLB invalide ou longueur déclarée incorrecte.')
   let offset = 12
   let document: GltfDocument | null = null
   let binary: Uint8Array | null = null
@@ -324,7 +345,11 @@ async function analyzeGlb(file: File): Promise<ModelAnalysis> {
   if (!document) throw new Error('Le fichier GLB ne contient pas de document JSON.')
   const buffers = (document.buffers ?? []).map((entry, index: number) => {
     if (typeof entry.uri === 'string') throw new Error('Le GLB référence une ressource externe non intégrée.')
-    if (index === 0 && binary) return binary
+    if (index === 0 && binary) {
+      if (typeof entry.byteLength !== 'number' || entry.byteLength > binary.byteLength) throw new Error('La ressource binaire GLB est tronquée.')
+      return binary
+    }
+    if ((entry.byteLength ?? 0) > 0) throw new Error('Une ressource binaire GLB est manquante.')
     return new Uint8Array()
   })
   return analyzeGltfDocument(document, buffers, 'glb')

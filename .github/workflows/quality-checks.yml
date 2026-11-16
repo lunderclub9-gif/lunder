@@ -1,8 +1,5 @@
 name: Quality checks
 
-permissions:
-  contents: write
-
 on:
   push:
     branches:
@@ -12,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:

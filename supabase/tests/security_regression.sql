@@ -1,4 +1,4 @@
--- Run with psql / Supabase SQL editor after migrations 001–021 on a test DB.
+-- Run with psql / Supabase SQL editor after migrations 001–022 on a test DB.
 -- These assertions intentionally fail if a privileged RPC becomes public again.
 
 DO $$
@@ -28,6 +28,30 @@ BEGIN
   IF NOT has_function_privilege('anon', 'public.create_guest_order(jsonb)', 'EXECUTE')
      OR NOT has_function_privilege('anon', 'public.track_order(text,text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'A required guest RPC grant is missing.';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.estimate_manufacturing_dimensions(numeric,numeric,numeric,text,integer,jsonb,boolean)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.estimate_manufacturing_model(numeric,numeric,numeric,numeric,text,integer,jsonb,boolean)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.estimate_manufacturing_quote(text,numeric,numeric,integer,jsonb,boolean)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.estimate_manufacturing_dimensions(numeric,numeric,numeric,text,integer,jsonb,boolean)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.estimate_manufacturing_model(numeric,numeric,numeric,numeric,text,integer,jsonb,boolean)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'An unthrottled manufacturing estimate RPC is still executable by a client role.';
+  END IF;
+
+  IF NOT has_function_privilege('anon', 'public.estimate_manufacturing_dimensions_limited(numeric,numeric,numeric,text,integer,jsonb,boolean)', 'EXECUTE')
+     OR NOT has_function_privilege('anon', 'public.estimate_manufacturing_model_limited(numeric,numeric,numeric,numeric,text,integer,jsonb,boolean)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.estimate_manufacturing_dimensions_limited(numeric,numeric,numeric,text,integer,jsonb,boolean)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.estimate_manufacturing_model_limited(numeric,numeric,numeric,numeric,text,integer,jsonb,boolean)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Rate-limited manufacturing estimate RPC grants are missing.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid = 'public.custom_requests'::regclass
+      AND tgname = 'custom_request_products_update_rate_limit'
+      AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'Custom request product save rate-limit trigger is missing.';
   END IF;
 
   IF has_column_privilege('anon', 'public.manufacturing_materials', 'price_per_gram_dzd', 'SELECT') THEN

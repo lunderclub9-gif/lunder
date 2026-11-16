@@ -5,13 +5,13 @@ catalog with 3D previews, guest cash-on-delivery checkout, Algerian delivery rat
 manufacturing requests with versioned quotes, and an owner-only admin area at `/admin`.
 
 **Stack:** React 18 + TypeScript + Vite 7 + Tailwind 3 · Supabase (Postgres, Auth, Storage) ·
-`@google/model-viewer` (lazy-loaded). No server process: all trust lives in Postgres policies and
+`@google/model-viewer` (loaded only when a customer opens a GLB/GLTF preview). No server process: all trust lives in Postgres policies and
 `SECURITY DEFINER` functions.
 
 ## Status
 
 The repository contains the storefront, owner back office, custom-manufacturing workflow, finance MVP,
-security hardening and unit tests. The 21 repository migrations have **not** been validated as one clean
+security hardening, migration regression checks and unit tests. The 21 repository migrations have **not** been validated as one clean
 sequence against a disposable database. Two connected Supabase projects contain the LUNDER schema and
 data, but their migration histories differ (one records only two separate super-admin migrations; the
 other records none). The active deployment target has not been conclusively identified. Do not run
@@ -52,7 +52,7 @@ Every write that carries money, stock, privacy or status is only reachable throu
 | `set_order_status(id, status)` | `SECURITY DEFINER` | owner | Validates the transition map and restores stock exactly once on cancellation |
 | `set_custom_request_status(id, status)` | `SECURITY DEFINER` | owner | Refuses `quoted`/`approved`, which may only result from a quote |
 | `product_cost_estimate(product)` | `SECURITY DEFINER` | owner | Computes cost from configured inputs, separating margin from markup |
-| `is_owner()` | `SECURITY DEFINER STABLE` | anon | Single source of truth for owner checks used by RLS and functions |
+| `is_owner()` | `SECURITY DEFINER STABLE` | authenticated | Single source of truth for owner checks; not executable by anonymous callers |
 | `log_owner_event(action)` | `SECURITY DEFINER` | owner | Append-only auth event, restricted to two action names |
 | `audit_row()` | `SECURITY DEFINER` trigger | nobody | Writes the audit entry with before/after diff; clients cannot insert logs |
 | `handle_new_user()` | `SECURITY DEFINER` trigger | nobody | Creates the profile with `role = 'customer'` on signup |
@@ -111,8 +111,9 @@ checks `is_owner()` inside them; guest token/checkout/estimate endpoints are exp
   Storage uploads, and abandoned/orphaned uploads need a scheduled cleanup or server-issued upload ticket.
 - Owner sign-in/out is logged by the app calling `log_owner_event`; an API login that bypasses the app
   is not recorded. Real auth-event logging needs a server-side hook.
-- `next_order_number()` is executable by any role and can only consume sequence values — it reveals
-  nothing and merely creates gaps in the numbering.
+- Internal helpers and trigger functions (`next_order_number`, audit hooks, status guards and cost
+  calculators) are not executable by `anon` or `authenticated`; triggers and trusted functions invoke
+  them as their database owner. The guest RPC surface is explicitly allow-listed.
 - Authorisation is only as good as the policies: any new table needs RLS enabled and an owner policy,
   which is why every migration here does both explicitly.
 

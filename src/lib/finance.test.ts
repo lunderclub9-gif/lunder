@@ -60,7 +60,7 @@ describe('summarizeFinances', () => {
     expect(result.isIncomplete).toBe(true)
   })
 
-  it('excludes partial cost snapshots from complete-cost totals', () => {
+  it('subtracts known partial costs without counting the line as fully costed', () => {
     const partial = order({
       order_items: [{
         id: 'line-3',
@@ -73,8 +73,10 @@ describe('summarizeFinances', () => {
       }],
     })
     const result = summarizeFinances([partial], [])
-    expect(result.estimatedProductionCostDzd).toBe(0)
+    expect(result.estimatedProductionCostDzd).toBe(250)
+    expect(result.provisionalProfitDzd).toBe(5250)
     expect(result.costCoveragePercent).toBe(0)
+    expect(result.uncostedItems).toBe(1)
     expect(result.isIncomplete).toBe(true)
   })
 

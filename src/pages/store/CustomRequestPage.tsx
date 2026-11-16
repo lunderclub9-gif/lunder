@@ -492,6 +492,7 @@ export default function CustomRequestPage() {
             format: product.analysis.format, mesh_volume_cm3: product.analysis.meshVolumeCm3,
             bounding_box_volume_cm3: product.analysis.boundingBoxVolumeCm3,
             triangle_count: product.analysis.triangleCount, vertex_count: product.analysis.vertexCount,
+            component_count: product.analysis.componentCount,
             warnings: product.analysis.warnings,
           },
         })),

@@ -174,10 +174,17 @@ export default function CustomRequestPage() {
       length: product.target.length, width: product.target.width, height: product.target.height,
       quantity: product.quantity, material: product.material,
     })) : [fallback]
-    const results = await Promise.all(inputs.map((item) => supabase.rpc('estimate_manufacturing_dimensions', {
-      p_length_mm: item.length, p_width_mm: item.width, p_height_mm: item.height,
-      p_material_name: item.material, p_quantity: item.quantity, p_options: effectiveOptions, p_rush: rush,
-    })))
+    const results = await Promise.all(inputs.map((item, index) => activeProducts.length
+      ? supabase.rpc('estimate_manufacturing_model', {
+          p_length_mm: item.length, p_width_mm: item.width, p_height_mm: item.height,
+          p_mesh_volume_cm3: activeProducts[index].analysis.meshVolumeCm3,
+          p_material_name: item.material, p_quantity: item.quantity, p_options: effectiveOptions, p_rush: rush,
+        })
+      : supabase.rpc('estimate_manufacturing_dimensions', {
+          p_length_mm: item.length, p_width_mm: item.width, p_height_mm: item.height,
+          p_material_name: item.material, p_quantity: item.quantity, p_options: effectiveOptions, p_rush: rush,
+        })
+    ))
     setEstimateLoading(false)
     const failed = results.find((result) => result.error || !result.data)
     if (failed) {
@@ -202,7 +209,7 @@ export default function CustomRequestPage() {
       estimates: {
         grams: rows.reduce((sum, row) => sum + Number((row.estimates as Record<string, unknown> | undefined)?.grams ?? 0), 0),
         printHours: Math.round(rows.reduce((sum, row) => sum + Number((row.estimates as Record<string, unknown> | undefined)?.printHours ?? 0), 0) * 10) / 10,
-        method: activeProducts.length ? 'multiple_model_bounding_box_estimates' : String((rows[0].estimates as Record<string, unknown> | undefined)?.method ?? ''),
+        method: activeProducts.length ? 'multiple_model_geometry_or_bounding_box_estimates' : String((rows[0].estimates as Record<string, unknown> | undefined)?.method ?? ''),
       },
     })
   }, [lengthMm, widthMm, heightMm, material, quantity, options, rush, productSpecs])
@@ -753,7 +760,7 @@ export default function CustomRequestPage() {
               {estimate.estimates && (
                 <p className="mt-2 text-xs text-charcoal-500">
                   Estimation de production : environ {estimate.estimates.grams ?? '—'} g et{' '}
-                  {estimate.estimates.printHours ?? '—'} h — méthode : {estimate.estimates.method === 'multiple_model_bounding_box_estimates' ? 'calcul séparé par modèle à partir des dimensions' : 'boîte englobante'}.
+                  {estimate.estimates.printHours ?? '—'} h — méthode : {estimate.estimates.method === 'multiple_model_geometry_or_bounding_box_estimates' ? 'calcul séparé par modèle à partir des dimensions' : 'boîte englobante'}.
                 </p>
               )}
               {estimate.assumptions && estimate.assumptions.length > 0 && (

@@ -551,6 +551,71 @@ export default function CustomRequestPage() {
         </div>
 
         <div className="admin-card">
+          <h2 className="mb-2 text-lg font-semibold text-offwhite">Fichiers</h2>
+          <p className="mb-4 text-xs text-charcoal-400">
+            Photos et fichiers 3D sont stockés dans un espace privé, accessibles uniquement au
+            studio. Formats acceptés : JPG, PNG, WebP, AVIF (5 Mo), GLB, GLTF, STL, OBJ (25 Mo).
+            Les fichiers 3D autonomes sont analysés pour extraire leurs dimensions et, lorsque possible,
+            le volume du maillage. Les mesures STL/OBJ supposent des millimètres ; le client peut ensuite
+            choisir les dimensions finales. Le temps et le poids de filament restent indicatifs sans G-code.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="btn-secondary cursor-pointer justify-center">
+              <Upload className="h-4 w-4" />
+              Ajouter des photos
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                multiple
+                disabled={uploading}
+                className="hidden"
+                onChange={(event) => handleFiles(event.target.files, 'image')}
+              />
+            </label>
+            <label className="btn-secondary cursor-pointer justify-center">
+              <Paperclip className="h-4 w-4" />
+              Ajouter un fichier 3D
+              <input
+                type="file"
+                accept=".glb,.gltf,.stl,.obj"
+                multiple
+                disabled={uploading}
+                className="hidden"
+                onChange={(event) => handleFiles(event.target.files, 'model')}
+              />
+            </label>
+          </div>
+
+          {uploading && (
+            <p className="mt-3 flex items-center gap-2 text-xs text-charcoal-300">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Téléversement en cours…
+            </p>
+          )}
+
+          {files.length > 0 && (
+            <ul className="mt-4 space-y-2">
+              {files.map((file) => (
+                <li
+                  key={file.path}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-charcoal-400/15 px-3 py-2 text-sm"
+                >
+                  <span className="min-w-0 truncate text-charcoal-200">{file.name}</span>
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => removeFile(file.path)}
+                    className="text-charcoal-400 hover:text-brand-red"
+                    aria-label={`Retirer ${file.name}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="admin-card">
           <h2 className="mb-2 text-lg font-semibold text-offwhite">Dimensions et matière</h2>
           <p className="mb-4 text-xs text-charcoal-400">
             Si vous ne joignez pas de modèle 3D, saisissez ses dimensions ici. Si vous joignez un ou plusieurs modèles analysables, leurs dimensions seront extraites automatiquement et vous pourrez définir la taille souhaitée pour chaque produit.
@@ -795,71 +860,7 @@ export default function CustomRequestPage() {
           )}
         </div>
 
-        <div className="admin-card">
-          <h2 className="mb-2 text-lg font-semibold text-offwhite">Fichiers</h2>
-          <p className="mb-4 text-xs text-charcoal-400">
-            Photos et fichiers 3D sont stockés dans un espace privé, accessibles uniquement au
-            studio. Formats acceptés : JPG, PNG, WebP, AVIF (5 Mo), GLB, GLTF, STL, OBJ (25 Mo).
-            Les fichiers 3D autonomes sont analysés pour extraire leurs dimensions et, lorsque possible,
-            le volume du maillage. Les mesures STL/OBJ supposent des millimètres ; le client peut ensuite
-            choisir les dimensions finales. Le temps et le poids de filament restent indicatifs sans G-code.
-          </p>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="btn-secondary cursor-pointer justify-center">
-              <Upload className="h-4 w-4" />
-              Ajouter des photos
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif"
-                multiple
-                disabled={uploading}
-                className="hidden"
-                onChange={(event) => handleFiles(event.target.files, 'image')}
-              />
-            </label>
-            <label className="btn-secondary cursor-pointer justify-center">
-              <Paperclip className="h-4 w-4" />
-              Ajouter un fichier 3D
-              <input
-                type="file"
-                accept=".glb,.gltf,.stl,.obj"
-                multiple
-                disabled={uploading}
-                className="hidden"
-                onChange={(event) => handleFiles(event.target.files, 'model')}
-              />
-            </label>
-          </div>
-
-          {uploading && (
-            <p className="mt-3 flex items-center gap-2 text-xs text-charcoal-300">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Téléversement en cours…
-            </p>
-          )}
-
-          {files.length > 0 && (
-            <ul className="mt-4 space-y-2">
-              {files.map((file) => (
-                <li
-                  key={file.path}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-charcoal-400/15 px-3 py-2 text-sm"
-                >
-                  <span className="min-w-0 truncate text-charcoal-200">{file.name}</span>
-                  <button
-                    type="button"
-                    disabled={uploading}
-                    onClick={() => removeFile(file.path)}
-                    className="text-charcoal-400 hover:text-brand-red"
-                    aria-label={`Retirer ${file.name}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
 
         {estimateAccepted && (
           <>

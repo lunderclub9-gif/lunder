@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Mail, MapPin, Phone } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { safeExternalUrl } from '@/lib/url'
+import { toMailtoHref, toTelHref } from '@/lib/contact'
 
 type Setting = { key: string; value: string | null }
 
@@ -27,7 +29,11 @@ export default function InfoPage() {
       })
   }, [])
 
-  const socials = Object.keys(SOCIAL_LABELS).filter((key) => settings[key])
+  const telHref = toTelHref(settings.phone)
+  const mailHref = toMailtoHref(settings.email)
+  const socials = Object.keys(SOCIAL_LABELS)
+    .map((key) => ({ key, label: SOCIAL_LABELS[key], url: safeExternalUrl(settings[key]) }))
+    .filter((social): social is { key: string; label: string; url: string } => Boolean(social.url))
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -35,18 +41,18 @@ export default function InfoPage() {
 
       <section className="admin-card mt-6 space-y-2 text-sm text-charcoal-300">
         <h2 className="mb-2 text-lg font-semibold text-offwhite">Nous contacter</h2>
-        {settings.phone ? (
+        {telHref ? (
           <p className="flex items-center gap-2">
             <Phone className="h-4 w-4 text-brand-red" />
-            <a href={`tel:${settings.phone.replace(/\s/g, '')}`} className="hover:text-offwhite">
+            <a href={telHref} className="hover:text-offwhite">
               {settings.phone}
             </a>
           </p>
         ) : null}
-        {settings.email ? (
+        {mailHref ? (
           <p className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-brand-red" />
-            <a href={`mailto:${settings.email}`} className="hover:text-offwhite">
+            <a href={mailHref} className="hover:text-offwhite">
               {settings.email}
             </a>
           </p>
@@ -57,7 +63,7 @@ export default function InfoPage() {
             {settings.address}
           </p>
         ) : null}
-        {!settings.phone && !settings.email && !settings.address && (
+        {!telHref && !mailHref && !settings.address && (
           <p className="text-charcoal-400">
             Les coordonnées du studio ne sont pas encore renseignées.
           </p>
@@ -65,15 +71,15 @@ export default function InfoPage() {
 
         {socials.length > 0 && (
           <div className="flex flex-wrap gap-3 pt-2">
-            {socials.map((key) => (
+            {socials.map((social) => (
               <a
-                key={key}
-                href={settings[key]}
+                key={social.key}
+                href={social.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-brand-red underline-offset-4 hover:underline"
               >
-                {SOCIAL_LABELS[key]}
+                {social.label}
               </a>
             ))}
           </div>

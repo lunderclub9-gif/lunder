@@ -40,6 +40,8 @@ DECLARE
   v_height numeric;
   v_quantity integer;
   v_volume_cm3 numeric;
+  v_mesh_volume_cm3 numeric;
+  v_estimate_method text;
   v_grams numeric;
   v_hours numeric;
   v_full jsonb;
@@ -111,6 +113,14 @@ BEGIN
     IF NOT FOUND THEN RAISE EXCEPTION 'MATIERE_INDISPONIBLE'; END IF;
 
     v_volume_cm3 := (v_length * v_width * v_height) / 1000.0;
+    v_mesh_volume_cm3 := nullif(v_product->'geometry'->>'mesh_volume_cm3', '')::numeric;
+    IF v_mesh_volume_cm3 IS NOT NULL AND v_mesh_volume_cm3 > 0
+       AND v_mesh_volume_cm3 <= v_volume_cm3 * 1.05 THEN
+      v_volume_cm3 := v_mesh_volume_cm3;
+      v_estimate_method := 'mesh_volume_heuristic';
+    ELSE
+      v_estimate_method := 'bounding_box_heuristic';
+    END IF;
     v_grams := greatest(
       v_volume_cm3 * v_rules.effective_volume_percent::numeric / 100
         * v_material.density_g_cm3,
@@ -162,7 +172,7 @@ BEGIN
       'gramsPerPiece', round(v_grams, 2),
       'hoursPerPiece', round(v_hours, 2),
       'totalDzd', coalesce((v_full->>'totalDzd')::integer, 0),
-      'method', 'bounding_box_heuristic'
+      'method', v_estimate_method
     ));
   END LOOP;
 
@@ -180,12 +190,12 @@ BEGIN
         'estimates', jsonb_build_object(
           'grams', round(v_total_grams, 1),
           'printHours', round(v_total_hours, 1),
-          'method', 'multi_product_bounding_box_heuristic',
+          'method', 'multi_product_mesh_or_bounding_box_heuristic',
           'geometryVerified', false
         ),
         'assumptions', jsonb_build_array(
           'Chaque produit est estimé séparément avec ses dimensions, sa matière et sa quantité.',
-          'Le poids et le temps sont des estimations basées sur les dimensions et les paramètres du studio, pas des données de trancheur.',
+          'Le poids et le temps sont des estimations basées sur le volume géométrique disponible ou la boîte englobante, puis les paramètres du studio ; ce ne sont pas des données de trancheur.',
           'Le studio vérifie les fichiers et confirme le prix final avant fabrication.'
         )
       ),
@@ -302,3 +312,87 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.get_custom_request_by_token(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_custom_request_by_token(uuid) TO anon, authenticated;
+
+
+-- Geometry-aware public estimate. Mesh volume is a client-side measurement of
+-- the uploaded mesh and is treated only as an indicative input; the final quote
+-- is still checked by the studio and can use slicer/G-code measurements.
+CREATE OR REPLACE FUNCTION public.estimate_manufacturing_model(
+  p_length_mm numeric,
+  p_width_mm numeric,
+  p_height_mm numeric,
+  p_mesh_volume_cm3 numeric,
+  p_material_name text,
+  p_quantity integer DEFAULT 1,
+  p_options jsonb DEFAULT '{}'::jsonb,
+  p_rush boolean DEFAULT false
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_rules public.manufacturing_pricing%ROWTYPE;
+  v_material public.manufacturing_materials%ROWTYPE;
+  v_box_volume_cm3 numeric;
+  v_volume_cm3 numeric;
+  v_grams numeric;
+  v_hours numeric;
+  v_full jsonb;
+  v_method text := 'bounding_box_heuristic';
+BEGIN
+  IF p_length_mm IS NULL OR p_width_mm IS NULL OR p_height_mm IS NULL
+     OR p_length_mm <= 0 OR p_width_mm <= 0 OR p_height_mm <= 0
+     OR p_length_mm > 2000 OR p_width_mm > 2000 OR p_height_mm > 2000 THEN
+    RAISE EXCEPTION 'DIMENSIONS_INVALIDES';
+  END IF;
+
+  SELECT * INTO v_rules FROM public.manufacturing_pricing WHERE id = true;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TARIFICATION_INDISPONIBLE'; END IF;
+
+  SELECT * INTO v_material
+  FROM public.manufacturing_materials
+  WHERE lower(btrim(name)) = lower(btrim(coalesce(p_material_name, ''))) AND is_available;
+  IF NOT FOUND THEN RAISE EXCEPTION 'MATIERE_INDISPONIBLE'; END IF;
+
+  v_box_volume_cm3 := (p_length_mm * p_width_mm * p_height_mm) / 1000.0;
+  v_volume_cm3 := v_box_volume_cm3;
+  IF p_mesh_volume_cm3 IS NOT NULL AND p_mesh_volume_cm3 > 0
+     AND p_mesh_volume_cm3 <= v_box_volume_cm3 * 1.05 THEN
+    v_volume_cm3 := p_mesh_volume_cm3;
+    v_method := 'mesh_volume_heuristic';
+  END IF;
+
+  v_grams := greatest(
+    v_volume_cm3 * v_rules.effective_volume_percent::numeric / 100
+      * v_material.density_g_cm3,
+    1
+  );
+  v_hours := greatest(v_grams / v_rules.print_speed_g_per_hour::numeric, 0.1);
+
+  v_full := public.manufacturing_calculate_full(
+    v_material.name, v_grams, v_hours, coalesce(p_quantity, 1),
+    coalesce(p_options, '{}'::jsonb), coalesce(p_rush, false)
+  );
+
+  RETURN public.customer_quote_breakdown(v_full) || jsonb_build_object(
+    'estimates', jsonb_build_object(
+      'grams', round(v_grams),
+      'printHours', round(v_hours * 10) / 10,
+      'method', v_method,
+      'meshVolumeCm3', CASE WHEN v_method = 'mesh_volume_heuristic' THEN round(v_volume_cm3, 3) ELSE NULL END,
+      'boundingBoxVolumeCm3', round(v_box_volume_cm3, 3),
+      'effectiveVolumePercent', v_rules.effective_volume_percent,
+      'printSpeedGPerHour', v_rules.print_speed_g_per_hour,
+      'densityGPerCm3', v_material.density_g_cm3,
+      'geometryVerified', false
+    ),
+    'material', v_full->>'material'
+  );
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.estimate_manufacturing_model(numeric, numeric, numeric, numeric, text, integer, jsonb, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.estimate_manufacturing_model(numeric, numeric, numeric, numeric, text, integer, jsonb, boolean) TO anon, authenticated;

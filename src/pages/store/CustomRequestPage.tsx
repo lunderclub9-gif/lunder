@@ -707,7 +707,8 @@ export default function CustomRequestPage() {
               <label key={key} className="flex items-center gap-1.5">
                 <input
                   type="checkbox"
-                  checked={options[key]}
+                  checked={options[key] || (key === 'modeling' && productSpecs.some((product) => product.mode === 'modify' || product.mode === 'inspiration')) || (key === 'design' && productSpecs.some((product) => product.mode === 'inspiration'))}
+                  disabled={(key === 'modeling' && productSpecs.some((product) => product.mode === 'modify' || product.mode === 'inspiration')) || (key === 'design' && productSpecs.some((product) => product.mode === 'inspiration'))}
                   onChange={(event) =>
                     setOptions((current) => ({ ...current, [key]: event.target.checked }))
                   }

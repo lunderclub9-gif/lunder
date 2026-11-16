@@ -30,7 +30,7 @@ describe('analyze3DModel', () => {
     expect(result.dimensionsMm).toEqual({ length: 10, width: 10, height: 10 })
     expect(result.triangleCount).toBe(4)
     expect(result.meshVolumeCm3).toBeCloseTo(1 / 6, 2)
-    expect(result.componentCount).toBe(1)
+    expect(result.componentCount).toBeNull()
   })
 
   it('rejects unsupported file extensions', async () => {

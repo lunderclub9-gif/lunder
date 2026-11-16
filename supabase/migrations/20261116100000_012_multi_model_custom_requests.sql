@@ -266,12 +266,6 @@ BEGIN
     'estimate_public_breakdown', public.customer_quote_breakdown(r.estimate_breakdown),
     'estimate_accepted_at', r.estimate_accepted_at,
     'rejection_reason', r.rejection_reason,
-    'delivery', jsonb_build_object(
-      'method', r.delivery_method,
-      'address', r.delivery_address,
-      'wilaya', (SELECT name_fr FROM public.wilayas WHERE code = r.delivery_wilaya_code),
-      'commune', (SELECT name_fr FROM public.communes WHERE id = r.delivery_commune_id)
-    ),
     'product_specs', coalesce((
       SELECT jsonb_agg(jsonb_build_object(
         'id', p->>'id',

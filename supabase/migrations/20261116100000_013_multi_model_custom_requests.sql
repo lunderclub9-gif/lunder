@@ -379,7 +379,8 @@ BEGIN
 
   v_box_volume_cm3 := (p_length_mm * p_width_mm * p_height_mm) / 1000.0;
   v_volume_cm3 := v_box_volume_cm3;
-  IF p_mesh_volume_cm3 IS NOT NULL AND p_mesh_volume_cm3 > 0
+  IF p_mesh_volume_cm3 IS NOT NULL
+     AND p_mesh_volume_cm3 >= v_box_volume_cm3 * 0.001
      AND p_mesh_volume_cm3 <= v_box_volume_cm3 * 1.05 THEN
     v_volume_cm3 := p_mesh_volume_cm3;
     v_method := 'mesh_volume_heuristic';

@@ -174,11 +174,11 @@ export default function FinancialDashboardPage() {
       current.revenue += Number(item.line_total_dzd)
       current.quantity += Number(item.quantity)
       if (item.cost_status === 'complete' && item.unit_cost_dzd != null) current.cost += Number(item.unit_cost_dzd) * Number(item.quantity)
-      else if (!manuallyCostedOrders.has(order.id)) current.missing = true
+      else current.missing = true
       map.set(item.product_name, current)
     }))
     return [...map.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 6)
-  }, [orders, expenses])
+  }, [orders])
 
   const expenseBreakdown = useMemo(() => {
     const map = new Map<string, number>()

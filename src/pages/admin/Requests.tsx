@@ -41,6 +41,8 @@ type Quote = {
     discountDzd?: number
     rushFeeDzd?: number
     totalDzd?: number
+    products?: { name: string; quantity: number; dimensionsMm: { length: number; width: number; height: number }; material: string; gramsPerPiece: number; hoursPerPiece: number; totalDzd: number; method: string }[]
+    estimates?: { grams?: number; printHours?: number; method?: string }
   } | null
 }
 type RequestRow = {
@@ -557,6 +559,22 @@ export default function AdminRequests() {
                                 </li>
                               ))}
                             </ul>
+                          )}
+                          {request.estimate_breakdown?.products && (
+                            <div className="mt-3 border-t border-charcoal-400/15 pt-2">
+                              <p className="mb-1 font-semibold text-charcoal-300">Calcul par produit</p>
+                              <ul className="space-y-2">
+                                {request.estimate_breakdown.products.map((product, index) => (
+                                  <li key={`${product.name}-${index}`} className="rounded bg-charcoal-900/60 p-2">
+                                    <p className="font-semibold text-offwhite">{product.name} · {product.quantity} pièce(s)</p>
+                                    <p>{product.dimensionsMm.length} × {product.dimensionsMm.width} × {product.dimensionsMm.height} mm · {product.material}</p>
+                                    <p>{product.gramsPerPiece} g/pièce · {product.hoursPerPiece} h/pièce · {product.method === 'mesh_volume_heuristic' ? 'volume du maillage' : 'boîte englobante'}</p>
+                                    <p className="mt-1 text-right font-semibold text-offwhite">{formatDzd(product.totalDzd)}</p>
+                                  </li>
+                                ))}
+                              </ul>
+                              {request.estimate_breakdown.estimates && <p className="mt-2 text-charcoal-500">Total estimé : {request.estimate_breakdown.estimates.grams ?? '—'} g · {request.estimate_breakdown.estimates.printHours ?? '—'} h</p>}
+                            </div>
                           )}
                         </>
                       ) : (

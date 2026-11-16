@@ -78,7 +78,7 @@ describe('summarizeFinances', () => {
     expect(result.isIncomplete).toBe(true)
   })
 
-  it('treats a custom order as cost-covered when its production expense is linked', () => {
+  it('counts linked custom production expenses without falsely marking item costs complete', () => {
     const custom = order({
       id: 'custom-order',
       order_items: [{
@@ -101,7 +101,7 @@ describe('summarizeFinances', () => {
     }
     const result = summarizeFinances([custom], [linkedProductionCost])
     expect(result.manualProductionCostDzd).toBe(3500)
-    expect(result.uncostedItems).toBe(0)
-    expect(result.isIncomplete).toBe(false)
+    expect(result.uncostedItems).toBe(1)
+    expect(result.isIncomplete).toBe(true)
   })
 })

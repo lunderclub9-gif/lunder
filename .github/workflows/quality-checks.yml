@@ -3,7 +3,7 @@ name: Quality checks
 on:
   push:
     branches:
-      - feature/smart-custom-manufacturing-analyzer
+      - 'feature/**'
   pull_request:
     branches:
       - main

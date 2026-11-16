@@ -207,8 +207,8 @@ export default function CustomRequestPage() {
       rushFeeDzd: rows.reduce((sum, row) => sum + Number(row.rushFeeDzd ?? 0), 0),
       assumptions: [...new Set(rows.flatMap((row) => (row.assumptions as string[]) ?? []))],
       estimates: {
-        grams: rows.reduce((sum, row) => sum + Number((row.estimates as Record<string, unknown> | undefined)?.grams ?? 0), 0),
-        printHours: Math.round(rows.reduce((sum, row) => sum + Number((row.estimates as Record<string, unknown> | undefined)?.printHours ?? 0), 0) * 10) / 10,
+        grams: rows.reduce((sum, row, index) => sum + Number((row.estimates as Record<string, unknown> | undefined)?.grams ?? 0) * inputs[index].quantity, 0),
+        printHours: Math.round(rows.reduce((sum, row, index) => sum + Number((row.estimates as Record<string, unknown> | undefined)?.printHours ?? 0) * inputs[index].quantity, 0) * 10) / 10,
         method: activeProducts.length ? 'multiple_model_geometry_or_bounding_box_estimates' : String((rows[0].estimates as Record<string, unknown> | undefined)?.method ?? ''),
       },
     })

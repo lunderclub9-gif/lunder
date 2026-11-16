@@ -43,7 +43,7 @@ BEGIN
 
   -- Trusted database/service operations and the store owner are not throttled.
   IF session_user IN ('postgres', 'supabase_admin')
-     OR coalesce(auth.role(), '') = 'service_role'
+     OR coalesce(auth.jwt()->>'role', '') = 'service_role'
      OR (auth.uid() IS NOT NULL AND public.is_owner()) THEN
     RETURN true;
   END IF;

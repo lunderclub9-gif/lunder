@@ -123,7 +123,8 @@ export default function FinancialDashboardPage() {
         .select('total_dzd')
         .in('status', ['pending', 'confirmed', 'shipped'])
         .gte('created_at', dateStartIso(period.from))
-        .lt('created_at', dateStartIso(period.nextDay))\n        .is('archived_at', null),
+        .lt('created_at', dateStartIso(period.nextDay))
+        .is('archived_at', null),
     ])
 
     if (ordersError || expensesError || pendingError) {

@@ -171,6 +171,7 @@ export default function CustomRequestStatusPage() {
             {(request.product_specs ?? []).map((product, index) => (
               <div key={product.id || product.file_name} className="rounded-md bg-charcoal-900/60 p-2 text-xs">
                 <p className="font-semibold text-offwhite">{index + 1}. {product.file_name}</p>
+                <p className="mt-1 text-charcoal-400">{({ reference: "Modèle de référence", exact: "Dimensions exactes du fichier", modify: "Modification demandée", inspiration: "Inspiration pour une création" } as Record<string, string>)[product.mode] ?? "Modèle transmis"}</p>
                 <p className="mt-1">{product.target_dimensions_mm.length} × {product.target_dimensions_mm.width} × {product.target_dimensions_mm.height} mm · {product.quantity} pièce(s)</p>
                 <p className="text-charcoal-400">{product.material_name}{product.color ? ` · ${product.color}` : ''}</p>
                 {product.instructions && <p className="mt-1 whitespace-pre-line text-charcoal-300">Détails : {product.instructions}</p>}
@@ -179,9 +180,19 @@ export default function CustomRequestStatusPage() {
           </div>
         )}
         {request.files.length > 0 && (
-          <p className="text-xs text-charcoal-400">
-            {request.files.length} fichier(s) transmis — conservés en privé.
-          </p>
+          <div className="rounded-lg border border-charcoal-400/15 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-charcoal-400">
+              Fichiers reçus ({request.files.length}) — conservés en privé
+            </p>
+            <ul className="space-y-1">
+              {request.files.map((file, index) => (
+                <li key={index} className="flex items-center justify-between gap-3 text-xs">
+                  <span className="min-w-0 truncate text-charcoal-200">{file.original_name}</span>
+                  <span className="shrink-0 text-charcoal-500">{file.kind === "model" ? "Modèle 3D" : "Image / référence"}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         {request.estimate_price_dzd != null && (
           <p className="text-xs text-charcoal-400">

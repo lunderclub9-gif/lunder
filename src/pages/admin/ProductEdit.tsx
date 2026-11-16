@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Loader2, Upload, X, Star, Plus, Trash2 } from 'lucide-react'

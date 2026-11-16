@@ -104,7 +104,10 @@ export default function CustomRequestPage() {
           colors: (m.colors as string[]) ?? [],
         }))
         setMaterials(mats)
-        if (mats.length > 0) setMaterial((current) => current || mats[0].name)
+        if (mats.length > 0) {
+          setMaterial((current) => current || mats[0].name)
+          setProductSpecs((current) => current.map((product) => product.material ? product : { ...product, material: mats[0].name }))
+        }
       })
     supabase
       .from('wilayas')
@@ -268,7 +271,7 @@ export default function CustomRequestPage() {
         let modelAnalysis: ModelAnalysis | null = null
         if (isModel) {
           try { modelAnalysis = await analyze3DModel(file) } catch (analysisError) {
-            setEstimateError(analysisError instanceof Error ? analysisError.message : 'Analyse géométrique indisponible pour ce fichier.')
+            setError(analysisError instanceof Error ? `Fichier ajouté, mais analyse impossible : ${analysisError.message}` : 'Fichier ajouté, mais analyse géométrique indisponible.')
           }
         }
         const { error: uploadError } = await supabase.storage

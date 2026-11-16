@@ -81,7 +81,7 @@ export default function CustomRequestPage() {
 
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [productSpecs, setProductSpecs] = useState<ProductSpec[]>([])
-  const [modelViewerReady, setModelViewerReady] = useState(false)
+  const [modelViewerStatus, setModelViewerStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -105,13 +105,14 @@ export default function CustomRequestPage() {
   // This keeps the model-viewer runtime out of visits that only browse the store.
   const hasModelPreview = productSpecs.some((product) => Boolean(product.previewUrl))
   useEffect(() => {
-    if (!hasModelPreview || modelViewerReady) return
+    if (!hasModelPreview || modelViewerStatus !== 'idle') return
     let active = true
+    setModelViewerStatus('loading')
     void import('@google/model-viewer')
-      .then(() => { if (active) setModelViewerReady(true) })
-      .catch(() => { if (active) setModelViewerReady(false) })
+      .then(() => { if (active) setModelViewerStatus('ready') })
+      .catch(() => { if (active) setModelViewerStatus('error') })
     return () => { active = false }
-  }, [hasModelPreview, modelViewerReady])
+  }, [hasModelPreview, modelViewerStatus])
 
   useEffect(() => {
     let active = true
@@ -842,7 +843,7 @@ export default function CustomRequestPage() {
                   </div>
                   <button type="button" onClick={() => void removeFile(product.filePath)} disabled={uploading} className="btn-ghost text-xs">Retirer ce produit</button>
                 </div>
-                {product.previewUrl && modelViewerReady ? (
+                {product.previewUrl && modelViewerStatus === 'ready' ? (
                   <div className="overflow-hidden rounded-lg border border-charcoal-400/15">
                     <p className="px-3 py-2 text-xs text-charcoal-400">Aperçu 3D interactif — faites glisser pour tourner et utilisez le zoom</p>
                     {createElement('model-viewer' as ElementType, {
@@ -855,7 +856,7 @@ export default function CustomRequestPage() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-charcoal-500">{product.previewUrl ? 'Chargement de l’aperçu 3D… Si celui-ci ne s’affiche pas, le fichier et ses dimensions restent transmis au studio.' : 'Aperçu direct disponible pour GLB/GLTF. Le fichier STL/OBJ reste accessible au studio et ses dimensions sont analysées.'}</p>
+                  <p className="text-xs text-charcoal-500">{product.previewUrl ? (modelViewerStatus === 'error' ? 'L’aperçu 3D est indisponible sur cet appareil. Le fichier et ses dimensions restent transmis au studio.' : 'Chargement de l’aperçu 3D…') : 'Aperçu direct disponible pour GLB/GLTF. Le fichier STL/OBJ reste accessible au studio et ses dimensions sont analysées.'}</p>
                 )}
                 <label className="block">
                   <span className="label-text">Rôle du fichier</span>

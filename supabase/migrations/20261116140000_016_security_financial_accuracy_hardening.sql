@@ -2,6 +2,13 @@
 -- Keep trusted schemas before pg_temp: SECURITY DEFINER functions must never
 -- resolve attacker-created temporary relations ahead of application tables.
 
+-- Client roles need object access through grants/RLS, never CREATE in public.
+REVOKE CREATE ON SCHEMA public FROM PUBLIC, anon, authenticated;
+
+-- Future functions created by postgres migrations must be explicitly granted.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
+
 ALTER FUNCTION public.handle_new_user()
   SET search_path = pg_catalog, public, pg_temp;
 ALTER FUNCTION public.is_owner()

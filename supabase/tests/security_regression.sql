@@ -70,6 +70,11 @@ BEGIN
     RAISE EXCEPTION 'Public materials view must use security_invoker=true.';
   END IF;
 
+  IF has_schema_privilege('anon', 'public', 'CREATE')
+     OR has_schema_privilege('authenticated', 'public', 'CREATE') THEN
+    RAISE EXCEPTION 'Client roles must not be able to create objects in the public schema.';
+  END IF;
+
   IF has_schema_privilege('anon', 'lunder_private', 'USAGE')
      OR has_table_privilege('anon', 'lunder_private.guest_api_rate_limits', 'SELECT')
      OR has_function_privilege('anon', 'lunder_private.record_guest_rate_limit(text,integer,integer)', 'EXECUTE') THEN

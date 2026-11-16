@@ -873,7 +873,7 @@ export default function CustomRequestPage() {
                 </div>
                 <label className="block">
                   <span className="label-text">Détails ou modifications pour ce produit</span>
-                  <textarea rows={3} className="input-field resize-y" value={product.instructions} onChange={(event) => updateProduct(product.id, { instructions: event.target.value })} placeholder={product.mode === 'modify' ? 'Ex. ajouter une base, inscrire un prénom, retirer une partie, renforcer une zone…' : product.mode === 'inspiration' ? 'Décrivez le modèle que vous voulez créer en vous inspirant de ce fichier…' : 'Précisions propres à ce modèle (facultatif)…'} />
+                  <textarea rows={3} maxLength={2000} className="input-field resize-y" value={product.instructions} onChange={(event) => updateProduct(product.id, { instructions: event.target.value })} placeholder={product.mode === 'modify' ? 'Ex. ajouter une base, inscrire un prénom, retirer une partie, renforcer une zone…' : product.mode === 'inspiration' ? 'Décrivez le modèle que vous voulez créer en vous inspirant de ce fichier…' : 'Précisions propres à ce modèle (facultatif)…'} />
                 </label>
                 {product.analysis.warnings.length > 0 && <ul className="space-y-1 text-xs text-amber-300">{product.analysis.warnings.map((warning) => <li key={warning}>• {warning}</li>)}</ul>}
                 {product.mode === 'modify' && <p className="text-xs text-charcoal-400">Les modifications demandées doivent être décrites dans le champ Description ; le studio validera leur faisabilité.</p>}

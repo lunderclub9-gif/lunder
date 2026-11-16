@@ -831,6 +831,7 @@ export default function AdminRequests() {
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
+                        {(request.product_specs?.length ?? 0) > 1 && <p className="w-full text-xs text-charcoal-400">Cette demande contient plusieurs modèles : utilisez « Créer le devis depuis l’estimation », qui additionne les calculs de chaque produit. Le devis technique manuel ne prend en charge qu’un seul produit.</p>}
                         <button
                           type="button"
                           disabled={busy || !request.estimate_price_dzd}
@@ -840,7 +841,7 @@ export default function AdminRequests() {
                           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                           Créer le devis depuis l'estimation
                         </button>
-                        <button type="button" onClick={() => openAutoQuote(request)} className="btn-secondary">
+                        <button type="button" disabled={busy || (request.product_specs?.length ?? 0) > 1} onClick={() => openAutoQuote(request)} className="btn-secondary">
                           Devis technique (poids / heures)
                         </button>
                         <button type="button" onClick={() => openNewQuote(request)} className="btn-secondary">

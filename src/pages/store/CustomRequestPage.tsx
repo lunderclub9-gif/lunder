@@ -212,14 +212,14 @@ export default function CustomRequestPage() {
     })) : [fallback]
     try {
       const results = await Promise.all(inputs.map((item, index) => activeProducts.length
-      ? supabase.rpc('estimate_manufacturing_model', {
+      ? supabase.rpc('estimate_manufacturing_model_limited', {
           p_length_mm: item.length, p_width_mm: item.width, p_height_mm: item.height,
           p_mesh_volume_cm3: ['reference', 'exact'].includes(activeProducts[index].mode) && activeProducts[index].analysis.meshVolumeCm3 !== null
             ? activeProducts[index].analysis.meshVolumeCm3! * (item.length * item.width * item.height) / (activeProducts[index].original.length * activeProducts[index].original.width * activeProducts[index].original.height)
             : null,
           p_material_name: item.material, p_quantity: item.quantity, p_options: effectiveOptions, p_rush: rush,
         })
-      : supabase.rpc('estimate_manufacturing_dimensions', {
+      : supabase.rpc('estimate_manufacturing_dimensions_limited', {
           p_length_mm: item.length, p_width_mm: item.width, p_height_mm: item.height,
           p_material_name: item.material, p_quantity: item.quantity, p_options: effectiveOptions, p_rush: rush,
         })

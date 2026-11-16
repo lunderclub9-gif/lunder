@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Package, Loader2, ShoppingCart, Check } from 'lucide-react'
+import { ArrowLeft, Package, Loader2, ShoppingCart, Check, ShieldCheck, Truck, Sparkles } from 'lucide-react'
 import {
   supabase,
   type Product,
@@ -24,6 +24,12 @@ export default function ProductDetailPage() {
   const [selection, setSelection] = useState<Record<string, string>>({})
   const [added, setAdded] = useState(false)
   const { add } = useCart()
+
+  useEffect(() => {
+    if (!product) return
+    document.title = `${product.name} | LUNDER'S 3D STUDIO`
+    return () => { document.title = "LUNDER'S 3D STUDIO" }
+  }, [product])
 
   useEffect(() => {
     if (!slug) return
@@ -165,11 +171,11 @@ export default function ProductDetailPage() {
           {product.model_url ? (
             <Viewer3D src={product.model_url} poster={activeImage ?? undefined} alt={product.name} />
           ) : activeImage ? (
-            <div className="aspect-square overflow-hidden rounded-xl border border-charcoal-400/15 bg-charcoal-800">
+            <div className="aspect-square overflow-hidden rounded-3xl border border-charcoal-400/15 bg-charcoal-800 shadow-2xl shadow-black/20">
               <img src={activeImage} alt={product.name} className="h-full w-full object-cover" />
             </div>
           ) : (
-            <div className="flex aspect-square items-center justify-center rounded-xl border border-charcoal-400/15 bg-charcoal-800">
+            <div className="flex aspect-square items-center justify-center rounded-3xl border border-charcoal-400/15 bg-charcoal-800">
               <Package className="h-12 w-12 text-charcoal-600" />
             </div>
           )}
@@ -203,9 +209,9 @@ export default function ProductDetailPage() {
                 {product.category.name}
               </span>
             )}
-            <h1 className="mt-1 text-3xl font-bold text-offwhite">{product.name}</h1>
+            <h1 className="mt-1 text-3xl font-black leading-tight tracking-tight text-offwhite sm:text-4xl">{product.name}</h1>
             <div className="mt-3 flex items-center gap-3">
-              <span className="text-2xl font-bold text-offwhite">{formatDzd(displayPrice)}</span>
+              <span className="text-3xl font-black tracking-tight text-offwhite">{formatDzd(displayPrice)}</span>
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   inStock ? 'bg-green-600/20 text-green-400' : 'bg-brand-red/20 text-brand-red-light'
@@ -265,7 +271,7 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4 rounded-xl border border-charcoal-400/15 bg-charcoal-800/50 p-4">
+          <div className="grid grid-cols-2 gap-4 rounded-2xl border border-charcoal-400/15 bg-charcoal-800/50 p-5">
             {product.material && (
               <div>
                 <span className="text-xs text-charcoal-400">Matière</span>

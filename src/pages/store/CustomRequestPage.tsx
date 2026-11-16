@@ -543,9 +543,7 @@ export default function CustomRequestPage() {
         <div className="admin-card">
           <h2 className="mb-2 text-lg font-semibold text-offwhite">Dimensions et matière</h2>
           <p className="mb-4 text-xs text-charcoal-400">
-            Les trois dimensions sont nécessaires à l’estimation. Le poids et le temps sont déduits
-            automatiquement de la boîte englobante, de la matière et des hypothèses du studio : ce
-            sont des estimations, pas des mesures issues du fichier 3D.
+            Si vous ne joignez pas de modèle 3D, saisissez ses dimensions ici. Si vous joignez un ou plusieurs modèles analysables, leurs dimensions seront extraites automatiquement et vous pourrez définir la taille souhaitée pour chaque produit.
           </p>
           {productSpecs.length === 0 && (
           <div className="grid gap-4 sm:grid-cols-3">
@@ -752,8 +750,13 @@ export default function CustomRequestPage() {
               {estimate.estimates && (
                 <p className="mt-2 text-xs text-charcoal-500">
                   Estimation de production : environ {estimate.estimates.grams ?? '—'} g et{' '}
-                  {estimate.estimates.printHours ?? '—'} h — non vérifié sur le fichier 3D.
+                  {estimate.estimates.printHours ?? '—'} h — méthode : {estimate.estimates.method === 'multiple_model_bounding_box_estimates' ? 'calcul séparé par modèle à partir des dimensions' : 'boîte englobante'}.
                 </p>
+              )}
+              {estimate.assumptions && estimate.assumptions.length > 0 && (
+                <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-charcoal-500">
+                  {estimate.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}
+                </ul>
               )}
               <p className="mt-2 text-xs text-charcoal-500">
                 Estimation indicative, sous réserve de validation du propriétaire. Les frais de

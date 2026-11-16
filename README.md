@@ -11,7 +11,7 @@ manufacturing requests with versioned quotes, and an owner-only admin area at `/
 ## Status
 
 The repository contains the storefront, owner back office, custom-manufacturing workflow, finance MVP,
-security hardening and unit tests. The 20 repository migrations have **not** been validated as one clean
+security hardening and unit tests. The 21 repository migrations have **not** been validated as one clean
 sequence against a disposable database. Two connected Supabase projects contain the LUNDER schema and
 data, but their migration histories differ (one records only two separate super-admin migrations; the
 other records none). The active deployment target has not been conclusively identified. Do not run
@@ -174,6 +174,7 @@ have been reconciled. Later files depend on `public.is_owner()` and earlier tabl
 | `20261116160000_018_guest_api_rate_limits.sql` | IP/user rate limits for guest order creation, custom request creation and order tracking | 017 |
 | `20261116170000_019_public_view_and_function_privileges.sql` | invoker-secured public materials view, owner-only RPC grants and trigger-function revocations | 018 |
 | `20261116180000_020_custom_upload_storage_limits.sql` | server-side custom-upload folder path, file-count and aggregate-size limits | 019 |
+| `20261116190000_021_rls_performance_and_fk_indexes.sql` | consolidate overlapping read policies, cache auth identity in RLS, and index uncovered foreign keys | 020 |
 
 Treat migrations as **apply-once, in timestamp order**. Some operations are idempotent, but the chain
 as a whole is not advertised as safe to replay manually. Never mark a migration applied or skip one

@@ -19,7 +19,7 @@ type RequestProductSpec = {
   material_name: string
   color: string | null
   instructions?: string | null
-  geometry?: { format?: string; mesh_volume_cm3?: number | null; bounding_box_volume_cm3?: number; triangle_count?: number; vertex_count?: number; warnings?: string[] }
+  geometry?: { format?: string; mesh_volume_cm3?: number | null; bounding_box_volume_cm3?: number; triangle_count?: number; vertex_count?: number; component_count?: number | null; warnings?: string[] }
 }
 type Quote = {
   id: string
@@ -507,7 +507,7 @@ export default function AdminRequests() {
                               <p className="text-brand-red-light">Dimensions souhaitées : {product.target_dimensions_mm?.length} × {product.target_dimensions_mm?.width} × {product.target_dimensions_mm?.height} mm</p>
                               <p>Quantité : {product.quantity} · Matière : {product.material_name}{product.color ? ` · Couleur : ${product.color}` : ''}</p>
                               {product.instructions && <p className="mt-1 whitespace-pre-line text-offwhite">Demandes propres à ce produit : {product.instructions}</p>}
-                              <p>Maillage : {product.geometry?.format?.toUpperCase() ?? '3D'} · {product.geometry?.triangle_count?.toLocaleString('fr-FR') ?? '—'} triangles · Volume : {product.geometry?.mesh_volume_cm3 ?? 'non calculé'} cm³</p>
+                              <p>Maillage : {product.geometry?.format?.toUpperCase() ?? '3D'} · {product.geometry?.triangle_count?.toLocaleString('fr-FR') ?? '—'} triangles · {product.geometry?.component_count ?? '—'} élément(s) · Volume : {product.geometry?.mesh_volume_cm3 ?? 'non calculé'} cm³</p>
                               {product.geometry?.warnings?.length ? <ul className="mt-1 list-disc pl-4 text-amber-300">{product.geometry.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
                               <button type="button" onClick={() => {
                                 const file = request.custom_request_files.find((item) => item.storage_path === product.file_path)

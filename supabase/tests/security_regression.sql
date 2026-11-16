@@ -80,6 +80,26 @@ BEGIN
     RAISE EXCEPTION 'Storage guard trigger function is exposed as a public RPC.';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class AS relation
+    JOIN pg_namespace AS schema ON schema.oid = relation.relnamespace
+    WHERE schema.nspname = 'public'
+      AND relation.relkind = 'r'
+      AND NOT relation.relrowsecurity
+  ) THEN
+    RAISE EXCEPTION 'Every public base table must have row-level security enabled.';
+  END IF;
+
+  IF has_table_privilege('anon', 'public.orders', 'SELECT')
+     OR has_table_privilege('anon', 'public.orders', 'INSERT')
+     OR has_table_privilege('anon', 'public.order_items', 'SELECT')
+     OR has_table_privilege('anon', 'public.business_expenses', 'SELECT')
+     OR has_table_privilege('anon', 'public.tracking_attempts', 'SELECT')
+     OR has_table_privilege('anon', 'public.tracking_attempts', 'INSERT') THEN
+    RAISE EXCEPTION 'Anonymous callers have direct access to private order, finance or tracking tables.';
+  END IF;
+
   IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.manufacturing_materials'::regclass) THEN
     RAISE EXCEPTION 'Manufacturing materials RLS must remain enabled.';
   END IF;

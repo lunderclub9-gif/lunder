@@ -25,6 +25,16 @@ type Quote = {
 }
 
 type RequestView = {
+  product_specs?: {
+    id: string
+    file_name: string
+    mode: string
+    original_dimensions_mm: { length: number; width: number; height: number }
+    target_dimensions_mm: { length: number; width: number; height: number }
+    quantity: number
+    material_name: string
+    color: string | null
+  }[]
   request_number: string
   status: string
   title: string
@@ -154,6 +164,18 @@ export default function CustomRequestStatusPage() {
           {request.material_preference ? ` · ${request.material_preference}` : ''}
           {request.color_preference ? ` · ${request.color_preference}` : ''}
         </p>
+        {(request.product_specs ?? []).length > 0 && (
+          <div className="mt-3 space-y-2 rounded-lg border border-charcoal-400/15 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-charcoal-400">Produits et tailles demandées</p>
+            {(request.product_specs ?? []).map((product, index) => (
+              <div key={product.id || product.file_name} className="rounded-md bg-charcoal-900/60 p-2 text-xs">
+                <p className="font-semibold text-offwhite">{index + 1}. {product.file_name}</p>
+                <p className="mt-1">{product.target_dimensions_mm.length} × {product.target_dimensions_mm.width} × {product.target_dimensions_mm.height} mm · {product.quantity} pièce(s)</p>
+                <p className="text-charcoal-400">{product.material_name}{product.color ? ` · ${product.color}` : ''}</p>
+              </div>
+            ))}
+          </div>
+        )}
         {request.files.length > 0 && (
           <p className="text-xs text-charcoal-400">
             {request.files.length} fichier(s) transmis — conservés en privé.

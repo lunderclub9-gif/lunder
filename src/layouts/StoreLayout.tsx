@@ -49,6 +49,18 @@ export default function StoreLayout() {
   const whatsappHref = toWhatsAppHref(settings.whatsapp || settings.phone)
   const mailHref = toMailtoHref(settings.email)
 
+  useEffect(() => {
+    if (!mobileOpen && !searchOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileOpen(false)
+        setSearchOpen(false)
+      }
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [mobileOpen, searchOpen])
+
   // Les liens externes ne sont rendus que si l'URL est réellement http(s).
   const socials = Object.keys(SOCIAL_LABELS)
     .map((key) => ({ key, label: SOCIAL_LABELS[key], url: safeExternalUrl(settings[key]) }))
@@ -64,14 +76,15 @@ export default function StoreLayout() {
 
   return (
     <div className="min-h-screen bg-charcoal-900 text-offwhite">
+      <a href="#main-content" className="sr-only z-[60] rounded-lg bg-white px-4 py-3 text-sm font-semibold text-charcoal-950 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Aller au contenu</a>
       <header className="sticky top-0 z-50 border-b border-charcoal-400/10 bg-charcoal-900/90 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/boutique" className="flex items-center gap-2.5" onClick={() => setMobileOpen(false)}>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-red">
               <Printer className="h-5 w-5 text-white" />
             </div>
-            <div className="hidden sm:block">
-              <div className="text-sm font-bold tracking-wide text-offwhite">LUNDER'S 3D STUDIO</div>
+            <div className="block min-w-0">
+              <div className="text-[11px] font-bold tracking-wide text-offwhite sm:text-sm">LUNDER'S 3D STUDIO</div>
               <div className="text-[10px] font-medium tracking-widest text-charcoal-300">DESIGN · PRINT · CREATE</div>
             </div>
           </Link>
@@ -116,7 +129,9 @@ export default function StoreLayout() {
             <button
               className="md:hidden"
               onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Menu"
+              aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-navigation"
               type="button"
             >
               {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -142,7 +157,7 @@ export default function StoreLayout() {
         )}
 
         {mobileOpen && (
-          <nav className="border-t border-charcoal-400/10 bg-charcoal-900 px-4 py-3 md:hidden">
+          <nav id="mobile-navigation" className="border-t border-charcoal-400/10 bg-charcoal-900 px-4 py-3 md:hidden">
             <form onSubmit={submitSearch} className="mb-2" role="search">
               <input
                 type="search"
@@ -186,7 +201,7 @@ export default function StoreLayout() {
         )}
       </header>
 
-      <main className="min-h-[calc(100vh-4rem)]">
+      <main id="main-content" tabIndex={-1} className="min-h-[calc(100vh-4rem)]">
         <Outlet />
       </main>
 

@@ -168,6 +168,7 @@ export default function FinancialDashboardPage() {
   }, [orders, expenses, range])
 
   const products = useMemo(() => {
+    const manuallyCostedOrders = new Set(expenses.filter((expense) => expense.category === 'production' && expense.order_id).map((expense) => expense.order_id as string))
     const map = new Map<string, { name: string; revenue: number; quantity: number; cost: number; missing: boolean }>()
     orders.forEach((order) => (order.order_items ?? []).forEach((item) => {
       const current = map.get(item.product_name) ?? { name: item.product_name, revenue: 0, quantity: 0, cost: 0, missing: false }
@@ -178,7 +179,7 @@ export default function FinancialDashboardPage() {
       map.set(item.product_name, current)
     }))
     return [...map.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 6)
-  }, [orders])
+  }, [orders, expenses])
 
   const expenseBreakdown = useMemo(() => {
     const map = new Map<string, number>()

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { createElement, useCallback, useEffect, useRef, useState, type ElementType } from 'react'
+import '@google/model-viewer'
 import JsBarcode from 'jsbarcode'
 import { Link } from 'react-router-dom'
 import { AlertCircle, CheckCircle2, Download, Loader2, Paperclip, Upload, X } from 'lucide-react'
@@ -14,6 +15,7 @@ type ProductSpec = {
   id: string
   filePath: string
   fileName: string
+  previewUrl: string | null
   mode: 'reference' | 'exact' | 'modify' | 'inspiration'
   original: ModelAnalysis['dimensionsMm']
   target: ModelAnalysis['dimensionsMm']
@@ -91,7 +93,13 @@ export default function CustomRequestPage() {
   )
   const uploadLock = useRef(false)
   const estimateSequence = useRef(0)
+  const previewUrls = useRef(new Set<string>())
   const idempotencyKey = useRef<string>(crypto.randomUUID())
+
+  useEffect(() => () => {
+    previewUrls.current.forEach((url) => URL.revokeObjectURL(url))
+    previewUrls.current.clear()
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -318,8 +326,10 @@ export default function CustomRequestPage() {
         if (isModel && modelAnalysis) {
           invalidateEstimate()
           const id = `${Date.now()}-${uploadedCount}`
+          const previewUrl = ['glb', 'gltf'].includes(modelAnalysis.format) ? URL.createObjectURL(file) : null
+          if (previewUrl) previewUrls.current.add(previewUrl)
           setProductSpecs((current) => [...current, {
-            id, filePath: path, fileName: file.name, mode: 'reference',
+            id, filePath: path, fileName: file.name, previewUrl, mode: 'reference',
             original: modelAnalysis!.dimensionsMm, target: { ...modelAnalysis!.dimensionsMm },
             analysis: modelAnalysis!, preserveRatio: true, quantity: 1,
             material: material || materials[0]?.name || '', color, instructions: '',
@@ -344,6 +354,11 @@ export default function CustomRequestPage() {
     if (uploadLock.current) return
     invalidateEstimate()
     setError(null)
+    const productToRemove = productSpecs.find((product) => product.filePath === path)
+    if (productToRemove?.previewUrl) {
+      URL.revokeObjectURL(productToRemove.previewUrl)
+      previewUrls.current.delete(productToRemove.previewUrl)
+    }
     const { error: removeError } = await supabase.storage.from('custom-requests').remove([path])
     if (removeError) {
       setError('Impossible de supprimer ce fichier du stockage privé. Réessayez avant d’envoyer la demande.')
@@ -798,6 +813,21 @@ export default function CustomRequestPage() {
                   </div>
                   <button type="button" onClick={() => void removeFile(product.filePath)} disabled={uploading} className="btn-ghost text-xs">Retirer ce produit</button>
                 </div>
+                {product.previewUrl ? (
+                  <div className="overflow-hidden rounded-lg border border-charcoal-400/15">
+                    <p className="px-3 py-2 text-xs text-charcoal-400">Aperçu 3D interactif — faites glisser pour tourner et utilisez le zoom</p>
+                    {createElement('model-viewer' as ElementType, {
+                      src: product.previewUrl,
+                      alt: `Aperçu 3D de ${product.fileName}`,
+                      'camera-controls': true,
+                      'auto-rotate': true,
+                      'shadow-intensity': '0.8',
+                      style: { width: '100%', height: '260px', background: '#111827' },
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-charcoal-500">Aperçu direct disponible pour GLB/GLTF. Le fichier STL/OBJ reste accessible au studio et ses dimensions sont analysées.</p>
+                )}
                 <label className="block">
                   <span className="label-text">Rôle du fichier</span>
                   <select className="input-field" value={product.mode} onChange={(event) => {

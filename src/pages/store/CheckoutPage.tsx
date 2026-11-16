@@ -401,7 +401,7 @@ export default function CheckoutPage() {
           </label>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 lg:sticky lg:top-24">
           <div className="admin-card">
             <h2 className="mb-4 text-lg font-semibold text-offwhite">Récapitulatif</h2>
             <ul className="space-y-2 text-sm">

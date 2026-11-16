@@ -89,6 +89,7 @@ export default function CustomRequestPage() {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`
   )
   const uploadLock = useRef(false)
+  const estimateSequence = useRef(0)
   const idempotencyKey = useRef<string>(crypto.randomUUID())
 
   useEffect(() => {
@@ -143,6 +144,7 @@ export default function CustomRequestPage() {
   }, [wilayaCode])
 
   const runEstimate = useCallback(async () => {
+    const sequence = ++estimateSequence.current
     const activeProducts = productSpecs
     const fallback = {
       length: Number(lengthMm), width: Number(widthMm), height: Number(heightMm),
@@ -151,16 +153,19 @@ export default function CustomRequestPage() {
     if (!activeProducts.length && (!fallback.material || !Number.isFinite(fallback.length) || fallback.length <= 0 || !Number.isFinite(fallback.width) || fallback.width <= 0 || !Number.isFinite(fallback.height) || fallback.height <= 0)) {
       setEstimate(null)
       setEstimateError(null)
+      setEstimateLoading(false)
       return
     }
     if (activeProducts.reduce((sum, product) => sum + product.quantity, 0) > 500) {
       setEstimate(null)
       setEstimateError('La quantité totale ne peut pas dépasser 500 pièces par demande.')
+      setEstimateLoading(false)
       return
     }
     if (activeProducts.some((product) => !product.material || Object.values(product.target).some((value) => !Number.isFinite(value) || value <= 0 || value > 2000))) {
       setEstimate(null)
       setEstimateError('Vérifiez les dimensions et la matière de chaque modèle.')
+      setEstimateLoading(false)
       return
     }
     setEstimateLoading(true)
@@ -185,6 +190,7 @@ export default function CustomRequestPage() {
           p_material_name: item.material, p_quantity: item.quantity, p_options: effectiveOptions, p_rush: rush,
         })
     ))
+    if (sequence !== estimateSequence.current) return
     setEstimateLoading(false)
     const failed = results.find((result) => result.error || !result.data)
     if (failed) {
@@ -227,7 +233,16 @@ export default function CustomRequestPage() {
     setEstimateAccepted(false)
   }, [lengthMm, widthMm, heightMm, material, quantity, options, rush, productSpecs])
 
+  const invalidateEstimate = () => {
+    estimateSequence.current += 1
+    setEstimateLoading(false)
+    setEstimateAccepted(false)
+    setEstimate(null)
+    setEstimateError(null)
+  }
+
   const updateProduct = (id: string, patch: Partial<ProductSpec>) => {
+    invalidateEstimate()
     setProductSpecs((current) => current.map((product) => product.id === id ? { ...product, ...patch } : product))
   }
 
@@ -291,6 +306,7 @@ export default function CustomRequestPage() {
           { path, name: file.name, mime: check.contentType, size: file.size, kind },
         ])
         if (isModel && modelAnalysis) {
+          invalidateEstimate()
           const id = `${Date.now()}-${uploadedCount}`
           setProductSpecs((current) => [...current, {
             id, filePath: path, fileName: file.name, mode: 'reference',
@@ -316,6 +332,7 @@ export default function CustomRequestPage() {
 
   const removeFile = async (path: string) => {
     if (uploadLock.current) return
+    invalidateEstimate()
     setError(null)
     const { error: removeError } = await supabase.storage.from('custom-requests').remove([path])
     if (removeError) {
@@ -637,7 +654,7 @@ export default function CustomRequestPage() {
                   max={2000}
                   required
                   value={value}
-                  onChange={(event) => setter(event.target.value)}
+                  onChange={(event) => { invalidateEstimate(); setter(event.target.value) }}
                   className="input-field"
                   placeholder="ex. 120"
                 />
@@ -648,7 +665,7 @@ export default function CustomRequestPage() {
               <select
                 required
                 value={material}
-                onChange={(event) => setMaterial(event.target.value)}
+                onChange={(event) => { invalidateEstimate(); setMaterial(event.target.value) }}
                 className="input-field"
                 disabled={materials.length === 0}
               >
@@ -687,7 +704,7 @@ export default function CustomRequestPage() {
                 max={100}
                 required
                 value={quantity}
-                onChange={(event) => setQuantity(event.target.value)}
+                onChange={(event) => { invalidateEstimate(); setQuantity(event.target.value) }}
                 className="input-field"
               />
             </label>
@@ -709,8 +726,10 @@ export default function CustomRequestPage() {
                   type="checkbox"
                   checked={options[key] || (key === 'modeling' && productSpecs.some((product) => product.mode === 'modify' || product.mode === 'inspiration')) || (key === 'design' && productSpecs.some((product) => product.mode === 'inspiration'))}
                   disabled={(key === 'modeling' && productSpecs.some((product) => product.mode === 'modify' || product.mode === 'inspiration')) || (key === 'design' && productSpecs.some((product) => product.mode === 'inspiration'))}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    invalidateEstimate()
                     setOptions((current) => ({ ...current, [key]: event.target.checked }))
+                  }}
                   }
                   className="h-3.5 w-3.5 accent-brand-red"
                 />
@@ -721,7 +740,7 @@ export default function CustomRequestPage() {
               <input
                 type="checkbox"
                 checked={rush}
-                onChange={(event) => setRush(event.target.checked)}
+                onChange={(event) => { invalidateEstimate(); setRush(event.target.checked) }}
                 className="h-3.5 w-3.5 accent-brand-red"
               />
               Production urgente

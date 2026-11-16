@@ -195,7 +195,8 @@ export default function CustomRequestPage() {
       length: product.target.length, width: product.target.width, height: product.target.height,
       quantity: product.quantity, material: product.material,
     })) : [fallback]
-    const results = await Promise.all(inputs.map((item, index) => activeProducts.length
+    try {
+      const results = await Promise.all(inputs.map((item, index) => activeProducts.length
       ? supabase.rpc('estimate_manufacturing_model', {
           p_length_mm: item.length, p_width_mm: item.width, p_height_mm: item.height,
           p_mesh_volume_cm3: ['reference', 'exact'].includes(activeProducts[index].mode) && activeProducts[index].analysis.meshVolumeCm3 !== null
@@ -235,7 +236,13 @@ export default function CustomRequestPage() {
         printHours: Math.round(rows.reduce((sum, row, index) => sum + Number((row.estimates as Record<string, unknown> | undefined)?.printHours ?? 0) * inputs[index].quantity, 0) * 10) / 10,
         method: activeProducts.length ? 'multiple_model_geometry_or_bounding_box_estimates' : String((rows[0].estimates as Record<string, unknown> | undefined)?.method ?? ''),
       },
-    })
+      })
+    } catch (estimateFailure) {
+      if (sequence !== estimateSequence.current) return
+      setEstimateLoading(false)
+      setEstimate(null)
+      setEstimateError(estimateFailure instanceof Error ? estimateFailure.message : 'Impossible de contacter le service de calcul. Réessayez.')
+    }
   }, [lengthMm, widthMm, heightMm, material, quantity, options, rush, productSpecs, files])
 
   useEffect(() => {

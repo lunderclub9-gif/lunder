@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS lunder_private.guest_api_rate_limits (
 
 CREATE INDEX IF NOT EXISTS idx_guest_api_rate_limits_lookup
   ON lunder_private.guest_api_rate_limits (client_key, action, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_guest_api_rate_limits_created_at
+  ON lunder_private.guest_api_rate_limits (created_at);
 
 ALTER TABLE lunder_private.guest_api_rate_limits ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE lunder_private.guest_api_rate_limits FROM PUBLIC, anon, authenticated;
@@ -70,6 +72,11 @@ BEGIN
 
   PERFORM pg_advisory_xact_lock(hashtextextended(v_client_key || ':' || p_action, 0));
 
+  IF mod(hashtextextended(v_client_key || ':' || p_action, 0), 100) = 0 THEN
+    DELETE FROM lunder_private.guest_api_rate_limits
+    WHERE created_at < now() - interval '1 day';
+  END IF;
+
   DELETE FROM lunder_private.guest_api_rate_limits
   WHERE client_key = v_client_key
     AND action = p_action
@@ -102,7 +109,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, lunder_private, pg_temp
 AS $$
 BEGIN
-  IF NOT lunder_private.record_guest_rate_limit('create_order', 5, 3600) THEN
+  IF NOT lunder_private.record_guest_rate_limit('create_order', 10, 3600) THEN
     RAISE EXCEPTION 'TROP_DEMANDES';
   END IF;
   RETURN NEW;
@@ -157,6 +164,9 @@ BEGIN
   IF v_number !~ '^LND-[0-9]{4}-[0-9]{5,}$' OR length(v_phone) <> 9 THEN
     RETURN jsonb_build_object('found', false, 'rate_limited', false);
   END IF;
+
+  DELETE FROM public.tracking_attempts
+  WHERE created_at < now() - interval '1 day';
 
   SELECT count(*) INTO v_attempts
   FROM public.tracking_attempts

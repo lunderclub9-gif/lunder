@@ -36,12 +36,17 @@ export default function TrackOrderPage() {
     setLoading(false)
 
     if (rpcError || !data) {
-      setError(
-        orderErrorMessage(rpcError?.message, 'Aucune commande ne correspond à ces informations.')
-      )
+      setError(orderErrorMessage(rpcError?.message, 'Aucune commande ne correspond à ces informations.'))
       return
     }
-    setOrder(data as TrackedOrder)
+    const result = data as TrackedOrder & { found?: boolean; rate_limited?: boolean }
+    if (result.found !== true) {
+      setError(result.rate_limited
+        ? 'Trop de tentatives de recherche. Réessayez dans quelques minutes.'
+        : 'Aucune commande ne correspond à ces informations.')
+      return
+    }
+    setOrder(result)
   }
 
   return (

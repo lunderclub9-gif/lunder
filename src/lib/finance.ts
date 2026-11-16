@@ -50,6 +50,7 @@ export function summarizeFinances(orders: FinanceOrder[], expenses: FinanceExpen
     }
   }
 
+  const manualProductionCostDzd = expenses.filter((expense) => expense.category === 'production').reduce((sum, expense) => sum + Number(expense.amount_dzd || 0), 0)
   const operatingExpensesDzd = expenses.reduce((sum, expense) => sum + Number(expense.amount_dzd || 0), 0)
   const provisionalProfitDzd = revenueDzd - estimatedProductionCostDzd - operatingExpensesDzd
   const totalItems = completeItems + uncostedItems
@@ -59,6 +60,7 @@ export function summarizeFinances(orders: FinanceOrder[], expenses: FinanceExpen
     productRevenueDzd,
     deliveryRevenueDzd,
     estimatedProductionCostDzd,
+    manualProductionCostDzd,
     operatingExpensesDzd,
     provisionalProfitDzd,
     completeItems,

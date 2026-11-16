@@ -15,7 +15,7 @@ BEGIN
   ) THEN
     ALTER TABLE public.custom_requests
       ADD CONSTRAINT custom_requests_product_specs_array_check
-      CHECK (jsonb_typeof(product_specs) = 'array' AND jsonb_array_length(product_specs) <= 10);
+      CHECK (CASE WHEN jsonb_typeof(product_specs) = 'array' THEN jsonb_array_length(product_specs) <= 10 ELSE false END);
   END IF;
 END $$;
 
@@ -60,9 +60,10 @@ BEGIN
   IF p_tracking_token IS NULL THEN
     RAISE EXCEPTION 'JETON_INVALIDE';
   END IF;
-  IF jsonb_typeof(p_products) <> 'array'
-     OR jsonb_array_length(p_products) < 1
-     OR jsonb_array_length(p_products) > 10 THEN
+  IF jsonb_typeof(p_products) IS DISTINCT FROM 'array' THEN
+    RAISE EXCEPTION 'PRODUITS_INVALIDES';
+  END IF;
+  IF jsonb_array_length(p_products) < 1 OR jsonb_array_length(p_products) > 10 THEN
     RAISE EXCEPTION 'PRODUITS_INVALIDES';
   END IF;
 

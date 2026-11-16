@@ -198,10 +198,14 @@ export default function CheckoutPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="mb-2 text-3xl font-bold text-offwhite">Commander</h1>
-      <p className="mb-6 text-sm text-charcoal-400">
-        Paiement à la livraison. Aucune carte bancaire n'est demandée.
-      </p>
+      <div className="mb-7 rounded-3xl border border-charcoal-400/15 bg-gradient-to-br from-charcoal-800 to-charcoal-950 p-5 sm:p-7">
+        <p className="text-[10px] font-bold tracking-[0.2em] text-brand-red-light">FINALISER VOTRE COMMANDE</p>
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-offwhite">Presque à vous.</h1>
+        <p className="mt-2 text-sm text-charcoal-400">Confirmez vos coordonnées et choisissez votre mode de livraison.</p>
+        <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-4">
+          {[['01', 'Panier', true], ['02', 'Livraison', true], ['03', 'Confirmation', false]].map(([number, label, active]) => <div key={number} className="flex items-center gap-2"><span className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ' + (active ? 'bg-brand-red text-white' : 'bg-charcoal-700 text-charcoal-400')}>{number}</span><span className={'text-[11px] font-semibold sm:text-xs ' + (active ? 'text-offwhite' : 'text-charcoal-500')}>{label}</span></div>)}
+        </div>
+      </div>
 
       {error && (
         <div className="mb-6 flex items-start gap-2 rounded-lg border border-brand-red/30 bg-brand-red/10 px-4 py-3 text-sm text-brand-red-light">

@@ -162,13 +162,18 @@ export default function CustomRequestPage() {
     }
     setEstimateLoading(true)
     setEstimateError(null)
+    const effectiveOptions = {
+      ...options,
+      modeling: options.modeling || activeProducts.some((product) => product.mode === 'modify' || product.mode === 'inspiration'),
+      design: options.design || activeProducts.some((product) => product.mode === 'inspiration'),
+    }
     const inputs = activeProducts.length ? activeProducts.map((product) => ({
       length: product.target.length, width: product.target.width, height: product.target.height,
       quantity: product.quantity, material: product.material,
     })) : [fallback]
     const results = await Promise.all(inputs.map((item) => supabase.rpc('estimate_manufacturing_dimensions', {
       p_length_mm: item.length, p_width_mm: item.width, p_height_mm: item.height,
-      p_material_name: item.material, p_quantity: item.quantity, p_options: options, p_rush: rush,
+      p_material_name: item.material, p_quantity: item.quantity, p_options: effectiveOptions, p_rush: rush,
     })))
     setEstimateLoading(false)
     const failed = results.find((result) => result.error || !result.data)
@@ -345,6 +350,11 @@ export default function CustomRequestPage() {
       return
     }
 
+    const pricingOptions = {
+      ...options,
+      modeling: options.modeling || productSpecs.some((product) => product.mode === 'modify' || product.mode === 'inspiration'),
+      design: options.design || productSpecs.some((product) => product.mode === 'inspiration'),
+    }
     setSubmitting(true)
     const { data, error: rpcError } = await supabase.rpc('create_custom_request', {
       p_payload: {
@@ -376,7 +386,7 @@ export default function CustomRequestPage() {
             warnings: product.analysis.warnings,
           },
         })),
-        manufacturing_options: options,
+        manufacturing_options: pricingOptions,
         rush,
         estimate_accepted: true,
         delivery: {
@@ -424,7 +434,7 @@ export default function CustomRequestPage() {
             warnings: product.analysis.warnings,
           },
         })),
-        p_options: options,
+        p_options: pricingOptions,
         p_rush: rush,
       })
       setSubmitting(false)
@@ -481,9 +491,7 @@ export default function CustomRequestPage() {
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <h1 className="text-3xl font-bold text-offwhite">Demande sur mesure</h1>
       <p className="mt-2 text-sm text-charcoal-400">
-        Décrivez la pièce, indiquez ses dimensions : le prix est estimé automatiquement. Vous
-        acceptez ensuite l’estimation, puis vous complétez vos coordonnées et votre livraison. Le
-        studio doit approuver la fabrication avant la création de la commande.
+        Décrivez votre projet, ajoutez un ou plusieurs modèles 3D si vous en avez, puis choisissez les dimensions finales et les options de fabrication. L’estimation est calculée produit par produit ; le studio vérifie ensuite la faisabilité avant toute fabrication.
       </p>
 
       {error && (
@@ -668,6 +676,7 @@ export default function CustomRequestPage() {
                   <select className="input-field" value={product.mode} onChange={(event) => {
                     const mode = event.target.value as ProductSpec['mode']
                     updateProduct(product.id, { mode, ...(mode === 'exact' ? { target: { ...product.original } } : {}) })
+                    if (mode === 'modify' || mode === 'inspiration') setOptions((current) => ({ ...current, modeling: true, ...(mode === 'inspiration' ? { design: true } : {}) }))
                   }}>
                     <option value="reference">Exemple / même forme, taille au choix</option>
                     <option value="exact">Fabriquer exactement à la taille du fichier</option>

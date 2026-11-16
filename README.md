@@ -176,6 +176,7 @@ have been reconciled. Later files depend on `public.is_owner()` and earlier tabl
 | `20261116170000_019_public_view_and_function_privileges.sql` | invoker-secured public materials view, owner-only RPC grants and trigger-function revocations | 018 |
 | `20261116180000_020_custom_upload_storage_limits.sql` | server-side custom-upload folder path, file-count and aggregate-size limits | 019 |
 | `20261116190000_021_rls_performance_and_fk_indexes.sql` | consolidate overlapping read policies, cache auth identity in RLS, and index uncovered foreign keys | 020 |
+| `20261116200000_022_guest_estimate_rate_limits.sql` | IP/user throttling for public manufacturing estimates and repeated model-spec saves; only rate-limited estimate wrappers remain public | 021 |
 
 A post-migration privilege regression script is provided at `supabase/tests/security_regression.sql`.
 

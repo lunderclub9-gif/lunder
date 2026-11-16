@@ -24,6 +24,8 @@ export default function CheckoutPage() {
   const [wilayas, setWilayas] = useState<Wilaya[]>([])
   const [communes, setCommunes] = useState<Commune[]>([])
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([])
+  const [destinationLoading, setDestinationLoading] = useState(false)
+  const [destinationError, setDestinationError] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -59,27 +61,50 @@ export default function CheckoutPage() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     setCommunes([])
     setCommuneId('')
     setPickupPoints([])
     setPickupId('')
-    if (!wilayaCode) return
+    setDestinationError(null)
 
-    supabase
-      .from('communes')
-      .select('id, name_fr')
-      .eq('wilaya_code', Number(wilayaCode))
-      .eq('is_active', true)
-      .order('name_fr')
-      .then(({ data }) => setCommunes((data as Commune[]) ?? []))
+    if (!wilayaCode) {
+      setDestinationLoading(false)
+      return () => { cancelled = true }
+    }
 
-    supabase
-      .from('pickup_points')
-      .select('id, name, address')
-      .eq('wilaya_code', Number(wilayaCode))
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => setPickupPoints((data as PickupPoint[]) ?? []))
+    setDestinationLoading(true)
+    void Promise.all([
+      supabase
+        .from('communes')
+        .select('id, name_fr')
+        .eq('wilaya_code', Number(wilayaCode))
+        .eq('is_active', true)
+        .order('name_fr'),
+      supabase
+        .from('pickup_points')
+        .select('id, name, address')
+        .eq('wilaya_code', Number(wilayaCode))
+        .eq('is_active', true)
+        .order('name'),
+    ]).then(([communesResult, pickupResult]) => {
+      if (cancelled) return
+      if (communesResult.error || pickupResult.error) {
+        setDestinationError('Impossible de charger les communes ou points relais. Vérifiez votre connexion et réessayez.')
+        setCommunes([])
+        setPickupPoints([])
+      } else {
+        setCommunes((communesResult.data as Commune[]) ?? [])
+        setPickupPoints((pickupResult.data as PickupPoint[]) ?? [])
+      }
+      setDestinationLoading(false)
+    }).catch(() => {
+      if (cancelled) return
+      setDestinationError('Impossible de charger les informations de livraison. Réessayez.')
+      setDestinationLoading(false)
+    })
+
+    return () => { cancelled = true }
   }, [wilayaCode])
 
   // Devis de livraison : la seule source de prix autorisée.
@@ -282,9 +307,9 @@ export default function CheckoutPage() {
                   value={communeId}
                   onChange={(event) => setCommuneId(event.target.value)}
                   className="input-field"
-                  disabled={!wilayaCode}
+                  disabled={!wilayaCode || destinationLoading}
                 >
-                  <option value="">Sélectionner...</option>
+                  <option value="">{destinationLoading ? 'Chargement…' : 'Sélectionner...'}</option>
                   {communes.map((commune) => (
                     <option key={commune.id} value={commune.id}>
                       {commune.name_fr}
@@ -293,6 +318,8 @@ export default function CheckoutPage() {
                 </select>
               </label>
             </div>
+
+            {destinationError && <p role="alert" className="mt-3 rounded-lg border border-brand-red/30 bg-brand-red/10 px-3 py-2 text-xs text-brand-red-light">{destinationError}</p>}
 
             <div className="mt-4 flex flex-wrap gap-2">
               {(['domicile', 'stopdesk'] as Method[]).map((option) => (
@@ -335,10 +362,10 @@ export default function CheckoutPage() {
                   value={pickupId}
                   onChange={(event) => setPickupId(event.target.value)}
                   className="input-field"
-                  disabled={pickupPoints.length === 0}
+                  disabled={destinationLoading || pickupPoints.length === 0}
                 >
                   <option value="">
-                    {pickupPoints.length === 0 ? 'Aucun point relais dans cette wilaya' : 'Sélectionner...'}
+                    {destinationLoading ? 'Chargement…' : pickupPoints.length === 0 ? 'Aucun point relais dans cette wilaya' : 'Sélectionner...'}
                   </option>
                   {pickupPoints.map((point) => (
                     <option key={point.id} value={point.id}>

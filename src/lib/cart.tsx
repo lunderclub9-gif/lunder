@@ -60,7 +60,7 @@ export function normalizeStoredCart(value: unknown): CartItem[] {
 
     const variantId = typeof item.variantId === 'string' ? item.variantId : null
     const quantity = Math.min(MAX_QUANTITY, Math.max(1, Math.floor(item.quantity)))
-    const imageUrl = typeof item.imageUrl === 'string' && /^https?:\\/\\//i.test(item.imageUrl)
+    const imageUrl = typeof item.imageUrl === 'string' && /^https?:\/\//i.test(item.imageUrl)
       ? item.imageUrl
       : null
 

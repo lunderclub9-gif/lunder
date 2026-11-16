@@ -52,7 +52,7 @@ BEGIN
     v_headers := coalesce(nullif(current_setting('request.headers', true), ''), '{}')::jsonb;
     v_ip_text := split_part(coalesce(v_headers->>'x-forwarded-for', ''), ',', 1);
     IF nullif(btrim(v_ip_text), '') IS NOT NULL THEN
-      v_client_key := 'ip:' || btrim(v_ip_text)::inet::text;
+      v_client_key := 'ip:' || md5(btrim(v_ip_text)::inet::text);
     END IF;
   EXCEPTION WHEN OTHERS THEN
     v_client_key := NULL;

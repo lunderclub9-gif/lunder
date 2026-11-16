@@ -158,7 +158,7 @@ export default function FinancialDashboardPage() {
       const date = order.delivered_at
       add(date, 'revenue', Number(order.total_dzd))
       const knownCost = (order.order_items ?? []).reduce((sum, item) =>
-        item.cost_status === 'complete' && item.unit_cost_dzd != null
+        (item.cost_status === 'complete' || item.cost_status === 'partial') && item.unit_cost_dzd != null
           ? sum + Number(item.unit_cost_dzd) * Number(item.quantity)
           : sum, 0)
       add(date, 'profit', Number(order.total_dzd) - knownCost)
@@ -173,8 +173,8 @@ export default function FinancialDashboardPage() {
       const current = map.get(item.product_name) ?? { name: item.product_name, revenue: 0, quantity: 0, cost: 0, missing: false }
       current.revenue += Number(item.line_total_dzd)
       current.quantity += Number(item.quantity)
-      if (item.cost_status === 'complete' && item.unit_cost_dzd != null) current.cost += Number(item.unit_cost_dzd) * Number(item.quantity)
-      else current.missing = true
+      if ((item.cost_status === 'complete' || item.cost_status === 'partial') && item.unit_cost_dzd != null) current.cost += Number(item.unit_cost_dzd) * Number(item.quantity)
+      if (item.cost_status !== 'complete') current.missing = true
       map.set(item.product_name, current)
     }))
     return [...map.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 6)

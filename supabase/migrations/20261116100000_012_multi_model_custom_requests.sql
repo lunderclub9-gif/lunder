@@ -54,6 +54,8 @@ DECLARE
   v_total_hours numeric := 0;
   v_name text;
   v_file_path text;
+  v_mode text;
+  v_instructions text;
   v_file_exists boolean;
   v_line jsonb;
 BEGIN
@@ -81,6 +83,14 @@ BEGIN
   FOR v_product IN SELECT value FROM jsonb_array_elements(p_products) LOOP
     v_name := coalesce(nullif(btrim(v_product->>'file_name'), ''), 'Modèle 3D');
     v_file_path := nullif(btrim(v_product->>'file_path'), '');
+    v_mode := coalesce(nullif(v_product->>'mode', ''), 'reference');
+    v_instructions := nullif(btrim(coalesce(v_product->>'instructions', '')), '');
+    IF v_mode NOT IN ('reference', 'exact', 'modify', 'inspiration') THEN
+      RAISE EXCEPTION 'MODE_PRODUIT_INVALIDE';
+    END IF;
+    IF length(v_name) > 180 OR length(coalesce(v_instructions, '')) > 2000 THEN
+      RAISE EXCEPTION 'DETAILS_PRODUIT_TROP_LONGS';
+    END IF;
     IF v_file_path IS NULL THEN RAISE EXCEPTION 'FICHIER_PRODUIT_REQUIS'; END IF;
 
     SELECT EXISTS (
@@ -124,7 +134,8 @@ BEGIN
     ELSE
       v_mesh_volume_cm3 := NULL;
     END IF;
-    IF v_mesh_volume_cm3 IS NOT NULL AND v_mesh_volume_cm3 > 0
+    IF v_mesh_volume_cm3 IS NOT NULL
+       AND v_mesh_volume_cm3 >= v_volume_cm3 * 0.001
        AND v_mesh_volume_cm3 <= v_volume_cm3 * 1.05 THEN
       v_volume_cm3 := v_mesh_volume_cm3;
       v_estimate_method := 'mesh_volume_heuristic';
@@ -162,7 +173,7 @@ BEGIN
       'id', v_product->>'id',
       'file_path', v_file_path,
       'file_name', v_name,
-      'mode', coalesce(v_product->>'mode', 'reference'),
+      'mode', v_mode,
       'original_dimensions_mm', v_product->'original_dimensions_mm',
       'target_dimensions_mm', jsonb_build_object(
         'length', v_length, 'width', v_width, 'height', v_height
@@ -171,7 +182,7 @@ BEGIN
       'material_name', v_material.name,
       'color', nullif(btrim(coalesce(v_product->>'color', '')), ''),
       'preserve_ratio', coalesce((v_product->>'preserve_ratio')::boolean, true),
-      'instructions', nullif(btrim(coalesce(v_product->>'instructions', '')), ''),
+      'instructions', v_instructions,
       'geometry', coalesce(v_product->'geometry', '{}'::jsonb)
     ));
 

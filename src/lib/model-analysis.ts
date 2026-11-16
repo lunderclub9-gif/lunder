@@ -188,7 +188,7 @@ async function analyzeGltfDocument(document: GltfDocument, buffers: Uint8Array[]
       if (!accessor || accessor.type !== 'VEC3' || typeof accessor.bufferView !== 'number') continue
       const bufferView = document.bufferViews?.[accessor.bufferView]
       const data = buffers[bufferView?.buffer ?? 0]
-      if (!bufferView || !data) continue
+      if (!bufferView || !data || typeof accessor.componentType !== 'number') continue
       const componentBytes = ({ 5126: 4, 5123: 2, 5125: 4, 5122: 2, 5121: 1, 5120: 1 } as Record<number, number>)[accessor.componentType]
       if (!componentBytes) continue
       const stride = bufferView.byteStride ?? componentBytes * 3
@@ -224,7 +224,7 @@ async function analyzeGltfDocument(document: GltfDocument, buffers: Uint8Array[]
       const indexAccessor = primitive.indices === undefined ? null : document.accessors?.[primitive.indices]
       let indices: number[]
       if (indexAccessor) {
-        if (typeof indexAccessor.bufferView !== 'number') {
+        if (typeof indexAccessor.componentType !== 'number' || typeof indexAccessor.bufferView !== 'number') {
           warnings.push('Une liste d’indices glTF ne référence pas de buffer exploitable ; volume incomplet.')
           continue
         }

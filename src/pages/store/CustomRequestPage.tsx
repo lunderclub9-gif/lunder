@@ -317,8 +317,12 @@ export default function CustomRequestPage() {
         const path = `${folder.current}/${Date.now()}-${uploadedCount}.${check.extension}`
         let modelAnalysis: ModelAnalysis | null = null
         if (isModel) {
-          try { modelAnalysis = await analyze3DModel(file) } catch (analysisError) {
-            setError(analysisError instanceof Error ? `Fichier ajouté, mais analyse impossible : ${analysisError.message}` : 'Fichier ajouté, mais analyse géométrique indisponible.')
+          try {
+            modelAnalysis = await analyze3DModel(file)
+          } catch (analysisError) {
+            throw new Error(analysisError instanceof Error
+              ? `« ${file.name} » n’a pas été ajouté : analyse 3D impossible. ${analysisError.message}`
+              : `« ${file.name} » n’a pas été ajouté : analyse géométrique indisponible.`)
           }
         }
         const { error: uploadError } = await supabase.storage
@@ -488,6 +492,7 @@ export default function CustomRequestPage() {
           target_dimensions_mm: product.target, quantity: product.quantity,
           material_name: product.material, color: product.color,
           preserve_ratio: product.preserveRatio,
+          instructions: product.instructions.trim(),
           geometry: {
             format: product.analysis.format, mesh_volume_cm3: product.analysis.meshVolumeCm3,
             bounding_box_volume_cm3: product.analysis.boundingBoxVolumeCm3,

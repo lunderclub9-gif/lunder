@@ -82,6 +82,7 @@ export default function CustomRequestPage() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [productSpecs, setProductSpecs] = useState<ProductSpec[]>([])
   const [modelViewerStatus, setModelViewerStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const modelViewerLoadStarted = useRef(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -105,14 +106,15 @@ export default function CustomRequestPage() {
   // This keeps the model-viewer runtime out of visits that only browse the store.
   const hasModelPreview = productSpecs.some((product) => Boolean(product.previewUrl))
   useEffect(() => {
-    if (!hasModelPreview || modelViewerStatus !== 'idle') return
+    if (!hasModelPreview || modelViewerLoadStarted.current) return
+    modelViewerLoadStarted.current = true
     let active = true
     setModelViewerStatus('loading')
     void import('@google/model-viewer')
       .then(() => { if (active) setModelViewerStatus('ready') })
       .catch(() => { if (active) setModelViewerStatus('error') })
     return () => { active = false }
-  }, [hasModelPreview, modelViewerStatus])
+  }, [hasModelPreview])
 
   useEffect(() => {
     let active = true

@@ -131,7 +131,7 @@ export default function FinancialDashboardPage() {
       setOrders([])
       setExpenses([])
       setPendingValue(0)
-      setError('Impossible de charger les données financières. Vérifiez que la migration 014 est appliquée à Supabase et que votre compte possède les droits propriétaire.')
+      setError('Impossible de charger les données financières. Vérifiez que la migration 015 est appliquée à Supabase et que votre compte possède les droits propriétaire.')
       setLoading(false)
       return
     }
@@ -168,7 +168,6 @@ export default function FinancialDashboardPage() {
   }, [orders, expenses, range])
 
   const products = useMemo(() => {
-    const manuallyCostedOrders = new Set(expenses.filter((expense) => expense.category === 'production' && expense.order_id).map((expense) => expense.order_id as string))
     const map = new Map<string, { name: string; revenue: number; quantity: number; cost: number; missing: boolean }>()
     orders.forEach((order) => (order.order_items ?? []).forEach((item) => {
       const current = map.get(item.product_name) ?? { name: item.product_name, revenue: 0, quantity: 0, cost: 0, missing: false }
@@ -314,7 +313,7 @@ export default function FinancialDashboardPage() {
 
           <div className="rounded-xl border border-charcoal-400/15 bg-charcoal-800/40 p-4 text-xs leading-6 text-charcoal-400">
             <p className="font-semibold text-charcoal-200">Comment lire ces chiffres ?</p>
-            <p>Le chiffre encaissé ne prend en compte que les commandes livrées. Les coûts des produits sont des estimations figées au moment de la commande à partir de vos fiches « Coûts produits ». Les lignes anciennes, les produits sans fiche complète et les commandes sur mesure sans dépense de production saisie sont signalés comme non chiffrés.</p>
+            <p>Le chiffre encaissé ne prend en compte que les commandes livrées. Les coûts des produits sont des estimations figées au moment de la commande à partir de vos fiches « Coûts produits ». Les lignes anciennes, les produits sans fiche complète et les commandes sur mesure sans coût unitaire vérifiable sont signalés comme non chiffrés. Une dépense liée améliore le résultat global, mais ne prouve pas à elle seule le coût complet de chaque article.</p>
             <p>Le résultat provisoire soustrait les coûts de production connus et les dépenses enregistrées. Il ne remplace pas une comptabilité certifiée et peut être supérieur au bénéfice réel tant que tous les coûts ne sont pas renseignés. Ne saisissez pas une deuxième fois un coût déjà inclus dans la fiche produit.</p>
           </div>
         </>

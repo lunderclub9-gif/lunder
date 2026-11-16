@@ -355,14 +355,14 @@ export default function CustomRequestPage() {
     invalidateEstimate()
     setError(null)
     const productToRemove = productSpecs.find((product) => product.filePath === path)
-    if (productToRemove?.previewUrl) {
-      URL.revokeObjectURL(productToRemove.previewUrl)
-      previewUrls.current.delete(productToRemove.previewUrl)
-    }
     const { error: removeError } = await supabase.storage.from('custom-requests').remove([path])
     if (removeError) {
       setError('Impossible de supprimer ce fichier du stockage privé. Réessayez avant d’envoyer la demande.')
       return
+    }
+    if (productToRemove?.previewUrl) {
+      URL.revokeObjectURL(productToRemove.previewUrl)
+      previewUrls.current.delete(productToRemove.previewUrl)
     }
     setFiles((current) => current.filter((file) => file.path !== path))
     setProductSpecs((current) => current.filter((product) => product.filePath !== path))

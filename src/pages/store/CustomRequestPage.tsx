@@ -150,6 +150,11 @@ export default function CustomRequestPage() {
       setEstimateError(null)
       return
     }
+    if (activeProducts.reduce((sum, product) => sum + product.quantity, 0) > 500) {
+      setEstimate(null)
+      setEstimateError('La quantité totale ne peut pas dépasser 500 pièces par demande.')
+      return
+    }
     if (activeProducts.some((product) => !product.material || Object.values(product.target).some((value) => !Number.isFinite(value) || value <= 0 || value > 2000))) {
       setEstimate(null)
       setEstimateError('Vérifiez les dimensions et la matière de chaque modèle.')
@@ -401,7 +406,34 @@ export default function CustomRequestPage() {
       )
       return
     }
-    setCreated(data as CreatedRequest)
+    const createdRequest = data as CreatedRequest
+    if (productSpecs.length > 0) {
+      const { data: savedProducts, error: productSaveError } = await supabase.rpc('save_custom_request_products', {
+        p_tracking_token: createdRequest.tracking_token,
+        p_products: productSpecs.map((product) => ({
+          id: product.id, file_path: product.filePath, file_name: product.fileName,
+          mode: product.mode, original_dimensions_mm: product.original,
+          target_dimensions_mm: product.target, quantity: product.quantity,
+          material_name: product.material, color: product.color,
+          preserve_ratio: product.preserveRatio,
+          geometry: {
+            format: product.analysis.format, mesh_volume_cm3: product.analysis.meshVolumeCm3,
+            bounding_box_volume_cm3: product.analysis.boundingBoxVolumeCm3,
+            triangle_count: product.analysis.triangleCount, vertex_count: product.analysis.vertexCount,
+            warnings: product.analysis.warnings,
+          },
+        })),
+        p_options: options,
+        p_rush: rush,
+      })
+      if (productSaveError || !savedProducts) {
+        setError(orderErrorMessage(productSaveError?.message, 'La demande est créée, mais les détails des modèles n’ont pas pu être enregistrés. Réessayez pour terminer leur enregistrement.'))
+        return
+      }
+      const saved = savedProducts as Record<string, unknown>
+      setEstimate((current) => current ? { ...current, totalDzd: Number(saved.totalDzd ?? current.totalDzd) } : current)
+    }
+    setCreated(createdRequest)
   }
 
   useEffect(() => {
@@ -631,7 +663,10 @@ export default function CustomRequestPage() {
                 </div>
                 <label className="block">
                   <span className="label-text">Rôle du fichier</span>
-                  <select className="input-field" value={product.mode} onChange={(event) => updateProduct(product.id, { mode: event.target.value as ProductSpec['mode'] })}>
+                  <select className="input-field" value={product.mode} onChange={(event) => {
+                    const mode = event.target.value as ProductSpec['mode']
+                    updateProduct(product.id, { mode, ...(mode === 'exact' ? { target: { ...product.original } } : {}) })
+                  }}>
                     <option value="reference">Exemple / même forme, taille au choix</option>
                     <option value="exact">Fabriquer exactement à la taille du fichier</option>
                     <option value="modify">Modifier le modèle avant fabrication</option>

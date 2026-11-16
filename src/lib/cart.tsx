@@ -107,7 +107,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (existing) {
         return current.map((line) =>
           line.key === key
-            ? { ...line, quantity: Math.min(MAX_QUANTITY, line.quantity + quantity) }
+            ? {
+                ...line,
+                ...item,
+                key,
+                quantity: Math.min(MAX_QUANTITY, line.quantity + quantity),
+              }
             : line
         )
       }

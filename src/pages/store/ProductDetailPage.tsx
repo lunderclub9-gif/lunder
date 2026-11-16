@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Package, Loader2, ShoppingCart, Check, ShieldCheck, Truck, Sparkles } from 'lucide-react'
+import { ArrowLeft, Package, Loader2, ShoppingCart, Check, ShieldCheck, Truck } from 'lucide-react'
 import {
   supabase,
   type Product,
@@ -161,12 +161,17 @@ export default function ProductDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Link to="/boutique/produits" className="btn-ghost mb-6">
+      <div className="mb-6 flex flex-wrap items-center gap-2 text-xs text-charcoal-500">
+        <Link to="/boutique" className="transition hover:text-offwhite">Accueil</Link><span>/</span>
+        <Link to="/boutique/produits" className="transition hover:text-offwhite">Boutique</Link><span>/</span>
+        <span className="max-w-[14rem] truncate text-charcoal-300">{product.name}</span>
+      </div>
+      <Link to="/boutique/produits" className="btn-ghost mb-5">
         <ArrowLeft className="h-4 w-4" />
         Retour
       </Link>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid items-start gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12">
         <div className="space-y-4">
           {product.model_url ? (
             <Viewer3D src={product.model_url} poster={activeImage ?? undefined} alt={product.name} />
@@ -202,8 +207,9 @@ export default function ProductDetailPage() {
           )}
         </div>
 
-        <div className="space-y-6">
-          <div>
+        <div className="space-y-6 lg:sticky lg:top-24">
+          <div className="rounded-3xl border border-charcoal-400/15 bg-gradient-to-br from-charcoal-800/90 to-charcoal-950/80 p-5 sm:p-7">
+            <div className="mb-4 text-[10px] font-bold tracking-[0.2em] text-brand-red-light">LUNDER'S 3D STUDIO · CRÉATION & DESIGN</div>
             {product.category && (
               <span className="text-xs font-medium tracking-wide text-brand-red uppercase">
                 {product.category.name}
@@ -320,13 +326,9 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-charcoal-400/15 bg-charcoal-800/30 p-4">
-            <div className="flex items-start gap-3">
-              <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
-              <p className="text-xs text-charcoal-300">
-                Paiement à la livraison disponible partout en Algérie. Livraison à domicile et points relais.
-              </p>
-            </div>
+          <div className="grid gap-3 rounded-2xl border border-charcoal-400/15 bg-charcoal-800/30 p-4 sm:grid-cols-2">
+            <div className="flex items-start gap-2.5"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-400" /><p className="text-xs leading-5 text-charcoal-300">Paiement à la livraison, sans carte bancaire.</p></div>
+            <div className="flex items-start gap-2.5"><Truck className="mt-0.5 h-4 w-4 shrink-0 text-brand-red-light" /><p className="text-xs leading-5 text-charcoal-300">Livraison à domicile ou point relais selon votre wilaya.</p></div>
           </div>
         </div>
       </div>

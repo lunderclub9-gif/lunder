@@ -162,6 +162,7 @@ async function analyzeGltfDocument(document: Record<string, any>, buffers: Uint8
   const bounds = emptyBounds()
   let vertexCount = 0
   let triangleCount = 0
+  let volume = 0
   const warnings = ['La géométrie glTF est mesurée dans les coordonnées locales des maillages ; les transformations de scène peuvent modifier les dimensions finales.']
   for (const mesh of document.meshes ?? []) {
     for (const primitive of mesh.primitives ?? []) {
@@ -186,19 +187,58 @@ async function analyzeGltfDocument(document: Record<string, any>, buffers: Uint8
           default: return dataView.getInt8(position)
         }
       }
+      const positions: number[][] = []
       for (let i = 0; i < accessor.count; i += 1) {
         const point = [0, 1, 2].map((axis) => read(offset + i * stride + axis * componentBytes))
+        positions.push(point)
         if (point.every(Number.isFinite)) {
           addVertex(bounds, point[0], point[1], point[2])
           vertexCount += 1
         }
       }
+
+      // glTF primitive mode 4 is TRIANGLES (the default). Other modes are
+      // bounded, but are not converted into a volume estimate here.
+      if (primitive.mode !== undefined && primitive.mode !== 4) {
+        warnings.push('Certaines primitives ne sont pas des triangles simples ; leur volume géométrique est exclu du calcul.')
+        continue
+      }
+
       const indexAccessor = primitive.indices === undefined ? null : document.accessors?.[primitive.indices]
-      triangleCount += indexAccessor ? Math.floor(indexAccessor.count / 3) : Math.floor(accessor.count / 3)
+      let indices: number[]
+      if (indexAccessor) {
+        const indexView = document.bufferViews?.[indexAccessor.bufferView]
+        const indexData = buffers[indexView?.buffer ?? 0]
+        const indexBytes = ({ 5121: 1, 5123: 2, 5125: 4 } as Record<number, number>)[indexAccessor.componentType]
+        if (!indexView || !indexData || !indexBytes) {
+          warnings.push('Une liste d’indices glTF n’a pas pu être lue ; volume incomplet.')
+          continue
+        }
+        const indexDataView = new DataView(indexData.buffer, indexData.byteOffset, indexData.byteLength)
+        const indexStride = indexView.byteStride ?? indexBytes
+        const indexOffset = (indexView.byteOffset ?? 0) + (indexAccessor.byteOffset ?? 0)
+        const readIndex = (position: number) => indexAccessor.componentType === 5125
+          ? indexDataView.getUint32(position, true)
+          : indexAccessor.componentType === 5123
+            ? indexDataView.getUint16(position, true)
+            : indexDataView.getUint8(position)
+        indices = Array.from({ length: indexAccessor.count }, (_, index) => readIndex(indexOffset + index * indexStride))
+      } else {
+        indices = Array.from({ length: positions.length }, (_, index) => index)
+      }
+      for (let index = 0; index + 2 < indices.length; index += 3) {
+        const a = positions[indices[index]]
+        const b = positions[indices[index + 1]]
+        const c = positions[indices[index + 2]]
+        if (!a || !b || !c) continue
+        triangleCount += 1
+        volume += signedTetraVolume(a, b, c)
+      }
     }
   }
   if (!vertexCount) throw new Error('Aucun attribut POSITION exploitable trouvé dans le fichier glTF.')
-  return finish(format, bounds, triangleCount, vertexCount, null, 'm', warnings)
+  if (!triangleCount) warnings.push('Aucun triangle exploitable : le volume du maillage ne peut pas être calculé.')
+  return finish(format, bounds, triangleCount, vertexCount, triangleCount ? volume : null, 'm', warnings)
 }
 
 async function analyzeGlb(file: File): Promise<ModelAnalysis> {

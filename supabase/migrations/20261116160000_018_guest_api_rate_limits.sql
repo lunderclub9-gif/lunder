@@ -153,7 +153,7 @@ SET search_path = pg_catalog, public, lunder_private, pg_temp
 AS $$
 DECLARE
   v_number text := upper(left(btrim(coalesce(p_order_number, '')), 32));
-  v_phone text := right(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), 9);
+  v_phone text := right(regexp_replace(left(coalesce(p_phone, ''), 64), '[^0-9]', '', 'g'), 9);
   v_attempts integer;
   v_result jsonb;
 BEGIN
@@ -194,7 +194,7 @@ BEGIN
   INTO v_result
   FROM public.orders AS o
   WHERE o.order_number = v_number
-    AND right(regexp_replace(o.phone, '\D', '', 'g'), 9) = v_phone;
+    AND right(regexp_replace(o.phone, '[^0-9]', '', 'g'), 9) = v_phone;
 
   IF v_result IS NULL THEN
     RETURN jsonb_build_object('found', false, 'rate_limited', false);

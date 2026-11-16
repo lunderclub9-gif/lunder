@@ -121,15 +121,15 @@ async function analyzeObj(file: File): Promise<ModelAnalysis> {
   let volume = 0
   const warnings = ['OBJ ne stocke pas toujours son unité : les mesures sont supposées en millimètres.']
   for (const rawLine of source.split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (line.startsWith('v ')) {
-      const values = line.slice(2).trim().split(/\s+/).slice(0, 3).map(Number)
+    const line = rawLine.split('#')[0].trim()
+    if (/^v\s+/.test(line)) {
+      const values = line.replace(/^v\s+/, '').trim().split(/\s+/).slice(0, 3).map(Number)
       if (values.length === 3 && values.every(Number.isFinite)) {
         vertices.push(values)
         addVertex(bounds, values[0], values[1], values[2])
       }
-    } else if (line.startsWith('f ')) {
-      const indices = line.slice(2).trim().split(/\s+/).map((part) => Number(part.split('/')[0]))
+    } else if (/^f\s+/.test(line)) {
+      const indices = line.replace(/^f\s+/, '').trim().split(/\s+/).map((part) => Number(part.split('/')[0]))
       if (indices.length < 3 || indices.some((index) => !Number.isInteger(index) || index === 0)) continue
       const resolved = indices.map((index) => index > 0 ? index - 1 : vertices.length + index)
       const first = vertices[resolved[0]]

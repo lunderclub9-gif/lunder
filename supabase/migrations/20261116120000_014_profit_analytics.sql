@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS public.business_expenses (
   amount_dzd integer NOT NULL CHECK (amount_dzd > 0),
   expense_date date NOT NULL DEFAULT current_date,
   order_id uuid REFERENCES public.orders(id) ON DELETE SET NULL,
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT auth.uid(),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );

@@ -22,10 +22,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Refresh compatible dependency lockfile
+        run: npm update --package-lock-only --ignore-scripts
       - name: Install dependencies
         run: npm ci
-      - name: Apply non-breaking dependency security fixes
-        run: npm audit fix
       - name: Dependency security audit
         run: npm audit --audit-level=high
       - name: Lint

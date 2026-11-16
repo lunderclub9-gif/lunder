@@ -825,7 +825,7 @@ export default function CustomRequestPage() {
               {estimate.estimates && (
                 <p className="mt-2 text-xs text-charcoal-500">
                   Estimation de production : environ {estimate.estimates.grams ?? '—'} g et{' '}
-                  {estimate.estimates.printHours ?? '—'} h — méthode : {estimate.estimates.method === 'multiple_model_geometry_or_bounding_box_estimates' ? 'calcul séparé par modèle à partir des dimensions' : 'boîte englobante'}.
+                  {estimate.estimates.printHours ?? '—'} h — méthode : {estimate.estimates.method === 'multiple_model_geometry_or_bounding_box_estimates' ? 'calcul séparé par modèle à partir du volume du maillage si disponible, sinon des dimensions' : 'boîte englobante'}.
                 </p>
               )}
               {estimate.assumptions && estimate.assumptions.length > 0 && (

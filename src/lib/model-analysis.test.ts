@@ -10,7 +10,7 @@ const tetraVertices = [
 
 describe('analyze3DModel', () => {
   it('reads dimensions and mesh volume from an ASCII STL', async () => {
-    const file = new File(['solid tetra\\n' + tetraVertices.join('\\n') + '\\nendsolid tetra'], 'tetra.stl')
+    const file = new File(['solid tetra\n' + tetraVertices.join('\n') + '\nendsolid tetra'], 'tetra.stl')
     const result = await analyze3DModel(file)
     expect(result.format).toBe('stl')
     expect(result.dimensionsMm).toEqual({ length: 10, width: 10, height: 10 })
@@ -23,7 +23,7 @@ describe('analyze3DModel', () => {
     const source = [
       'v 0 0 0', 'v 10 0 0', 'v 0 10 0', 'v 0 0 10',
       'f 1 3 2', 'f 1 2 4', 'f 1 4 3', 'f 2 3 4',
-    ].join('\\n')
+    ].join('\n')
     const result = await analyze3DModel(new File([source], 'tetra.obj'))
     expect(result.format).toBe('obj')
     expect(result.dimensionsMm).toEqual({ length: 10, width: 10, height: 10 })

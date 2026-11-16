@@ -398,7 +398,7 @@ export default function CustomRequestPage() {
         })),
         manufacturing_options: pricingOptions,
         rush,
-        estimate_accepted: true,
+        estimate_accepted: productSpecs.length === 0,
         delivery: {
           wilaya_code: Number(wilayaCode),
           commune_id: communeId,

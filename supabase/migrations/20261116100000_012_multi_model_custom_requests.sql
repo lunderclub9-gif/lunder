@@ -111,6 +111,19 @@ BEGIN
 
     v_volume_cm3 := (v_length * v_width * v_height) / 1000.0;
     v_mesh_volume_cm3 := nullif(v_product->'geometry'->>'mesh_volume_cm3', '')::numeric;
+    IF coalesce(v_product->>'mode', 'reference') NOT IN ('reference', 'exact') THEN
+      v_mesh_volume_cm3 := NULL;
+    ELSIF v_mesh_volume_cm3 IS NOT NULL
+      AND nullif(v_product->'original_dimensions_mm'->>'length', '')::numeric > 0
+      AND nullif(v_product->'original_dimensions_mm'->>'width', '')::numeric > 0
+      AND nullif(v_product->'original_dimensions_mm'->>'height', '')::numeric > 0 THEN
+      v_mesh_volume_cm3 := v_mesh_volume_cm3 * v_volume_cm3 /
+        ((nullif(v_product->'original_dimensions_mm'->>'length', '')::numeric
+          * nullif(v_product->'original_dimensions_mm'->>'width', '')::numeric
+          * nullif(v_product->'original_dimensions_mm'->>'height', '')::numeric) / 1000.0);
+    ELSE
+      v_mesh_volume_cm3 := NULL;
+    END IF;
     IF v_mesh_volume_cm3 IS NOT NULL AND v_mesh_volume_cm3 > 0
        AND v_mesh_volume_cm3 <= v_volume_cm3 * 1.05 THEN
       v_volume_cm3 := v_mesh_volume_cm3;
@@ -341,6 +354,9 @@ DECLARE
   v_full jsonb;
   v_method text := 'bounding_box_heuristic';
 BEGIN
+  IF p_quantity IS NULL OR p_quantity < 1 OR p_quantity > 100 THEN
+    RAISE EXCEPTION 'QUANTITE_PRODUIT_INVALIDE';
+  END IF;
   IF p_length_mm IS NULL OR p_width_mm IS NULL OR p_height_mm IS NULL
      OR p_length_mm <= 0 OR p_width_mm <= 0 OR p_height_mm <= 0
      OR p_length_mm > 2000 OR p_width_mm > 2000 OR p_height_mm > 2000 THEN

@@ -59,17 +59,12 @@ export default function AdminProductEdit() {
     seo_description: '',
   })
 
-  useEffect(() => {
-    loadCategories()
-    if (!isNew && id) loadProduct(id)
-  }, [id])
-
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     const { data } = await supabase.from('categories').select('*').eq('is_active', true).order('name')
     setCategories((data as Category[]) ?? [])
-  }
+  }, [])
 
-  const loadOptions = async (productId: string) => {
+  const loadOptions = useCallback(async (productId: string) => {
     const { data } = await supabase
       .from('product_options')
       .select('*, values:product_option_values(*)')
@@ -82,18 +77,18 @@ export default function AdminProductEdit() {
       ),
     }))
     setOptions(parsed)
-  }
+  }, [])
 
-  const loadVariants = async (productId: string) => {
+  const loadVariants = useCallback(async (productId: string) => {
     const { data } = await supabase
       .from('product_variants')
       .select('*, values:product_variant_values(option_value_id)')
       .eq('product_id', productId)
       .order('created_at')
     setVariants((data as ProductVariant[]) ?? [])
-  }
+  }, [])
 
-  const loadProduct = async (productId: string) => {
+  const loadProduct = useCallback(async (productId: string) => {
     const { data } = await supabase.from('products').select('*').eq('id', productId).maybeSingle()
     if (data) {
       const p = data as Product
@@ -125,7 +120,12 @@ export default function AdminProductEdit() {
     setImages((imgs as ProductImage[]) ?? [])
     await Promise.all([loadOptions(productId), loadVariants(productId)])
     setLoading(false)
-  }
+  }, [loadOptions, loadVariants])
+
+  useEffect(() => {
+    void loadCategories()
+    if (!isNew && id) void loadProduct(id)
+  }, [id, isNew, loadCategories, loadProduct])
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files

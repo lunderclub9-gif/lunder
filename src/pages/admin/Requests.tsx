@@ -300,8 +300,8 @@ export default function AdminRequests() {
     }
     if ((request.product_specs?.length ?? 0) > 0 && !(await confirmAction({
       title: 'Vérifier l’estimation des modèles 3D',
-      description: 'Le volume du maillage et les dimensions proviennent de l’analyse du fichier, mais le poids et le temps restent des estimations : ils ne viennent pas d’un trancheur G-code. Ouvrez les fichiers, vérifiez les tailles et confirmez que vous souhaitez créer le devis à partir de cette estimation.',
-      confirmLabel: 'Créer le devis estimatif',
+      description: 'Les dimensions et le volume sont transmis par l’analyse exécutée dans le navigateur du client et ne sont pas recalculés côté serveur. Le poids et le temps ne viennent pas d’un trancheur G-code. Pour un devis ferme, ouvrez le modèle dans votre trancheur, vérifiez les dimensions, le poids réel et le temps, puis utilisez le devis manuel. Confirmez ici uniquement si vous acceptez un devis indicatif.',
+      confirmLabel: 'Créer le devis indicatif',
     }))) return
     setBusy(true)
     const { error: rpcError } = await supabase.rpc('create_custom_quote_from_estimate', {
@@ -516,7 +516,7 @@ export default function AdminRequests() {
                             </div>
                           ))}
                         </div>
-                        <p className="mt-2 text-charcoal-500">Le volume géométrique est une mesure du maillage ; le poids et le temps de fabrication restent estimatifs jusqu’à validation du fichier de tranchage.</p>
+                        <p className="mt-2 text-charcoal-500">Les dimensions et le volume affichés sont fournis par l’analyse du navigateur client et ne sont pas vérifiés côté serveur. Le poids et le temps restent estimatifs jusqu’à validation du fichier dans un trancheur G-code. Vérifiez le modèle avant tout devis ferme.</p>
                       </div>
                     )}
 

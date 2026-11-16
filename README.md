@@ -107,7 +107,7 @@ checks `is_owner()` inside them; guest token/checkout/estimate endpoints are exp
 
 - Guests must upload without an account, so the private intake bucket accepts anonymous `INSERT`. The
   Storage trigger caps each request folder at 10 files / 100 MiB and the bucket caps each file at 25 MiB;
-  guest order/request RPCs, manufacturing estimates, repeated product-spec saves and tracking are rate-limited. There is still no global per-IP quota for direct
+  guest order/request RPCs, manufacturing estimates, repeated product-spec saves and tracking are rate-limited; rate-limit keys store a one-way hash of the client IP, not the raw address. There is still no global per-IP quota for direct
   Storage uploads, and abandoned/orphaned uploads need a scheduled cleanup or server-issued upload ticket.
 - Owner sign-in/out is logged by the app calling `log_owner_event`; an API login that bypasses the app
   is not recorded. Real auth-event logging needs a server-side hook.

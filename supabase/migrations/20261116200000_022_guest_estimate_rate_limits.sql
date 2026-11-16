@@ -117,7 +117,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, lunder_private, pg_temp
 AS $$
 BEGIN
-  IF NOT lunder_private.record_guest_rate_limit('manufacturing_estimate', 60, 900) THEN
+  IF NOT lunder_private.record_guest_rate_limit('manufacturing_estimate', 300, 900) THEN
     RAISE EXCEPTION 'TROP_DEMANDES';
   END IF;
 
@@ -145,7 +145,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, lunder_private, pg_temp
 AS $$
 BEGIN
-  IF NOT lunder_private.record_guest_rate_limit('manufacturing_estimate', 60, 900) THEN
+  IF NOT lunder_private.record_guest_rate_limit('manufacturing_estimate', 300, 900) THEN
     RAISE EXCEPTION 'TROP_DEMANDES';
   END IF;
 

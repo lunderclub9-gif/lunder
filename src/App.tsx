@@ -29,6 +29,7 @@ const AdminManufacturingPricing = lazy(() => import('@/pages/admin/Manufacturing
 const AdminProductCostMaterials = lazy(() => import('@/pages/admin/ProductCostMaterials'))
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'))
 const AdminHistory = lazy(() => import('@/pages/admin/History'))
+const AdminFinancialDashboard = lazy(() => import('@/pages/admin/FinancialDashboard'))
 
 function FullPageLoader() {
   return (
@@ -96,6 +97,7 @@ export default function App() {
                 }
               >
                 <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="finances" element={<AdminFinancialDashboard />} />
                 <Route path="produits" element={<AdminProducts />} />
                 <Route path="produits/nouveau" element={<AdminProductEdit />} />
                 <Route path="produits/:id" element={<AdminProductEdit />} />

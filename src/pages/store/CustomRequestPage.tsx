@@ -146,6 +146,13 @@ export default function CustomRequestPage() {
   const runEstimate = useCallback(async () => {
     const sequence = ++estimateSequence.current
     const activeProducts = productSpecs
+    const modelFileCount = files.filter((file) => file.kind === 'model').length
+    if (modelFileCount !== activeProducts.length) {
+      setEstimate(null)
+      setEstimateError('Un ou plusieurs fichiers 3D n’ont pas pu être analysés. Retirez le fichier concerné ou réexportez-le en GLB autonome, STL ou OBJ valide pour éviter une estimation incomplète.')
+      setEstimateLoading(false)
+      return
+    }
     const fallback = {
       length: Number(lengthMm), width: Number(widthMm), height: Number(heightMm),
       quantity: Number(quantity) || 1, material,
@@ -182,7 +189,9 @@ export default function CustomRequestPage() {
     const results = await Promise.all(inputs.map((item, index) => activeProducts.length
       ? supabase.rpc('estimate_manufacturing_model', {
           p_length_mm: item.length, p_width_mm: item.width, p_height_mm: item.height,
-          p_mesh_volume_cm3: activeProducts[index].analysis.meshVolumeCm3,
+          p_mesh_volume_cm3: ['reference', 'exact'].includes(activeProducts[index].mode) && activeProducts[index].analysis.meshVolumeCm3 !== null
+            ? activeProducts[index].analysis.meshVolumeCm3! * (item.length * item.width * item.height) / (activeProducts[index].original.length * activeProducts[index].original.width * activeProducts[index].original.height)
+            : null,
           p_material_name: item.material, p_quantity: item.quantity, p_options: effectiveOptions, p_rush: rush,
         })
       : supabase.rpc('estimate_manufacturing_dimensions', {
@@ -218,7 +227,7 @@ export default function CustomRequestPage() {
         method: activeProducts.length ? 'multiple_model_geometry_or_bounding_box_estimates' : String((rows[0].estimates as Record<string, unknown> | undefined)?.method ?? ''),
       },
     })
-  }, [lengthMm, widthMm, heightMm, material, quantity, options, rush, productSpecs])
+  }, [lengthMm, widthMm, heightMm, material, quantity, options, rush, productSpecs, files])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -610,6 +619,11 @@ export default function CustomRequestPage() {
             </p>
           )}
 
+          {files.some((file) => file.kind === 'model' && !productSpecs.some((product) => product.filePath === file.path)) && (
+            <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+              Un fichier 3D n’a pas pu être analysé. Il ne sera pas ignoré dans le calcul : retirez-le ou réexportez-le en GLB autonome, STL ou OBJ valide avant de continuer.
+            </p>
+          )}
           {files.length > 0 && (
             <ul className="mt-4 space-y-2">
               {files.map((file) => (
@@ -730,7 +744,6 @@ export default function CustomRequestPage() {
                     invalidateEstimate()
                     setOptions((current) => ({ ...current, [key]: event.target.checked }))
                   }}
-                  }
                   className="h-3.5 w-3.5 accent-brand-red"
                 />
                 {label}
@@ -818,8 +831,7 @@ export default function CustomRequestPage() {
         <div className="admin-card">
           <h2 className="mb-2 text-lg font-semibold text-offwhite">Estimation automatique</h2>
           <p className="mb-4 text-xs text-charcoal-400">
-            Estimation indicative calculée à partir de vos dimensions. Elle ne constitue pas un
-            devis ferme : le propriétaire vérifie la faisabilité et peut ajuster le prix.
+            Estimation indicative calculée séparément pour chaque produit, avec sa taille finale, sa matière, sa quantité et les paramètres de fabrication du studio. Elle ne constitue pas un devis ferme : le propriétaire vérifie la faisabilité et peut ajuster le prix.
           </p>
           {estimateLoading && <p className="text-xs text-charcoal-300">Calcul de l’estimation…</p>}
           {estimateError && <p className="text-xs text-brand-red-light">{estimateError}</p>}

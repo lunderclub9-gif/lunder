@@ -15,7 +15,7 @@ describe('analyze3DModel', () => {
     expect(result.format).toBe('stl')
     expect(result.dimensionsMm).toEqual({ length: 10, width: 10, height: 10 })
     expect(result.triangleCount).toBe(4)
-    expect(result.meshVolumeCm3).not.toBeNull()
+    expect(result.meshVolumeCm3).toBeCloseTo(1 / 6, 2)
     expect(result.vertexCount).toBe(12)
   })
 
@@ -28,6 +28,7 @@ describe('analyze3DModel', () => {
     expect(result.format).toBe('obj')
     expect(result.dimensionsMm).toEqual({ length: 10, width: 10, height: 10 })
     expect(result.triangleCount).toBe(4)
+    expect(result.meshVolumeCm3).toBeCloseTo(1 / 6, 2)
   })
 
   it('rejects unsupported file extensions', async () => {

@@ -65,7 +65,7 @@ function finish(
   signedVolume: number | null,
   unit: ModelAnalysis['unit'],
   warnings: string[],
-  componentCount = 1
+  componentCount: number | null = 1
 ): ModelAnalysis {
   if (!Number.isFinite(bounds.min[0]) || !Number.isFinite(bounds.max[0])) {
     throw new Error('Aucun sommet 3D exploitable n’a été trouvé dans ce fichier.')
@@ -112,7 +112,7 @@ async function analyzeStl(file: File): Promise<ModelAnalysis> {
   let vertices = 0
   let volume = 0
   const warnings: string[] = ['STL ne stocke pas d’unité : les mesures sont supposées en millimètres.']
-  let componentCount = 1
+  let componentCount: number | null = null
   const view = new DataView(buffer)
   const binaryCount = buffer.byteLength >= 84 ? view.getUint32(80, true) : -1
   const isBinary = binaryCount >= 0 && 84 + binaryCount * 50 === buffer.byteLength
@@ -133,7 +133,8 @@ async function analyzeStl(file: File): Promise<ModelAnalysis> {
     }
   } else {
     const source = new TextDecoder().decode(bytes)
-    componentCount = Math.max(1, [...source.matchAll(/^\s*solid(?:\s|$)/gim)].length)
+    const solids = [...source.matchAll(/^\s*solid(?:\s|$)/gim)].length
+    componentCount = solids > 0 ? solids : null
     const values: number[][] = []
     for (const match of source.matchAll(/\bvertex\s+([-+\d.eE]+)\s+([-+\d.eE]+)\s+([-+\d.eE]+)/gi)) {
       const point = [Number(match[1]), Number(match[2]), Number(match[3])]
@@ -184,7 +185,7 @@ async function analyzeObj(file: File): Promise<ModelAnalysis> {
   }
   if (!vertices.length) throw new Error('Le fichier OBJ ne contient aucun sommet 3D valide.')
   if (!triangles) warnings.push('Aucune face triangulable : le volume de matière ne peut pas être calculé.')
-  return finish('obj', bounds, triangles, vertices.length, triangles ? volume : null, 'mm', warnings, Math.max(1, componentCount))
+  return finish('obj', bounds, triangles, vertices.length, triangles ? volume : null, 'mm', warnings, componentCount || null)
 }
 
 function decodeDataUri(uri: string): Uint8Array {

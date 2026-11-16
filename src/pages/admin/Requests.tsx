@@ -8,6 +8,18 @@ import { orderErrorMessage } from '@/lib/checkout'
 import { canOwnerApproveCustomQuote } from '@/lib/custom-workflow'
 
 type RequestFile = { id: string; kind: string; storage_path: string; original_name: string }
+type RequestProductSpec = {
+  id: string
+  file_path: string
+  file_name: string
+  mode: string
+  original_dimensions_mm: { length: number; width: number; height: number }
+  target_dimensions_mm: { length: number; width: number; height: number }
+  quantity: number
+  material_name: string
+  color: string | null
+  geometry?: { format?: string; mesh_volume_cm3?: number | null; bounding_box_volume_cm3?: number; triangle_count?: number; vertex_count?: number; warnings?: string[] }
+}
 type Quote = {
   id: string
   version: number
@@ -66,6 +78,7 @@ type RequestRow = {
   rush: boolean
   deletion_started_at: string | null
   custom_request_files: RequestFile[]
+  product_specs?: RequestProductSpec[]
   custom_quotes: Quote[]
 }
 
@@ -473,6 +486,30 @@ export default function AdminRequests() {
                       {request.color_preference ? ` · ${request.color_preference}` : ''}
                       {request.rush ? ' · urgent' : ''}
                     </p>
+
+                    {(request.product_specs ?? []).length > 0 && (
+                      <div className="rounded-lg border border-charcoal-400/15 p-3 text-xs text-charcoal-300">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-charcoal-400">Analyse des produits ({request.product_specs?.length})</p>
+                        <div className="space-y-3">
+                          {(request.product_specs ?? []).map((product, index) => (
+                            <div key={product.id || product.file_path} className="rounded-lg bg-charcoal-900/60 p-3">
+                              <p className="font-semibold text-offwhite">{index + 1}. {product.file_name}</p>
+                              <p className="mt-1">Mode : {({ reference: 'Modèle de référence', exact: 'Dimensions exactes du fichier', modify: 'Modification demandée', inspiration: 'Inspiration' } as Record<string, string>)[product.mode] ?? product.mode}</p>
+                              <p>Dimensions originales : {product.original_dimensions_mm?.length} × {product.original_dimensions_mm?.width} × {product.original_dimensions_mm?.height} mm</p>
+                              <p className="text-brand-red-light">Dimensions souhaitées : {product.target_dimensions_mm?.length} × {product.target_dimensions_mm?.width} × {product.target_dimensions_mm?.height} mm</p>
+                              <p>Quantité : {product.quantity} · Matière : {product.material_name}{product.color ? ` · Couleur : ${product.color}` : ''}</p>
+                              <p>Maillage : {product.geometry?.format?.toUpperCase() ?? '3D'} · {product.geometry?.triangle_count?.toLocaleString('fr-FR') ?? '—'} triangles · Volume : {product.geometry?.mesh_volume_cm3 ?? 'non calculé'} cm³</p>
+                              {product.geometry?.warnings?.length ? <ul className="mt-1 list-disc pl-4 text-amber-300">{product.geometry.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
+                              <button type="button" onClick={() => {
+                                const file = request.custom_request_files.find((item) => item.storage_path === product.file_path)
+                                if (file) void openFile(file)
+                              }} className="mt-2 text-brand-red-light underline-offset-4 hover:underline">Ouvrir le fichier 3D</button>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-charcoal-500">Le volume géométrique est une mesure du maillage ; le poids et le temps de fabrication restent estimatifs jusqu’à validation du fichier de tranchage.</p>
+                      </div>
+                    )}
 
                     <div className="rounded-lg border border-charcoal-400/15 p-3 text-xs text-charcoal-300">
                       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-charcoal-400">

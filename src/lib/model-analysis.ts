@@ -70,6 +70,9 @@ function finish(
   if (meshCm3 !== null && meshCm3 > boxMm3 / 1000 * 1.05) {
     warnings.push('Le volume du maillage dépasse sa boîte englobante ; vérifiez les unités ou l’intégrité du fichier.')
   }
+  if (meshCm3 !== null && meshCm3 > 0 && meshCm3 < boxMm3 / 1000 * 0.001) {
+    warnings.push('Le volume calculé est très faible par rapport aux dimensions ; le maillage peut être ouvert, très fin ou mal orienté.')
+  }
   return {
     format, dimensionsMm: { length: round(dimensions[0]), width: round(dimensions[1]), height: round(dimensions[2]) },
     boundingBoxVolumeCm3: round(boxMm3 / 1000, 3),

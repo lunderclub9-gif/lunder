@@ -20,7 +20,6 @@ export default function ProductDetailPage() {
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [loading, setLoading] = useState(true)
   const [activeImage, setActiveImage] = useState<string | null>(null)
-  const [selectedColor, setSelectedColor] = useState<string | null>(null)
   const [selection, setSelection] = useState<Record<string, string>>({})
   const [added, setAdded] = useState(false)
   const { add } = useCart()
@@ -85,7 +84,6 @@ export default function ProductDetailPage() {
       })
       setSelection(initial)
 
-      if (p.available_colors.length > 0) setSelectedColor(p.available_colors[0])
       setLoading(false)
     })()
   }, [slug])
@@ -261,19 +259,12 @@ export default function ProductDetailPage() {
               <h3 className="mb-2 text-sm font-semibold text-offwhite">Couleurs disponibles</h3>
               <div className="flex flex-wrap gap-2">
                 {product.available_colors.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
-                      selectedColor === color
-                        ? 'border-brand-red bg-brand-red/10 text-brand-red-light'
-                        : 'border-charcoal-400/20 text-charcoal-300 hover:border-charcoal-300'
-                    }`}
-                  >
+                  <span key={color} className="rounded-full border border-charcoal-400/20 bg-charcoal-800 px-3 py-1.5 text-xs font-medium text-charcoal-200">
                     {color}
-                  </button>
+                  </span>
                 ))}
               </div>
+              <p className="mt-2 text-[11px] text-charcoal-500">La couleur souhaitée peut être confirmée avec l’atelier avant fabrication.</p>
             </div>
           )}
 

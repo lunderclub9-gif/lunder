@@ -31,8 +31,6 @@ ALTER FUNCTION public.get_custom_request_by_token(uuid)
   SET search_path = pg_catalog, public, pg_temp;
 ALTER FUNCTION public.create_custom_quote(uuid, integer, integer, date, text)
   SET search_path = pg_catalog, public, pg_temp;
-ALTER FUNCTION public.approve_custom_quote(uuid, jsonb)
-  SET search_path = pg_catalog, public, pg_temp;
 ALTER FUNCTION public.set_custom_request_status(uuid, text)
   SET search_path = pg_catalog, public, pg_temp;
 ALTER FUNCTION public.product_cost_estimate(uuid)
@@ -46,8 +44,6 @@ ALTER FUNCTION public.quote_custom_manufacturing(uuid, text, numeric, numeric, j
 ALTER FUNCTION public.decide_custom_quote(uuid, text, jsonb)
   SET search_path = pg_catalog, public, pg_temp;
 ALTER FUNCTION public.guard_custom_request_status()
-  SET search_path = pg_catalog, public, pg_temp;
-ALTER FUNCTION public.delete_order(uuid)
   SET search_path = pg_catalog, public, pg_temp;
 ALTER FUNCTION public.delete_order(uuid, text)
   SET search_path = pg_catalog, public, pg_temp;
@@ -86,6 +82,12 @@ ALTER FUNCTION public.save_custom_request_products(uuid, jsonb, jsonb, boolean)
 ALTER FUNCTION public.estimate_manufacturing_model(numeric, numeric, numeric, numeric, text, integer, jsonb, boolean)
   SET search_path = pg_catalog, public, pg_temp;
 ALTER FUNCTION public.snapshot_order_item_cost()
+  SET search_path = pg_catalog, public, pg_temp;
+ALTER FUNCTION public.update_updated_at()
+  SET search_path = pg_catalog, public, pg_temp;
+ALTER FUNCTION public.next_order_number()
+  SET search_path = pg_catalog, public, pg_temp;
+ALTER FUNCTION public.customer_quote_breakdown(jsonb)
   SET search_path = pg_catalog, public, pg_temp;
 
 -- The old trigger checked current_user from inside SECURITY DEFINER. In that

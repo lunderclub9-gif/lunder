@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarDays, ChartNoAxesCombined, CircleDollarSign, Loader2, Plus, RefreshCw, ShoppingBag, Trash2, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { AlertTriangle, CalendarDays, BarChart3, CircleDollarSign, Loader2, Plus, ShoppingBag, Trash2, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import { FINANCE_EXPENSE_CATEGORIES, localDateKey, summarizeFinances, type FinanceExpense, type FinanceOrder } from '@/lib/finance'

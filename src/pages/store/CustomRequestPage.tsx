@@ -1,5 +1,4 @@
 import { createElement, useCallback, useEffect, useRef, useState, type ElementType } from 'react'
-import '@google/model-viewer'
 import JsBarcode from 'jsbarcode'
 import { Link } from 'react-router-dom'
 import { AlertCircle, CheckCircle2, Download, Loader2, Paperclip, Upload, X } from 'lucide-react'
@@ -82,6 +81,7 @@ export default function CustomRequestPage() {
 
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [productSpecs, setProductSpecs] = useState<ProductSpec[]>([])
+  const [modelViewerReady, setModelViewerReady] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -100,6 +100,18 @@ export default function CustomRequestPage() {
     previewUrls.current.forEach((url) => URL.revokeObjectURL(url))
     previewUrls.current.clear()
   }, [])
+
+  // Load the 3D viewer only when the customer has a GLB/GLTF preview.
+  // This keeps the model-viewer runtime out of visits that only browse the store.
+  const hasModelPreview = productSpecs.some((product) => Boolean(product.previewUrl))
+  useEffect(() => {
+    if (!hasModelPreview || modelViewerReady) return
+    let active = true
+    void import('@google/model-viewer')
+      .then(() => { if (active) setModelViewerReady(true) })
+      .catch(() => { if (active) setModelViewerReady(false) })
+    return () => { active = false }
+  }, [hasModelPreview, modelViewerReady])
 
   useEffect(() => {
     let active = true
@@ -830,7 +842,7 @@ export default function CustomRequestPage() {
                   </div>
                   <button type="button" onClick={() => void removeFile(product.filePath)} disabled={uploading} className="btn-ghost text-xs">Retirer ce produit</button>
                 </div>
-                {product.previewUrl ? (
+                {product.previewUrl && modelViewerReady ? (
                   <div className="overflow-hidden rounded-lg border border-charcoal-400/15">
                     <p className="px-3 py-2 text-xs text-charcoal-400">Aperçu 3D interactif — faites glisser pour tourner et utilisez le zoom</p>
                     {createElement('model-viewer' as ElementType, {
@@ -843,7 +855,7 @@ export default function CustomRequestPage() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-charcoal-500">Aperçu direct disponible pour GLB/GLTF. Le fichier STL/OBJ reste accessible au studio et ses dimensions sont analysées.</p>
+                  <p className="text-xs text-charcoal-500">{product.previewUrl ? 'Chargement de l’aperçu 3D… Si celui-ci ne s’affiche pas, le fichier et ses dimensions restent transmis au studio.' : 'Aperçu direct disponible pour GLB/GLTF. Le fichier STL/OBJ reste accessible au studio et ses dimensions sont analysées.'}</p>
                 )}
                 <label className="block">
                   <span className="label-text">Rôle du fichier</span>

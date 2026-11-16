@@ -34,6 +34,7 @@ type RequestView = {
     quantity: number
     material_name: string
     color: string | null
+    instructions?: string | null
   }[]
   request_number: string
   status: string
@@ -172,6 +173,7 @@ export default function CustomRequestStatusPage() {
                 <p className="font-semibold text-offwhite">{index + 1}. {product.file_name}</p>
                 <p className="mt-1">{product.target_dimensions_mm.length} × {product.target_dimensions_mm.width} × {product.target_dimensions_mm.height} mm · {product.quantity} pièce(s)</p>
                 <p className="text-charcoal-400">{product.material_name}{product.color ? ` · ${product.color}` : ''}</p>
+                {product.instructions && <p className="mt-1 whitespace-pre-line text-charcoal-300">Détails : {product.instructions}</p>}
               </div>
             ))}
           </div>

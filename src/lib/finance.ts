@@ -35,11 +35,14 @@ export function summarizeFinances(orders: FinanceOrder[], expenses: FinanceExpen
   let estimatedProductionCostDzd = 0
   let completeItems = 0
   let uncostedItems = 0
+  const manuallyCostedOrders = new Set(expenses.filter((expense) => expense.category === 'production' && expense.order_id).map((expense) => expense.order_id as string))
 
   for (const order of orders) {
     for (const item of order.order_items ?? []) {
       if (item.cost_status === 'complete' && item.unit_cost_dzd != null) {
         estimatedProductionCostDzd += Number(item.unit_cost_dzd) * Number(item.quantity)
+        completeItems += Number(item.quantity)
+      } else if (manuallyCostedOrders.has(order.id)) {
         completeItems += Number(item.quantity)
       } else {
         uncostedItems += Number(item.quantity)

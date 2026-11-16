@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Package, Loader2, ShoppingCart, Check, ShieldCheck, Truck } from 'lucide-react'
+import { ArrowLeft, Package, Loader2, ShoppingCart, ShieldCheck, Truck } from 'lucide-react'
 import {
   supabase,
   type Product,

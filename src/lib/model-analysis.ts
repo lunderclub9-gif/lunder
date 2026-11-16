@@ -11,6 +11,7 @@ export type ModelAnalysis = {
   meshVolumeCm3: number | null
   triangleCount: number
   vertexCount: number
+  componentCount: number | null
   unit: 'mm' | 'm'
   warnings: string[]
 }
@@ -63,7 +64,8 @@ function finish(
   vertices: number,
   signedVolume: number | null,
   unit: ModelAnalysis['unit'],
-  warnings: string[]
+  warnings: string[],
+  componentCount = 1
 ): ModelAnalysis {
   if (!Number.isFinite(bounds.min[0]) || !Number.isFinite(bounds.max[0])) {
     throw new Error('Aucun sommet 3D exploitable n’a été trouvé dans ce fichier.')
@@ -92,7 +94,7 @@ function finish(
     format, dimensionsMm: { length: round(dimensions[0]), width: round(dimensions[1]), height: round(dimensions[2]) },
     boundingBoxVolumeCm3: round(boxMm3 / 1000, 3),
     meshVolumeCm3: meshCm3 === null ? null : round(meshCm3, 3),
-    triangleCount: triangles, vertexCount: vertices, unit, warnings,
+    triangleCount: triangles, vertexCount: vertices, componentCount, unit, warnings,
   }
 }
 
@@ -110,6 +112,7 @@ async function analyzeStl(file: File): Promise<ModelAnalysis> {
   let vertices = 0
   let volume = 0
   const warnings: string[] = ['STL ne stocke pas d’unité : les mesures sont supposées en millimètres.']
+  let componentCount = 1
   const view = new DataView(buffer)
   const binaryCount = buffer.byteLength >= 84 ? view.getUint32(80, true) : -1
   const isBinary = binaryCount >= 0 && 84 + binaryCount * 50 === buffer.byteLength
@@ -130,6 +133,7 @@ async function analyzeStl(file: File): Promise<ModelAnalysis> {
     }
   } else {
     const source = new TextDecoder().decode(bytes)
+    componentCount = Math.max(1, [...source.matchAll(/^\s*solid(?:\s|$)/gim)].length)
     const values: number[][] = []
     for (const match of source.matchAll(/\bvertex\s+([-+\d.eE]+)\s+([-+\d.eE]+)\s+([-+\d.eE]+)/gi)) {
       const point = [Number(match[1]), Number(match[2]), Number(match[3])]
@@ -144,7 +148,7 @@ async function analyzeStl(file: File): Promise<ModelAnalysis> {
     for (let i = 0; i < values.length; i += 3) volume += signedTetraVolume(values[i], values[i + 1], values[i + 2])
   }
   if (triangles === 0) throw new Error('Le fichier STL ne contient aucun triangle.')
-  return finish('stl', bounds, triangles, vertices, volume, 'mm', warnings)
+  return finish('stl', bounds, triangles, vertices, volume, 'mm', warnings, componentCount)
 }
 
 async function analyzeObj(file: File): Promise<ModelAnalysis> {
@@ -153,10 +157,13 @@ async function analyzeObj(file: File): Promise<ModelAnalysis> {
   const vertices: number[][] = []
   let triangles = 0
   let volume = 0
+  let componentCount = 0
   const warnings = ['OBJ ne stocke pas toujours son unité : les mesures sont supposées en millimètres.']
   for (const rawLine of source.split(/\r?\n/)) {
     const line = rawLine.split('#')[0].trim()
-    if (/^v\s+/.test(line)) {
+    if (/^o(?:\s|$)/.test(line)) {
+      componentCount += 1
+    } else if (/^v\s+/.test(line)) {
       const values = line.replace(/^v\s+/, '').trim().split(/\s+/).slice(0, 3).map(Number)
       if (values.length === 3 && values.every(Number.isFinite)) {
         vertices.push(values)
@@ -177,7 +184,7 @@ async function analyzeObj(file: File): Promise<ModelAnalysis> {
   }
   if (!vertices.length) throw new Error('Le fichier OBJ ne contient aucun sommet 3D valide.')
   if (!triangles) warnings.push('Aucune face triangulable : le volume de matière ne peut pas être calculé.')
-  return finish('obj', bounds, triangles, vertices.length, triangles ? volume : null, 'mm', warnings)
+  return finish('obj', bounds, triangles, vertices.length, triangles ? volume : null, 'mm', warnings, Math.max(1, componentCount))
 }
 
 function decodeDataUri(uri: string): Uint8Array {
@@ -294,7 +301,7 @@ async function analyzeGltfDocument(document: GltfDocument, buffers: Uint8Array[]
   }
   if (!vertexCount) throw new Error('Aucun attribut POSITION exploitable trouvé dans le fichier glTF.')
   if (!triangleCount) warnings.push('Aucun triangle exploitable : le volume du maillage ne peut pas être calculé.')
-  return finish(format, bounds, triangleCount, vertexCount, triangleCount ? volume : null, 'm', warnings)
+  return finish(format, bounds, triangleCount, vertexCount, triangleCount ? volume : null, 'm', warnings, (document.meshes ?? []).length)
 }
 
 async function analyzeGlb(file: File): Promise<ModelAnalysis> {

@@ -297,6 +297,11 @@ export default function AdminRequests() {
       setError('Aucune estimation disponible pour cette demande.')
       return
     }
+    if ((request.product_specs?.length ?? 0) > 0 && !(await confirmAction({
+      title: 'Vérifier l’estimation des modèles 3D',
+      description: 'Le volume du maillage et les dimensions proviennent de l’analyse du fichier, mais le poids et le temps restent des estimations : ils ne viennent pas d’un trancheur G-code. Ouvrez les fichiers, vérifiez les tailles et confirmez que vous souhaitez créer le devis à partir de cette estimation.',
+      confirmLabel: 'Créer le devis estimatif',
+    }))) return
     setBusy(true)
     const { error: rpcError } = await supabase.rpc('create_custom_quote_from_estimate', {
       p_request_id: request.id,

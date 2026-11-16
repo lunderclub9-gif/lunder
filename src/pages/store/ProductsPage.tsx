@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowDownWideNarrow, Package, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
 import { supabase, type Product, type Category } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
@@ -206,7 +206,7 @@ export default function ProductsPage() {
 
         <div className="mt-12 rounded-2xl border border-brand-red/20 bg-brand-red/5 p-6 sm:flex sm:items-center sm:justify-between sm:gap-6">
           <div><h2 className="text-lg font-bold text-offwhite">Vous avez une idée à fabriquer ?</h2><p className="mt-1 text-sm text-charcoal-400">Envoyez une image ou un modèle 3D à notre atelier.</p></div>
-          <a href="/boutique/sur-mesure" className="btn-secondary mt-4 shrink-0 border-brand-red/30 text-brand-red-light hover:bg-brand-red hover:text-white sm:mt-0">Demande sur mesure</a>
+          <Link to="/boutique/sur-mesure" className="btn-secondary mt-4 shrink-0 border-brand-red/30 text-brand-red-light hover:bg-brand-red hover:text-white sm:mt-0">Demande sur mesure</Link>
         </div>
       </div>
     </div>

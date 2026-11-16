@@ -8,6 +8,7 @@ import {
   ShoppingBag,
   Tag,
   Truck,
+  BarChart3,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -157,6 +158,10 @@ export default function AdminDashboard() {
           <Link to="/admin/demandes" className="btn-secondary">
             <FileText className="h-4 w-4" />
             Voir les demandes
+          </Link>
+          <Link to="/admin/finances" className="btn-secondary">
+            <BarChart3 className="h-4 w-4" />
+            Centre financier
           </Link>
         </div>
       </div>

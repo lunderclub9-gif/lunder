@@ -8,7 +8,7 @@ import {
   type ExtractedMaterial,
 } from '@/lib/smart-file-analyzer'
 
-const unitLabels: Record<NonNullable<ExtractedMaterial['unit']>, string> = {
+const unitLabels: Record<Exclude<ExtractedMaterial['unit'], ''>, string> = {
   piece: 'Pièce',
   meter: 'Mètre',
   m2: 'Mètre carré',

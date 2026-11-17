@@ -97,7 +97,11 @@ export default function CustomRequestPage() {
   const uploadLock = useRef(false)
   const estimateSequence = useRef(0)
   const previewUrls = useRef(new Set<string>())
-  const idempotencyKey = useRef<string>(crypto.randomUUID())
+  const idempotencyKey = useRef<string>(
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  )
 
   useEffect(() => () => {
     previewUrls.current.forEach((url) => URL.revokeObjectURL(url))

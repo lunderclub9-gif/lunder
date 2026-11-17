@@ -6,7 +6,7 @@ const today = '2026-11-13'
 function ownerApproval(overrides: Partial<Parameters<typeof canOwnerApproveCustomQuote>[0]> = {}) {
   return canOwnerApproveCustomQuote({
     requestStatus: 'quoted',
-    quoteStatus: 'sent',
+    quoteStatus: 'accepted',
     validUntil: '2026-11-20',
     orderId: null,
     today,
@@ -15,11 +15,11 @@ function ownerApproval(overrides: Partial<Parameters<typeof canOwnerApproveCusto
 }
 
 describe('règles du workflow sur mesure', () => {
-  it('permet au propriétaire d’approuver un devis envoyé sans décision préalable du client', () => {
-    expect(ownerApproval({ quoteStatus: 'sent' })).toBe(true)
+  it('refuse l’approbation propriétaire tant que le client n’a pas accepté', () => {
+    expect(ownerApproval({ quoteStatus: 'sent' })).toBe(false)
   })
 
-  it('permet aussi l’approbation d’un devis accepté par le client', () => {
+  it('permet l’approbation d’un devis accepté par le client', () => {
     expect(ownerApproval({ quoteStatus: 'accepted' })).toBe(true)
   })
 

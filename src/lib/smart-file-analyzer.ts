@@ -130,3 +130,70 @@ export function validateExtractedMaterial(row: ExtractedMaterial): string[] {
   if (!row.unit) issues.push('Unité requise')
   return issues
 }
+
+
+export type SupplierComparisonRow = {
+  materialName: string
+  unit: Exclude<ExtractedMaterial['unit'], ''>
+  firstPriceDzd: number
+  secondPriceDzd: number
+  differenceDzd: number
+  differencePercent: number
+  cheaper: 'first' | 'second' | 'same'
+  firstSupplier: string
+  secondSupplier: string
+}
+
+export type SupplierQuoteComparison = {
+  matched: SupplierComparisonRow[]
+  onlyFirst: string[]
+  onlySecond: string[]
+}
+
+/** Compares two reviewed supplier CSVs by normalized material name and unit. */
+export function compareSupplierQuotes(first: CsvAnalysis, second: CsvAnalysis): SupplierQuoteComparison {
+  const toMap = (analysis: CsvAnalysis) => {
+    const map = new Map<string, ExtractedMaterial>()
+    for (const row of analysis.rows) {
+      if (validateExtractedMaterial(row).length > 0 || !row.unit) continue
+      const key = `${normalizeHeader(row.materialName)}::${row.unit}`
+      if (map.has(key)) throw new Error('MATERIAU_DUPLIQUE_DANS_DEVIS_FOURNISSEUR')
+      map.set(key, row)
+    }
+    return map
+  }
+
+  const firstRows = toMap(first)
+  const secondRows = toMap(second)
+  const matched: SupplierComparisonRow[] = []
+  const onlyFirst: string[] = []
+  const onlySecond: string[] = []
+
+  for (const [key, row] of firstRows) {
+    const other = secondRows.get(key)
+    if (!other) {
+      onlyFirst.push(row.materialName)
+      continue
+    }
+    const firstPriceDzd = Number(row.unitPriceDzd)
+    const secondPriceDzd = Number(other.unitPriceDzd)
+    const differenceDzd = secondPriceDzd - firstPriceDzd
+    matched.push({
+      materialName: row.materialName,
+      unit: row.unit as Exclude<ExtractedMaterial['unit'], ''>,
+      firstPriceDzd,
+      secondPriceDzd,
+      differenceDzd,
+      differencePercent: firstPriceDzd > 0 ? (differenceDzd / firstPriceDzd) * 100 : 0,
+      cheaper: firstPriceDzd < secondPriceDzd ? 'first' : firstPriceDzd > secondPriceDzd ? 'second' : 'same',
+      firstSupplier: row.supplier,
+      secondSupplier: other.supplier,
+    })
+  }
+
+  for (const [key, row] of secondRows) {
+    if (!firstRows.has(key)) onlySecond.push(row.materialName)
+  }
+
+  return { matched, onlyFirst, onlySecond }
+}

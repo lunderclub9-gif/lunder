@@ -39,6 +39,7 @@ export default function CheckoutPage() {
   const [terms, setTerms] = useState(false)
 
   const [quote, setQuote] = useState<DeliveryQuote | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -109,12 +110,17 @@ export default function CheckoutPage() {
 
   // Devis de livraison : la seule source de prix autorisée.
   useEffect(() => {
+    let cancelled = false
     setQuote(null)
     setQuoteError(null)
-    if (!wilayaCode || !communeId || items.length === 0) return
 
-    let cancelled = false
-    supabase
+    if (!wilayaCode || !communeId || items.length === 0) {
+      setQuoteLoading(false)
+      return () => { cancelled = true }
+    }
+
+    setQuoteLoading(true)
+    void supabase
       .rpc('quote_delivery', {
         p_wilaya_code: Number(wilayaCode),
         p_commune_id: communeId,
@@ -130,9 +136,16 @@ export default function CheckoutPage() {
               "La livraison n'est pas disponible pour cette destination."
             )
           )
+          setQuoteLoading(false)
           return
         }
         setQuote(row)
+        setQuoteLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setQuoteError('Impossible de calculer les frais de livraison. Vérifiez votre connexion et réessayez.')
+        setQuoteLoading(false)
       })
 
     return () => {
@@ -380,6 +393,8 @@ export default function CheckoutPage() {
             <div className="mt-4 rounded-lg border border-charcoal-400/15 bg-charcoal-900/60 px-4 py-3 text-sm">
               {quoteError ? (
                 <p className="text-brand-red-light">{quoteError}</p>
+              ) : quoteLoading ? (
+                <p className="flex items-center gap-2 text-charcoal-300"><Loader2 className="h-4 w-4 animate-spin" /> Calcul des frais de livraison…</p>
               ) : quote ? (
                 <div className="flex items-center gap-2 text-charcoal-200">
                   <Truck className="h-4 w-4 text-brand-red" />
@@ -462,7 +477,7 @@ export default function CheckoutPage() {
               Montants indicatifs : le total définitif est recalculé par la boutique au moment de
               l'enregistrement.
             </p>
-            <button type="submit" disabled={submitting || !quote} className="btn-primary mt-4 w-full">
+            <button type="submit" disabled={submitting || quoteLoading || !quote} className="btn-primary mt-4 w-full">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmer la commande'}
             </button>
           </div>

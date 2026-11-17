@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
-  Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X,
+  Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X, FileSpreadsheet,
   ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins, BarChart3, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -24,6 +24,7 @@ const navGroups = [
   { label: 'Tarification', items: [
     { to: '/admin/couts-produits', label: 'Matières premières', icon: Coins },
     { to: '/admin/tarification', label: 'Fabrication sur mesure', icon: Calculator },
+    { to: '/admin/analyse-fichiers', label: 'Analyse de fichiers', icon: FileSpreadsheet },
   ] },
   { label: 'Finances', items: [{ to: '/admin/finances', label: 'Centre financier', icon: BarChart3 }] },
   { label: 'Configuration', items: [{ to: '/admin/parametres', label: 'Paramètres du magasin', icon: Settings }] },

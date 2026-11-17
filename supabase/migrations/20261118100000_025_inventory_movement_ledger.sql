@@ -61,13 +61,15 @@ CREATE POLICY inventory_movements_owner_read
 UPDATE public.order_items i
 SET stock_tracked = (
       i.product_id IS NOT NULL
-      AND NOT coalesce(v.made_to_order, p.made_to_order, false)
+      AND NOT coalesce(
+        (SELECT v.made_to_order FROM public.product_variants v WHERE v.id = i.variant_id),
+        (SELECT p.made_to_order FROM public.products p WHERE p.id = i.product_id),
+        false
+      )
     ),
     stock_product_id_snapshot = i.product_id,
     stock_variant_id_snapshot = i.variant_id
-FROM public.products p
-LEFT JOIN public.product_variants v ON v.id = i.variant_id
-WHERE p.id = i.product_id;
+WHERE i.product_id IS NOT NULL;
 
 UPDATE public.order_items i
 SET stock_reserved = (
@@ -352,6 +354,10 @@ BEGIN
   FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'COMMANDE_INTROUVABLE';
+  END IF;
+
+  IF v_order.archived_at IS NOT NULL THEN
+    RAISE EXCEPTION 'COMMANDE_ARCHIVEE';
   END IF;
 
   IF v_order.status = p_status THEN

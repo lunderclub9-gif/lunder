@@ -1,4 +1,4 @@
--- Run with psql / Supabase SQL editor after migrations 001–022 on a test DB.
+-- Run with psql / Supabase SQL editor after migrations 001–028 on an isolated test DB.
 -- These assertions intentionally fail if a privileged RPC becomes public again.
 
 DO $$

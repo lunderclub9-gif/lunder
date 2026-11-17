@@ -18,6 +18,7 @@ const unitLabels: Record<Exclude<ExtractedMaterial['unit'], ''>, string> = {
 export default function SmartFileAnalyzerPage() {
   const [analysis, setAnalysis] = useState<CsvAnalysis | null>(null)
   const [fileName, setFileName] = useState('')
+  const [sourcePreview, setSourcePreview] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -35,6 +36,7 @@ export default function SmartFileAnalyzerPage() {
     setError(null)
     setNotice(null)
     setAnalysis(null)
+    setSourcePreview('')
     if (!file) return
     if (file.size > 5 * 1024 * 1024) {
       setError('Le fichier dépasse la limite de 5 Mo.')
@@ -47,6 +49,7 @@ export default function SmartFileAnalyzerPage() {
     try {
       const text = await file.text()
       const result = analyzeMaterialsCsv(text)
+      setSourcePreview(text.split(/\r?\n/).slice(0, 12).join('\n'))
       if (result.rows.length === 0) throw new Error('AUCUNE_LIGNE_DONNEES')
       setAnalysis(result)
       setFileName(file.name)
@@ -147,7 +150,11 @@ export default function SmartFileAnalyzerPage() {
           <span className="mt-1 text-xs text-charcoal-500">Colonnes : Material, Quantity, Unit, Unit Price</span>
           <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" className="sr-only" onChange={(event) => void handleFile(event.target.files?.[0])} />
         </label>
-        {fileName && <div className="mt-3 flex items-center justify-between gap-3 text-xs text-charcoal-300"><span>{fileName}</span><button type="button" onClick={() => { setAnalysis(null); setFileName(''); setNotice(null); setError(null) }} className="rounded-lg p-2 hover:bg-charcoal-800" aria-label="Retirer le fichier"><X className="h-4 w-4" /></button></div>}
+        {fileName && <div className="mt-3 flex items-center justify-between gap-3 text-xs text-charcoal-300"><span>{fileName}</span><button type="button" onClick={() => { setAnalysis(null); setFileName(''); setSourcePreview(''); setNotice(null); setError(null) }} className="rounded-lg p-2 hover:bg-charcoal-800" aria-label="Retirer le fichier"><X className="h-4 w-4" /></button></div>}
+        {sourcePreview && <details className="mt-3 rounded-lg border border-charcoal-400/10 bg-charcoal-950 p-3">
+          <summary className="cursor-pointer text-xs font-medium text-charcoal-300">Afficher l’aperçu du document original (12 premières lignes)</summary>
+          <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs text-charcoal-400">{sourcePreview}</pre>
+        </details>}
       </section>
 
       {analysis && (

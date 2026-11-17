@@ -49,7 +49,7 @@ export default function ProductCostMaterialsPage() {
 
   const updateMaterialCost = async (material: Material, cost: string) => {
     const parsed = Number(cost)
-    if (!Number.isFinite(parsed) || parsed < 0) { setError('Le coût doit être un nombre positif ou nul.'); return }
+    if (!Number.isFinite(parsed) || parsed <= 0) { setError('Le coût doit être strictement positif.'); return }
     const { error: updateError } = await supabase.from('materials')
       .update({
         unit_cost_dzd: Math.round(parsed),

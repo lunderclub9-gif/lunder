@@ -67,20 +67,20 @@ describe('smart file analyzer CSV extraction', () => {
 
   it('extracts dimensions, technical notes and supplied line totals without filling missing values', () => {
     const result = analyzeMaterialsCsv(
-      'Material,Quantity,Unit,Unit Price,Total,Length mm,Width mm,Height mm,Specification\\nPanel,2,piece,500,1000,1200,600,18,White laminated MDF'
+      'Material,Quantity,Unit,Unit Price,Total,Length mm,Width mm,Height mm,Specification\nPanel,2,piece,500,1000,1200,600,18,White laminated MDF'
     )
     expect(result.rows[0]).toMatchObject({
       dimensions: 'L: 1200 × W: 600 × H: 18',
       lineTotalDzd: '1000',
       technicalSpecification: 'White laminated MDF',
     })
-    const missing = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price\\nPanel,2,piece,500')
+    const missing = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price\nPanel,2,piece,500')
     expect(missing.rows[0].lineTotalDzd).toBe('')
   })
 
   it('flags inconsistent supplied line totals and duplicate BOM rows', () => {
     const result = analyzeMaterialsCsv(
-      'Material,Quantity,Unit,Unit Price,Total\\nPanel,2,piece,500,1200\\n panel ,1,piece,400,400\\nGlass,1,m2,900,900'
+      'Material,Quantity,Unit,Unit Price,Total\nPanel,2,piece,500,1200\n panel ,1,piece,400,400\nGlass,1,m2,900,900'
     )
     expect(result.rows[0].issues).toContain('Total de ligne différent de quantité × prix unitaire')
     expect(validateExtractedMaterial(result.rows[0])).toContain('Total de ligne différent de quantité × prix unitaire')

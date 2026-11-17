@@ -430,3 +430,92 @@ GRANT EXECUTE ON FUNCTION public.create_custom_quote_from_costing(
 ) TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
+
+
+-- Keep the existing product-cost screen limited to configured per-kilogram
+-- materials. A piece/meter/m² material must never be treated as a kg price.
+CREATE OR REPLACE FUNCTION public.product_cost_estimate(p_product_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_cost public.product_costs%ROWTYPE;
+  v_material_cost numeric := 0;
+  v_cost_per_kg integer;
+  v_machine numeric := 0;
+  v_labour numeric := 0;
+  v_failures numeric := 0;
+  v_packaging numeric := 0;
+  v_returns numeric := 0;
+  v_total numeric;
+  v_price integer;
+  v_margin numeric;
+  v_material_missing boolean := false;
+BEGIN
+  IF NOT public.is_owner() THEN
+    RAISE EXCEPTION 'ACCES_REFUSE';
+  END IF;
+
+  SELECT * INTO v_cost
+  FROM public.product_costs
+  WHERE product_id = p_product_id;
+
+  SELECT price_dzd INTO v_price
+  FROM public.products
+  WHERE id = p_product_id;
+
+  IF v_price IS NULL THEN
+    RAISE EXCEPTION 'PRODUIT_INTROUVABLE';
+  END IF;
+
+  IF v_cost.product_id IS NULL OR v_cost.material_id IS NULL THEN
+    v_material_missing := true;
+  ELSE
+    SELECT cost_per_kg_dzd INTO v_cost_per_kg
+    FROM public.materials
+    WHERE id = v_cost.material_id
+      AND is_active
+      AND unit_type = 'kg'
+      AND unit_cost_configured;
+
+    IF NOT FOUND THEN
+      v_material_missing := true;
+    ELSE
+      v_material_cost := coalesce(v_cost_per_kg, 0) * v_cost.print_grams / 1000.0;
+    END IF;
+  END IF;
+
+  IF v_cost.product_id IS NOT NULL THEN
+    v_machine := v_cost.print_hours * v_cost.machine_hour_rate_dzd;
+    v_labour := v_cost.labor_minutes / 60.0 * v_cost.labor_hour_rate_dzd;
+    v_failures := (v_material_cost + v_machine + v_labour) * v_cost.failure_rate_pct / 100.0;
+    v_packaging := v_cost.packaging_dzd;
+    v_returns := v_cost.return_reserve_dzd;
+  END IF;
+
+  v_total := v_material_cost + v_machine + v_labour + v_failures + v_packaging + v_returns;
+  v_margin := v_price - v_total;
+
+  RETURN jsonb_build_object(
+    'is_estimate', true,
+    'material_manquante', v_material_missing,
+    'material_dzd', round(v_material_cost),
+    'machine_dzd', round(v_machine),
+    'labour_dzd', round(v_labour),
+    'failures_dzd', round(v_failures),
+    'packaging_dzd', round(v_packaging),
+    'return_reserve_dzd', round(v_returns),
+    'total_cost_dzd', round(v_total),
+    'price_dzd', v_price,
+    'margin_dzd', round(v_margin),
+    'margin_pct', CASE WHEN v_price > 0 THEN round(v_margin / v_price * 100, 1) ELSE NULL END,
+    'markup_pct', CASE WHEN v_total > 0 THEN round(v_margin / v_total * 100, 1) ELSE NULL END
+  );
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.product_cost_estimate(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.product_cost_estimate(uuid) TO authenticated;

@@ -418,9 +418,9 @@ export default function AdminRequests() {
     <div className="animate-fade-in">
       <h1 className="mb-2 text-2xl font-bold text-offwhite">Demandes sur mesure</h1>
       <p className="mb-6 text-sm text-charcoal-400">
-        Vérifiez la demande et les fichiers, créez ou ajustez le devis, puis approuvez explicitement
-        la fabrication pour créer une commande. L’acceptation du devis par le client est informative
-        et n’est pas requise pour l’approbation propriétaire. Un nouveau devis expire la version précédente.
+        Vérifiez la demande et les fichiers, créez une version de devis, puis attendez l’acceptation
+        du client avant d’approuver la fabrication. Seule la dernière version acceptée et vérifiée
+        peut être transformée en commande. Toute modification nécessite un nouveau devis et un nouvel accord.
       </p>
 
       <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filtrer les demandes">

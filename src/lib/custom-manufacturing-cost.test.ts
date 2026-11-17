@@ -97,6 +97,17 @@ describe('calculateCustomManufacturingCost', () => {
     })).toThrow('TAUX_MACHINE_NON_CONFIGURE')
   })
 
+  it('keeps profit and tax consistent when the minimum quote floor applies', () => {
+    const result = calculateCustomManufacturingCost({
+      ...base,
+      settings: { ...base.settings, taxPercent: 10, minimumQuoteDzd: 50_000 },
+    })
+    expect(result.sellingBeforeTaxDzd).toBe(45_455)
+    expect(result.profitDzd).toBe(16_895)
+    expect(result.taxDzd).toBe(4_546)
+    expect(result.finalPriceDzd).toBe(50_001)
+  })
+
   it('rejects invalid quantities and an empty zero-cost estimate', () => {
     expect(() => calculateCustomManufacturingCost({
       ...base,

@@ -15,6 +15,7 @@ describe('smart file analyzer CSV extraction', () => {
       supplier: 'Supplier A',
       reference: 'PVC-01',
       confidence: 'high',
+      reviewDecision: 'pending',
     })
     expect(result.rows[1].unit).toBe('meter')
   })

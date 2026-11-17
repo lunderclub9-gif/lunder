@@ -281,6 +281,70 @@ $$;
 REVOKE ALL ON FUNCTION public.guard_custom_quote_immutability()
   FROM PUBLIC, anon, authenticated;
 
+-- Backfill still-pending legacy quotes when their current request data and
+-- a current delivery rate are available. Already accepted legacy quotes remain
+-- unverified and must be re-issued/re-accepted before a new order is created.
+UPDATE public.custom_quotes q
+SET specifications_snapshot = jsonb_build_object(
+      'title', r.title,
+      'description', r.description,
+      'intended_use', r.intended_use,
+      'dimensions', r.dimensions,
+      'dimension_unit', r.dimension_unit,
+      'dim_length_mm', r.dim_length_mm,
+      'dim_width_mm', r.dim_width_mm,
+      'dim_height_mm', r.dim_height_mm,
+      'quantity', r.quantity,
+      'material_preference', r.material_preference,
+      'color_preference', r.color_preference,
+      'manufacturing_options', r.manufacturing_options,
+      'rush', r.rush,
+      'product_specs', r.product_specs
+    ),
+    delivery_price_dzd = d.price_dzd,
+    delivery_snapshot = jsonb_build_object(
+      'wilaya_code', r.delivery_wilaya_code,
+      'wilaya_name', w.name_fr,
+      'commune_id', r.delivery_commune_id,
+      'commune_name', c.name_fr,
+      'delivery_method', r.delivery_method,
+      'address', r.delivery_address,
+      'pickup_point_id', r.delivery_pickup_point_id,
+      'pickup_point_name', pp.name,
+      'carrier', d.carrier,
+      'estimated_days_min', d.estimated_days_min,
+      'estimated_days_max', d.estimated_days_max,
+      'price_dzd', d.price_dzd
+    )
+FROM public.custom_requests r
+JOIN public.wilayas w
+  ON w.code = r.delivery_wilaya_code AND w.is_active
+JOIN public.communes c
+  ON c.id = r.delivery_commune_id
+ AND c.wilaya_code = r.delivery_wilaya_code
+ AND c.is_active
+LEFT JOIN public.pickup_points pp
+  ON pp.id = r.delivery_pickup_point_id
+ AND pp.wilaya_code = r.delivery_wilaya_code
+ AND pp.is_active
+CROSS JOIN LATERAL (
+  SELECT dr.price_dzd, dr.estimated_days_min, dr.estimated_days_max, dr.carrier
+  FROM public.delivery_rates dr
+  WHERE dr.is_active
+    AND dr.method = r.delivery_method
+    AND (
+      (dr.commune_id IS NOT NULL AND dr.commune_id = r.delivery_commune_id)
+      OR (dr.commune_id IS NULL AND dr.wilaya_code = r.delivery_wilaya_code)
+    )
+  ORDER BY (dr.commune_id IS NOT NULL) DESC
+  LIMIT 1
+) d
+WHERE q.request_id = r.id
+  AND q.status = 'sent'
+  AND r.delivery_method IN ('domicile', 'stopdesk')
+  AND (r.delivery_method <> 'domicile' OR nullif(btrim(coalesce(r.delivery_address, '')), '') IS NOT NULL)
+  AND (r.delivery_method <> 'stopdesk' OR pp.id IS NOT NULL);
+
 DROP TRIGGER IF EXISTS custom_quotes_immutability_guard ON public.custom_quotes;
 CREATE TRIGGER custom_quotes_immutability_guard
   BEFORE UPDATE OR DELETE ON public.custom_quotes

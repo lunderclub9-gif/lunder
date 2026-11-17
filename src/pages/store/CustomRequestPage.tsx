@@ -966,19 +966,8 @@ export default function CustomRequestPage() {
           {estimateError && <p className="text-xs text-brand-red-light">{estimateError}</p>}
           {estimate ? (
             <div className="rounded-lg border border-charcoal-400/15 p-3">
-              <ul className="space-y-1 text-sm">
-                {estimate.lines.map((line, index) => (
-                  <li key={index} className="flex justify-between gap-3 text-charcoal-300">
-                    <span>
-                      {line.label}
-                      {line.detail ? (
-                        <span className="ml-2 text-xs text-charcoal-500">{line.detail}</span>
-                      ) : null}
-                    </span>
-                    <span>{formatDzd(line.amountDzd)}</span>
-                  </li>
-                ))}
-              </ul>
+              <p className="text-xs text-charcoal-400">Le calcul détaillé reste interne à l’atelier. Vous voyez uniquement le montant global estimé, sans avoir à calculer les coûts de fabrication.</p>
+
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-red/25 bg-brand-red/10 px-4 py-4 text-base font-bold text-offwhite">
                 <span>Total estimé ({estimate.quantity} pièce(s))</span>
                 <span>{formatDzd(estimate.totalDzd)}</span>

@@ -141,13 +141,19 @@ BEGIN
     PERFORM pg_advisory_xact_lock(hashtextextended('custom-request-upload:' || v_folder, 0));
   END IF;
 
-  SELECT EXISTS (
-    SELECT 1
-    FROM storage.objects
-    WHERE bucket_id = 'custom-requests'
-      AND split_part(name, '/', 1) = v_folder
-      AND (TG_OP <> 'UPDATE' OR id <> NEW.id)
-  ) INTO v_folder_exists;
+  IF TG_OP = 'UPDATE'
+     AND OLD.bucket_id = 'custom-requests'
+     AND split_part(OLD.name, '/', 1) = v_folder THEN
+    v_folder_exists := true;
+  ELSE
+    SELECT EXISTS (
+      SELECT 1
+      FROM storage.objects
+      WHERE bucket_id = 'custom-requests'
+        AND split_part(name, '/', 1) = v_folder
+        AND (TG_OP <> 'UPDATE' OR id <> NEW.id)
+    ) INTO v_folder_exists;
+  END IF;
 
   SELECT count(*),
          coalesce(sum(coalesce(nullif(metadata->>'size', '')::bigint, 0)), 0)

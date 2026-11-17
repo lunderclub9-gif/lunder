@@ -44,9 +44,12 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  v_is_new_upload := TG_OP = 'INSERT'
-    OR NEW.name IS DISTINCT FROM OLD.name
-    OR NEW.metadata->>'size' IS DISTINCT FROM OLD.metadata->>'size';
+  IF TG_OP = 'INSERT' THEN
+    v_is_new_upload := true;
+  ELSE
+    v_is_new_upload := NEW.name IS DISTINCT FROM OLD.name
+      OR NEW.metadata->>'size' IS DISTINCT FROM OLD.metadata->>'size';
+  END IF;
 
   IF NOT v_is_new_upload THEN
     RETURN NEW;

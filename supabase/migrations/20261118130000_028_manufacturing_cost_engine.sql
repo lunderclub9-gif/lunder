@@ -187,7 +187,7 @@ DECLARE
   v_material_id uuid;
   v_quantity numeric;
   v_quantity_with_waste numeric;
-  v_line_cost integer;
+  v_line_cost bigint;
   v_material_total bigint := 0;
   v_labor_cost integer := 0;
   v_machine_cost integer := 0;
@@ -196,7 +196,7 @@ DECLARE
   v_cost_before_margin bigint;
   v_selling_before_tax bigint;
   v_profit bigint;
-  v_tax integer;
+  v_tax bigint;
   v_final_price bigint;
   v_margin_percent numeric;
   v_tax_percent numeric;

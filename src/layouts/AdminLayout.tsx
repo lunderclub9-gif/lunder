@@ -25,6 +25,7 @@ const navGroups = [
     { to: '/admin/couts-produits', label: 'Matières premières', icon: Coins },
     { to: '/admin/tarification', label: 'Fabrication sur mesure', icon: Calculator },
     { to: '/admin/analyse-fichiers', label: 'Analyse de fichiers', icon: FileSpreadsheet },
+    { to: '/admin/calcul-devis', label: 'Calculateur de devis', icon: Calculator },
   ] },
   { label: 'Finances', items: [{ to: '/admin/finances', label: 'Centre financier', icon: BarChart3 }] },
   { label: 'Configuration', items: [{ to: '/admin/parametres', label: 'Paramètres du magasin', icon: Settings }] },

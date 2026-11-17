@@ -37,7 +37,7 @@ export default function SmartFileAnalyzerPage() {
     [analysis]
   )
   const readyRows = useMemo(
-    () => analysis?.rows.filter((row, index) => validateExtractedMaterial(row).length === 0 && !duplicateRows.has(index)) ?? [],
+    () => analysis?.rows.filter((row, index) => row.reviewDecision === 'approved' && validateExtractedMaterial(row).length === 0 && !duplicateRows.has(index)) ?? [],
     [analysis, duplicateRows]
   )
 
@@ -108,6 +108,7 @@ export default function SmartFileAnalyzerPage() {
         ...patch,
         issues: [],
         confidence: 'high',
+        reviewDecision: 'pending',
       } : row),
     }) : current)
   }
@@ -221,13 +222,13 @@ export default function SmartFileAnalyzerPage() {
 
           <section className="admin-card">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="font-semibold text-offwhite">Vérifier les données extraites</h2><p className="mt-1 text-xs text-charcoal-400">Les champs invalides et doublons sont bloqués. Les dimensions, notes et totaux proviennent uniquement du fichier source.</p></div>
+              <div><h2 className="font-semibold text-offwhite">Vérifier les données extraites</h2><p className="mt-1 text-xs text-charcoal-400">Chaque ligne doit être confirmée ou rejetée individuellement. Les champs invalides et doublons restent bloqués.</p></div>
               <span className="rounded-full bg-charcoal-800 px-3 py-1 text-xs text-charcoal-300">{analysis.headers.length} colonnes détectées</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[850px] text-left text-sm">
                 <thead className="border-b border-charcoal-400/15 text-xs text-charcoal-400">
-                  <tr><th className="px-2 py-3">Matière</th><th className="px-2 py-3">Quantité</th><th className="px-2 py-3">Unité</th><th className="px-2 py-3">Dimensions</th><th className="px-2 py-3">Prix unitaire (DA)</th><th className="px-2 py-3">Total source (DA)</th><th className="px-2 py-3">Fournisseur</th><th className="px-2 py-3">État</th></tr>
+                  <tr><th className="px-2 py-3">Matière</th><th className="px-2 py-3">Quantité</th><th className="px-2 py-3">Unité</th><th className="px-2 py-3">Dimensions</th><th className="px-2 py-3">Prix unitaire (DA)</th><th className="px-2 py-3">Total source (DA)</th><th className="px-2 py-3">Fournisseur</th><th className="px-2 py-3">Validation</th><th className="px-2 py-3">État</th></tr>
                 </thead>
                 <tbody className="divide-y divide-charcoal-400/10">
                   {analysis.rows.map((row, index) => {
@@ -240,6 +241,7 @@ export default function SmartFileAnalyzerPage() {
                       <td className="px-2 py-3"><input aria-label={`Prix unitaire ligne ${row.sourceRow}`} type="number" min="1" step="1" value={row.unitPriceDzd} onChange={(event) => updateRow(index, { unitPriceDzd: event.target.value })} className="input-field w-32 py-2" /></td>
                       <td className="px-2 py-3"><span className="text-xs text-charcoal-300">{row.lineTotalDzd || '—'}</span></td>
                       <td className="px-2 py-3"><input aria-label={`Fournisseur ligne ${row.sourceRow}`} value={row.supplier} onChange={(event) => updateRow(index, { supplier: event.target.value })} className="input-field min-w-32 py-2" /></td>
+                      <td className="px-2 py-3"><select aria-label={`Décision ligne ${row.sourceRow}`} value={row.reviewDecision} onChange={(event) => updateRow(index, { reviewDecision: event.target.value as ExtractedMaterial['reviewDecision'] })} className="input-field w-32 py-2"><option value="pending">À examiner</option><option value="approved">Confirmer</option><option value="rejected">Rejeter</option></select></td>
                       <td className="px-2 py-3">{issues.length === 0 ? <span className="text-xs text-emerald-400">Valide</span> : <span className="text-xs text-amber-300" title={issues.join(' · ')}>{issues.join(' · ')}</span>}</td>
                     </tr>
                   })}
@@ -247,10 +249,10 @@ export default function SmartFileAnalyzerPage() {
               </table>
             </div>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-charcoal-400/10 pt-4">
-              <p className="text-xs text-charcoal-500">Les doublons du fichier et du catalogue sont exclus. Aucun prix historique n’est écrasé. Vérifiez chaque ligne avant confirmation.</p>
+              <p className="text-xs text-charcoal-500">Seules les lignes marquées « Confirmer », valides et sans doublon sont importées. Les prix existants ne sont jamais écrasés.</p>
               <button type="button" onClick={() => void importMaterials()} disabled={busy || readyRows.length === 0} className="btn-primary">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Confirmer et ajouter {readyRows.length} matière(s)
+                Ajouter les {readyRows.length} ligne(s) confirmée(s)
               </button>
             </div>
           </section>

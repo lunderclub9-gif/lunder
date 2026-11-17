@@ -65,6 +65,7 @@ export type CustomManufacturingCostEstimate = {
   marginPercent: number
   taxPercent: number
   wastePercent: number
+  estimatedProductionHours: number
 }
 
 const roundDzd = (value: number): number => Math.round(value)
@@ -172,5 +173,6 @@ export function calculateCustomManufacturingCost(
     marginPercent,
     taxPercent,
     wastePercent,
+    estimatedProductionHours: laborMinutes / 60 + machineHours + assemblyMinutes / 60 + finishingMinutes / 60,
   }
 }

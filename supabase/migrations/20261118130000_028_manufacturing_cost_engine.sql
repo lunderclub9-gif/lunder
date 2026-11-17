@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.suppliers (
 );
 
 ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.suppliers FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.suppliers TO authenticated;
 DROP POLICY IF EXISTS suppliers_owner_all ON public.suppliers;
 CREATE POLICY suppliers_owner_all ON public.suppliers
@@ -148,6 +149,7 @@ VALUES (true)
 ON CONFLICT (id) DO NOTHING;
 
 ALTER TABLE public.manufacturing_cost_settings ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.manufacturing_cost_settings FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.manufacturing_cost_settings TO authenticated;
 DROP POLICY IF EXISTS manufacturing_cost_settings_owner_all ON public.manufacturing_cost_settings;
 CREATE POLICY manufacturing_cost_settings_owner_all

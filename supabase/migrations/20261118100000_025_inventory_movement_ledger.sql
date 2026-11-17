@@ -361,7 +361,8 @@ BEGIN
     END IF;
   END LOOP;
 END;
-$;
+$$;
+
 REVOKE ALL ON FUNCTION public.apply_order_inventory_movement(uuid, text, text)
   FROM PUBLIC, anon, authenticated;
 

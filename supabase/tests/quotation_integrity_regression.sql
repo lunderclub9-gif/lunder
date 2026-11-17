@@ -80,7 +80,8 @@ BEGIN
     RAISE EXCEPTION 'Internal manufacturing information leaked: %', v_public;
   END IF;
 
-  IF (v_public->>'unitPriceDzd')::numeric <> 1500
+  IF (v_public->'lines'->0->>'amountDzd')::numeric <> 3000
+     OR (v_public->>'unitPriceDzd')::numeric <> 1500
      OR (v_public->>'quantity')::integer <> 2
      OR (v_public->>'totalDzd')::numeric <> 2750 THEN
     RAISE EXCEPTION 'Public quote aggregate totals changed unexpectedly: %', v_public;

@@ -51,8 +51,10 @@ SET search_path = pg_catalog, public
 AS $$
 BEGIN
   IF NEW.unit_type = 'kg' THEN
-    IF TG_OP = 'INSERT'
-       OR NEW.cost_per_kg_dzd IS DISTINCT FROM OLD.cost_per_kg_dzd THEN
+    IF TG_OP = 'INSERT' THEN
+      NEW.unit_cost_dzd := NEW.cost_per_kg_dzd;
+      NEW.unit_cost_configured := NEW.cost_per_kg_dzd > 0;
+    ELSIF NEW.cost_per_kg_dzd IS DISTINCT FROM OLD.cost_per_kg_dzd THEN
       NEW.unit_cost_dzd := NEW.cost_per_kg_dzd;
       NEW.unit_cost_configured := NEW.cost_per_kg_dzd > 0;
     END IF;
@@ -195,7 +197,7 @@ DECLARE
   v_selling_before_tax bigint;
   v_profit bigint;
   v_tax integer;
-  v_final_price integer;
+  v_final_price bigint;
   v_margin_percent numeric;
   v_tax_percent numeric;
   v_waste_percent numeric;
@@ -211,9 +213,11 @@ BEGIN
 
   IF p_request_id IS NULL
      OR p_material_lines IS NULL
-     OR jsonb_typeof(p_material_lines) <> 'array'
-     OR jsonb_array_length(p_material_lines) > 50 THEN
+     OR jsonb_typeof(p_material_lines) <> 'array' THEN
     RAISE EXCEPTION 'LIGNES_MATIERES_INVALIDES';
+  END IF;
+  IF jsonb_array_length(p_material_lines) > 50 THEN
+    RAISE EXCEPTION 'TROP_DE_LIGNES_MATIERES';
   END IF;
 
   IF coalesce(p_labor_minutes, 0) < 0 OR coalesce(p_labor_minutes, 0) > 100000

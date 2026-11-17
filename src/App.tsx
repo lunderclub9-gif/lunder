@@ -27,6 +27,7 @@ const AdminDelivery = lazy(() => import('@/pages/admin/Delivery'))
 const AdminRequests = lazy(() => import('@/pages/admin/Requests'))
 const AdminManufacturingPricing = lazy(() => import('@/pages/admin/ManufacturingPricing'))
 const AdminProductCostMaterials = lazy(() => import('@/pages/admin/ProductCostMaterials'))
+const AdminSmartFileAnalyzer = lazy(() => import('@/pages/admin/SmartFileAnalyzer'))
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'))
 const AdminHistory = lazy(() => import('@/pages/admin/History'))
 const AdminFinancialDashboard = lazy(() => import('@/pages/admin/FinancialDashboard'))
@@ -107,6 +108,7 @@ export default function App() {
                 <Route path="demandes" element={<AdminRequests />} />
                 <Route path="tarification" element={<AdminManufacturingPricing />} />
                 <Route path="couts-produits" element={<AdminProductCostMaterials />} />
+                <Route path="analyse-fichiers" element={<AdminSmartFileAnalyzer />} />
                 <Route path="parametres" element={<AdminSettings />} />
                 <Route path="historique" element={<AdminHistory />} />
               </Route>

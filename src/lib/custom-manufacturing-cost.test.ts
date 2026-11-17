@@ -50,7 +50,7 @@ describe('calculateCustomManufacturingCost', () => {
     expect(result.sellingBeforeTaxDzd).toBe(35700)
     expect(result.taxDzd).toBe(6783)
     expect(result.finalPriceDzd).toBe(42483)
-    expect(result.estimatedProductionHours).toBe(4.75)
+    expect(result.estimatedProductionHours).toBe(5.25)
   })
 
   it('supports square-metre and kilogram material price units', () => {

@@ -192,6 +192,10 @@ BEGIN
     RAISE EXCEPTION 'DEVIS_SNAPSHOT_IMMUABLE';
   END IF;
 
+  IF OLD.status IN ('rejected', 'expired') AND NEW.status <> OLD.status THEN
+    RAISE EXCEPTION 'DEVIS_TERMINAL_IMMUABLE';
+  END IF;
+
   IF OLD.status IN ('accepted', 'approved') THEN
     IF OLD.status = 'approved' AND NEW.status <> 'approved' THEN
       RAISE EXCEPTION 'DEVIS_APPROUVE_IMMUABLE';

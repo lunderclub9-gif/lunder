@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, FileSpreadsheet, Loader2, Upload, X } from '
 import { supabase } from '@/lib/supabase'
 import {
   analyzeMaterialsCsv,
+  compareSupplierQuotes,
   validateExtractedMaterial,
   type CsvAnalysis,
   type ExtractedMaterial,
@@ -19,6 +20,9 @@ export default function SmartFileAnalyzerPage() {
   const [analysis, setAnalysis] = useState<CsvAnalysis | null>(null)
   const [fileName, setFileName] = useState('')
   const [sourcePreview, setSourcePreview] = useState('')
+  const [comparisonAnalysis, setComparisonAnalysis] = useState<CsvAnalysis | null>(null)
+  const [comparisonFileName, setComparisonFileName] = useState('')
+  const [comparisonError, setComparisonError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -31,6 +35,15 @@ export default function SmartFileAnalyzerPage() {
     () => analysis?.rows.filter((row) => validateExtractedMaterial(row).length === 0) ?? [],
     [analysis]
   )
+
+  const supplierComparison = useMemo(() => {
+    if (!analysis || !comparisonAnalysis) return null
+    try {
+      return { result: compareSupplierQuotes(analysis, comparisonAnalysis), error: null as string | null }
+    } catch (cause) {
+      return { result: null, error: cause instanceof Error ? cause.message : 'COMPARAISON_IMPOSSIBLE' }
+    }
+  }, [analysis, comparisonAnalysis])
 
   const handleFile = async (file?: File) => {
     setError(null)
@@ -58,6 +71,24 @@ export default function SmartFileAnalyzerPage() {
       setError(message.startsWith('COLONNES_REQUISES')
         ? 'Colonnes requises introuvables : Material, Quantity et Unit Price (ou leurs équivalents français).'
         : 'Impossible de lire ce fichier. Vérifiez son format et ses colonnes.')
+    }
+  }
+
+  const handleComparisonFile = async (file?: File) => {
+    setComparisonError(null)
+    setComparisonAnalysis(null)
+    setComparisonFileName('')
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024 || !/\\.(csv|tsv)$/i.test(file.name)) {
+      setComparisonError('Le second fichier doit être CSV/TSV et ne pas dépasser 5 Mo.')
+      return
+    }
+    try {
+      const result = analyzeMaterialsCsv(await file.text())
+      setComparisonAnalysis(result)
+      setComparisonFileName(file.name)
+    } catch {
+      setComparisonError('Le second devis ne contient pas les colonnes matières, quantités et prix requises.')
     }
   }
 
@@ -155,7 +186,22 @@ export default function SmartFileAnalyzerPage() {
           <summary className="cursor-pointer text-xs font-medium text-charcoal-300">Afficher l’aperçu du document original (12 premières lignes)</summary>
           <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs text-charcoal-400">{sourcePreview}</pre>
         </details>}
+        {analysis && <div className="mt-4 rounded-xl border border-charcoal-400/10 p-4">
+          <label className="block"><span className="text-sm font-semibold text-offwhite">Comparer avec un deuxième devis fournisseur</span><span className="mt-1 block text-xs text-charcoal-500">Importez un second CSV/TSV avec les mêmes colonnes pour comparer les prix unitaires par matière et unité.</span><input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" className="mt-3 block w-full text-xs text-charcoal-300 file:mr-3 file:rounded-lg file:border-0 file:bg-charcoal-800 file:px-3 file:py-2 file:text-charcoal-100" onChange={(event) => void handleComparisonFile(event.target.files?.[0])} /></label>
+          {comparisonFileName && <p className="mt-2 text-xs text-charcoal-400">Deuxième devis : {comparisonFileName}</p>}
+          {comparisonError && <p role="alert" className="mt-2 text-xs text-amber-300">{comparisonError}</p>}
+        </div>}
       </section>
+
+      {analysis && comparisonAnalysis && supplierComparison && (
+        <section className="admin-card space-y-3">
+          <div><h2 className="font-semibold text-offwhite">Comparaison des prix fournisseurs</h2><p className="text-xs text-charcoal-400">Comparaison par nom de matière et unité. Les prix ne sont pas enregistrés automatiquement.</p></div>
+          {supplierComparison.error ? <p role="alert" className="text-sm text-amber-300">Des lignes dupliquées empêchent une comparaison fiable.</p> : supplierComparison.result && <>
+            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b border-charcoal-400/15 text-xs text-charcoal-400"><tr><th className="px-2 py-2">Matière</th><th className="px-2 py-2">Devis 1</th><th className="px-2 py-2">Devis 2</th><th className="px-2 py-2">Écart</th><th className="px-2 py-2">Moins cher</th></tr></thead><tbody className="divide-y divide-charcoal-400/10">{supplierComparison.result.matched.map((row) => <tr key={row.materialName + row.unit}><td className="px-2 py-3">{row.materialName} <span className="text-xs text-charcoal-500">/ {row.unit}</span></td><td className="px-2 py-3">{row.firstPriceDzd.toLocaleString('fr-DZ')} DA</td><td className="px-2 py-3">{row.secondPriceDzd.toLocaleString('fr-DZ')} DA</td><td className="px-2 py-3">{row.differenceDzd > 0 ? '+' : ''}{row.differenceDzd.toLocaleString('fr-DZ')} DA ({row.differencePercent.toFixed(1)}%)</td><td className="px-2 py-3">{row.cheaper === 'first' ? 'Devis 1' : row.cheaper === 'second' ? 'Devis 2' : 'Identique'}</td></tr>)}</tbody></table></div>
+            <div className="flex flex-wrap gap-4 text-xs text-charcoal-400"><span>Uniquement devis 1 : {supplierComparison.result.onlyFirst.join(', ') || 'Aucune'}</span><span>Uniquement devis 2 : {supplierComparison.result.onlySecond.join(', ') || 'Aucune'}</span></div>
+          </>}
+        </section>
+      )}
 
       {analysis && (
         <>

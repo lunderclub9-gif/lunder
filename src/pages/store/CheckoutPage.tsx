@@ -120,12 +120,12 @@ export default function CheckoutPage() {
     }
 
     setQuoteLoading(true)
-    void supabase
-      .rpc('quote_delivery', {
-        p_wilaya_code: Number(wilayaCode),
-        p_commune_id: communeId,
-        p_method: method,
-      })
+    const quoteRequest = supabase.rpc('quote_delivery', {
+      p_wilaya_code: Number(wilayaCode),
+      p_commune_id: communeId,
+      p_method: method,
+    })
+    void Promise.resolve(quoteRequest)
       .then(({ data, error: rpcError }) => {
         if (cancelled) return
         const row = Array.isArray(data) ? (data[0] as DeliveryQuote | undefined) : undefined

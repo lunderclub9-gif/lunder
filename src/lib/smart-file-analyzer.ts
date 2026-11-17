@@ -4,6 +4,9 @@ export type ExtractedMaterial = {
   quantity: string
   unit: 'piece' | 'meter' | 'm2' | 'kg' | ''
   unitPriceDzd: string
+  lineTotalDzd: string
+  dimensions: string
+  technicalSpecification: string
   supplier: string
   reference: string
   confidence: 'high' | 'medium' | 'low'
@@ -65,6 +68,10 @@ function parseNumeric(value: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 }
 
+function cell(cells: string[], column: number): string {
+  return column >= 0 ? (cells[column] ?? '') : ''
+}
+
 export function analyzeMaterialsCsv(source: string): CsvAnalysis {
   const text = source.replace(/^\uFEFF/, '').trim()
   if (!text) throw new Error('FICHIER_VIDE')
@@ -80,8 +87,14 @@ export function analyzeMaterialsCsv(source: string): CsvAnalysis {
   const quantityCol = findColumn(headers, ['quantity', 'qty', 'quantite', 'qte'])
   const unitCol = findColumn(headers, ['unit', 'unite', 'measurementunit'])
   const priceCol = findColumn(headers, ['unitprice', 'priceperunit', 'unitcost', 'prixunitaire', 'coutunitaire', 'prixachat'])
+  const totalCol = findColumn(headers, ['total', 'linetotal', 'amount', 'montant', 'totaldzd', 'totalttc'])
   const supplierCol = findColumn(headers, ['supplier', 'fournisseur', 'suppliername'])
   const referenceCol = findColumn(headers, ['reference', 'ref', 'sku', 'code'])
+  const dimensionsCol = findColumn(headers, ['dimensions', 'dimension', 'size', 'taille', 'dimensionsmm', 'dimensionscm'])
+  const lengthCol = findColumn(headers, ['length', 'longueur', 'longueurmm', 'lengthmm'])
+  const widthCol = findColumn(headers, ['width', 'largeur', 'largeurmm', 'widthmm'])
+  const heightCol = findColumn(headers, ['height', 'hauteur', 'hauteurmm', 'heightmm'])
+  const specificationCol = findColumn(headers, ['specification', 'specifications', 'technicalspecification', 'descriptiontechnique', 'notes', 'bom', 'cuttinglist'])
 
   if (materialCol < 0 || quantityCol < 0 || priceCol < 0) {
     throw new Error('COLONNES_REQUISES: material, quantity, unit price')
@@ -91,32 +104,52 @@ export function analyzeMaterialsCsv(source: string): CsvAnalysis {
   let ignoredRows = 0
   for (let index = 1; index < lines.length; index += 1) {
     const cells = splitCsvLine(lines[index], delimiter)
-    const materialName = cells[materialCol] ?? ''
+    const materialName = cell(cells, materialCol)
     if (!materialName) {
       ignoredRows += 1
       continue
     }
-    const quantityRaw = cells[quantityCol] ?? ''
-    const priceRaw = cells[priceCol] ?? ''
+    const quantityRaw = cell(cells, quantityCol)
+    const priceRaw = cell(cells, priceCol)
+    const totalRaw = cell(cells, totalCol)
     const quantity = parseNumeric(quantityRaw)
     const unitPrice = parseNumeric(priceRaw)
-    const unit = unitCol >= 0 ? parseUnit(cells[unitCol] ?? '') : ''
+    const lineTotal = parseNumeric(totalRaw)
+    const unit = unitCol >= 0 ? parseUnit(cell(cells, unitCol)) : ''
+    const dimensionParts = [
+      dimensionsCol >= 0 ? cell(cells, dimensionsCol) : '',
+      lengthCol >= 0 ? `L: ${cell(cells, lengthCol)}` : '',
+      widthCol >= 0 ? `W: ${cell(cells, widthCol)}` : '',
+      heightCol >= 0 ? `H: ${cell(cells, heightCol)}` : '',
+    ].filter(Boolean)
+    const dimensions = dimensionParts.join(' × ')
     const issues: string[] = []
     if (quantity === null || quantity <= 0) issues.push('Quantité absente ou invalide')
     if (unitPrice === null || unitPrice <= 0) issues.push('Prix unitaire absent ou invalide')
     if (!unit) issues.push('Unité non reconnue')
+    if (totalRaw && (lineTotal === null || lineTotal <= 0)) issues.push('Total de ligne invalide')
+    if (lineTotal !== null && quantity !== null && unitPrice !== null && quantity > 0 && unitPrice > 0) {
+      const expected = quantity * unitPrice
+      if (Math.abs(lineTotal - expected) > Math.max(1, expected * 0.01)) {
+        issues.push('Total de ligne différent de quantité × prix unitaire')
+      }
+    }
     rows.push({
       sourceRow: index + 1,
       materialName,
       quantity: quantity === null ? quantityRaw : String(quantity),
       unit,
       unitPriceDzd: unitPrice === null ? priceRaw : String(unitPrice),
-      supplier: supplierCol >= 0 ? (cells[supplierCol] ?? '') : '',
-      reference: referenceCol >= 0 ? (cells[referenceCol] ?? '') : '',
+      lineTotalDzd: lineTotal === null ? totalRaw : String(lineTotal),
+      dimensions,
+      technicalSpecification: cell(cells, specificationCol),
+      supplier: cell(cells, supplierCol),
+      reference: cell(cells, referenceCol),
       confidence: issues.length === 0 ? 'high' : issues.length === 1 ? 'medium' : 'low',
       issues,
     })
   }
+
   return { headers, rows, ignoredRows }
 }
 
@@ -128,9 +161,20 @@ export function validateExtractedMaterial(row: ExtractedMaterial): string[] {
   const price = parseNumeric(row.unitPriceDzd)
   if (price === null || price <= 0 || !Number.isSafeInteger(price)) issues.push('Prix unitaire invalide (DZD entier requis)')
   if (!row.unit) issues.push('Unité requise')
+  if (row.lineTotalDzd.trim() && parseNumeric(row.lineTotalDzd) === null) issues.push('Total de ligne invalide')
   return issues
 }
 
+/** Returns row indexes with repeated normalized material + unit pairs. */
+export function findDuplicateMaterialRows(rows: ExtractedMaterial[]): Set<number> {
+  const groups = new Map<string, number[]>()
+  rows.forEach((row, index) => {
+    const key = `${normalizeHeader(row.materialName)}::${row.unit}`
+    if (!row.materialName.trim() || !row.unit) return
+    groups.set(key, [...(groups.get(key) ?? []), index])
+  })
+  return new Set([...groups.values()].filter((indexes) => indexes.length > 1).flat())
+}
 
 export type SupplierComparisonRow = {
   materialName: string

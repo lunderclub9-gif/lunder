@@ -675,6 +675,12 @@ AS $$
           THEN '[]'::jsonb
         ELSE
           (CASE
+            WHEN jsonb_typeof(p_breakdown->'subtotalDzd') = 'number'
+              AND (p_breakdown->>'subtotalDzd')::numeric >= 0
+            THEN jsonb_build_array(jsonb_build_object(
+              'label', 'Fabrication',
+              'amountDzd', round((p_breakdown->>'subtotalDzd')::numeric)
+            ))
             WHEN jsonb_typeof(p_breakdown->'unitPriceDzd') = 'number'
               AND (p_breakdown->>'unitPriceDzd')::numeric >= 0
             THEN jsonb_build_array(jsonb_build_object(

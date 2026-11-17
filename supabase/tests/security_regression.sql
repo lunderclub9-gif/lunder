@@ -110,3 +110,60 @@ BEGIN
   END IF;
 END;
 $$;
+
+
+-- Customer quotation projection must never forward stored internal line names,
+-- supplier details, or free-form production notes (including prefixed variants).
+DO $$
+DECLARE
+  v_public jsonb;
+BEGIN
+  v_public := public.customer_quote_breakdown(
+    jsonb_build_object(
+      'lines', jsonb_build_array(
+        jsonb_build_object('label', 'Matière', 'amountDzd', 400, 'detail', 'PVC supplier unit cost'),
+        jsonb_build_object('label', 'Matière / fournisseur confidentiel', 'amountDzd', 50, 'detail', 'private supplier note'),
+        jsonb_build_object('label', 'Impression (interne)', 'amountDzd', 200, 'detail', 'machine rate'),
+        jsonb_build_object('label', 'Marge studio — confidentiel', 'amountDzd', 300, 'detail', 'internal margin'),
+        jsonb_build_object('label', 'Production note: reject rate', 'amountDzd', 25, 'detail', 'operator-only'),
+        jsonb_build_object('label', 'Remise quantité', 'amountDzd', -100),
+        jsonb_build_object('label', 'Supplément urgence', 'amountDzd', 50)
+      ),
+      'unitPriceDzd', 1500,
+      'quantity', 1,
+      'subtotalDzd', 1500,
+      'discountPercent', 10,
+      'discountDzd', 100,
+      'rushFeeDzd', 50,
+      'totalDzd', 1450,
+      'geometryVerified', false
+    )
+  );
+
+  IF jsonb_array_length(v_public->'lines') <> 3 THEN
+    RAISE EXCEPTION 'Customer quote projection returned unexpected line count: %', v_public;
+  END IF;
+
+  IF v_public->'lines'->0->>'label' <> 'Fabrication'
+     OR v_public->'lines'->1->>'label' <> 'Remise'
+     OR v_public->'lines'->2->>'label' <> 'Supplément urgence' THEN
+    RAISE EXCEPTION 'Customer quote projection returned a non-allowlisted label: %', v_public;
+  END IF;
+
+  IF v_public::text ILIKE '%supplier%'
+     OR v_public::text ILIKE '%confidentiel%'
+     OR v_public::text ILIKE '%Matière%'
+     OR v_public::text ILIKE '%Impression%'
+     OR v_public::text ILIKE '%Marge studio%'
+     OR v_public::text ILIKE '%operator-only%'
+     OR v_public::text ILIKE '%machine rate%' THEN
+    RAISE EXCEPTION 'Internal manufacturing information leaked into customer quote projection: %', v_public;
+  END IF;
+
+  IF (v_public->'lines'->0->>'amountDzd')::numeric <> 1500
+     OR (v_public->'lines'->1->>'amountDzd')::numeric <> -100
+     OR (v_public->'lines'->2->>'amountDzd')::numeric <> 50 THEN
+    RAISE EXCEPTION 'Customer quote aggregate amounts changed unexpectedly: %', v_public;
+  END IF;
+END;
+$$;

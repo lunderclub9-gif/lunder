@@ -10,6 +10,7 @@ export type ExtractedMaterial = {
   supplier: string
   reference: string
   confidence: 'high' | 'medium' | 'low'
+  reviewDecision: 'pending' | 'approved' | 'rejected'
   issues: string[]
 }
 
@@ -146,6 +147,7 @@ export function analyzeMaterialsCsv(source: string): CsvAnalysis {
       supplier: cell(cells, supplierCol),
       reference: cell(cells, referenceCol),
       confidence: issues.length === 0 ? 'high' : issues.length === 1 ? 'medium' : 'low',
+      reviewDecision: 'pending',
       issues,
     })
   }

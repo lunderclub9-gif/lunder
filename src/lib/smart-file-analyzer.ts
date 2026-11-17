@@ -161,7 +161,16 @@ export function validateExtractedMaterial(row: ExtractedMaterial): string[] {
   const price = parseNumeric(row.unitPriceDzd)
   if (price === null || price <= 0 || !Number.isSafeInteger(price)) issues.push('Prix unitaire invalide (DZD entier requis)')
   if (!row.unit) issues.push('Unité requise')
-  if (row.lineTotalDzd.trim() && parseNumeric(row.lineTotalDzd) === null) issues.push('Total de ligne invalide')
+  if (row.lineTotalDzd.trim()) {
+    const total = parseNumeric(row.lineTotalDzd)
+    if (total === null || total <= 0) issues.push('Total de ligne invalide')
+    else if (quantity !== null && price !== null && quantity > 0 && price > 0) {
+      const expected = quantity * price
+      if (Math.abs(total - expected) > Math.max(1, expected * 0.01)) {
+        issues.push('Total de ligne différent de quantité × prix unitaire')
+      }
+    }
+  }
   return issues
 }
 

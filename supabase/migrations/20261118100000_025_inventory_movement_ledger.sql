@@ -78,7 +78,6 @@ SET stock_reserved = (
       i.stock_tracked
       AND o.archived_at IS NULL
       AND o.status NOT IN ('cancelled', 'delivered')
-      AND o.archived_at IS NULL
     ),
     inventory_movement_sequence = CASE
       WHEN i.stock_tracked AND (o.archived_at IS NOT NULL OR o.status IN ('cancelled', 'delivered')) THEN 2

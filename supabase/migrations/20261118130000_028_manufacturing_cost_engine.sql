@@ -335,13 +335,15 @@ BEGIN
   END IF;
 
   -- Gross margin is a share of the selling price, not a markup on cost.
-  v_selling_before_tax := round(v_cost_before_margin / (1 - v_margin_percent / 100));
+  -- The minimum quote is a tax-inclusive floor, so lift the pre-tax price
+  -- before calculating profit and tax rather than silently distorting either.
+  v_selling_before_tax := greatest(
+    round(v_cost_before_margin / (1 - v_margin_percent / 100)),
+    ceil(v_settings.minimum_quote_dzd / (1 + v_tax_percent / 100))
+  );
   v_profit := v_selling_before_tax - v_cost_before_margin;
   v_tax := round(v_selling_before_tax * v_tax_percent / 100);
-  v_final_price := greatest(
-    v_selling_before_tax + v_tax,
-    v_settings.minimum_quote_dzd
-  );
+  v_final_price := v_selling_before_tax + v_tax;
 
   IF v_final_price > 2147483647 THEN
     RAISE EXCEPTION 'PRIX_DEVIS_TROP_ELEVE';

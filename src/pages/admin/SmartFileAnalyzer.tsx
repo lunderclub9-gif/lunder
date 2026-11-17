@@ -49,6 +49,9 @@ export default function SmartFileAnalyzerPage() {
     setError(null)
     setNotice(null)
     setAnalysis(null)
+    setComparisonAnalysis(null)
+    setComparisonFileName('')
+    setComparisonError(null)
     setSourcePreview('')
     if (!file) return
     if (file.size > 5 * 1024 * 1024) {
@@ -213,7 +216,7 @@ export default function SmartFileAnalyzerPage() {
 
           <section className="admin-card">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="font-semibold text-offwhite">Vérifier les données extraites</h2><p className="mt-1 text-xs text-charcoal-400">Les champs en rouge doivent être corrigés. Aucun prix manquant n’est complété automatiquement.</p></div>
+              <div><h2 className="font-semibold text-offwhite">Vérifier les données extraites</h2><p className="mt-1 text-xs text-charcoal-400">Les champs invalides doivent être corrigés. Aucun prix manquant n’est complété automatiquement.</p></div>
               <span className="rounded-full bg-charcoal-800 px-3 py-1 text-xs text-charcoal-300">{analysis.headers.length} colonnes détectées</span>
             </div>
             <div className="overflow-x-auto">

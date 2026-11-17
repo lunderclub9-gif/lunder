@@ -146,10 +146,12 @@ export function calculateCustomManufacturingCost(
 
   if (costBeforeMarginDzd <= 0) throw new Error('COUT_TOTAL_NON_CONFIGURE')
 
-  const sellingBeforeTaxDzd = roundDzd(costBeforeMarginDzd / (1 - marginPercent / 100))
+  const targetSellingBeforeTaxDzd = roundDzd(costBeforeMarginDzd / (1 - marginPercent / 100))
+  const minimumSellingBeforeTaxDzd = Math.ceil(minimumQuoteDzd / (1 + taxPercent / 100))
+  const sellingBeforeTaxDzd = Math.max(targetSellingBeforeTaxDzd, minimumSellingBeforeTaxDzd)
   const profitDzd = sellingBeforeTaxDzd - costBeforeMarginDzd
   const taxDzd = roundDzd((sellingBeforeTaxDzd * taxPercent) / 100)
-  const finalPriceDzd = Math.max(sellingBeforeTaxDzd + taxDzd, minimumQuoteDzd)
+  const finalPriceDzd = sellingBeforeTaxDzd + taxDzd
 
   if (!Number.isSafeInteger(finalPriceDzd) || finalPriceDzd > 2_147_483_647) {
     throw new Error('PRIX_DEVIS_TROP_ELEVE')

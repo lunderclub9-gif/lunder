@@ -67,9 +67,15 @@ BEGIN
 
   SELECT pg_get_functiondef('public.restore_archived_order(uuid)'::regprocedure)
   INTO v_definition;
-  IF position('apply_order_inventory_movement' IN v_definition) = 0
-     OR position('STOCK_INSUFFISANT' IN v_definition) = 0 THEN
-    RAISE EXCEPTION 'Archive restoration does not re-reserve stock safely.';
+  IF position('apply_order_inventory_movement' IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Archive restoration does not call the stock reservation helper.';
+  END IF;
+
+  SELECT pg_get_functiondef('public.apply_order_inventory_movement(uuid,text,text)'::regprocedure)
+  INTO v_definition;
+  IF position('STOCK_INSUFFISANT' IN v_definition) = 0
+     OR position('stock_quantity >= v_item.quantity' IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Stock re-reservation does not guard against negative inventory.';
   END IF;
 
   IF EXISTS (

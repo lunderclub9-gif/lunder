@@ -231,7 +231,7 @@ export default function CustomCostingPage() {
             [assemblyMinutes, setAssemblyMinutes, 'Assemblage (minutes)'],
             [finishingMinutes, setFinishingMinutes, 'Finition (minutes)'],
             [packagingDzd, setPackagingDzd, 'Emballage (DA)'],
-            [transportDzd, setTransportDzd, 'Transport (DA)'],
+            [transportDzd, setTransportDzd, 'Transport de production (DA)'],
             [extraDzd, setExtraDzd, 'Autres frais (DA)'],
           ] as Array<[string, (value: string) => void, string]>).map(([value, setter, label]) => <label key={label} className="block"><span className="label-text">{label}</span><input type="number" min="0" step="any" value={value} onChange={(event) => setter(event.target.value)} className="input-field" /></label>)}
         </div>

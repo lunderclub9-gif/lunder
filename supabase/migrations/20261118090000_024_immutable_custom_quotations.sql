@@ -507,3 +507,175 @@ REVOKE EXECUTE ON FUNCTION public.customer_quote_breakdown(jsonb)
   FROM PUBLIC, anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';
+
+
+-- Customer token RPC exposes only the public projection of manufacturing
+-- breakdowns and the exact delivery amount that was frozen when the quote
+-- version was issued. Never return pricing_snapshot or internal specifications.
+CREATE OR REPLACE FUNCTION public.get_custom_request_by_token(p_token uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_result jsonb;
+BEGIN
+  IF p_token IS NULL THEN
+    RAISE EXCEPTION 'DEMANDE_INTROUVABLE';
+  END IF;
+
+  UPDATE public.custom_quotes
+  SET status = 'expired', decided_at = now()
+  WHERE request_id = (
+    SELECT id FROM public.custom_requests WHERE tracking_token = p_token
+  )
+    AND status = 'sent'
+    AND valid_until < current_date;
+
+  SELECT jsonb_build_object(
+    'request_number', r.request_number,
+    'status', r.status,
+    'created_at', r.created_at,
+    'title', r.title,
+    'description', r.description,
+    'quantity', r.quantity,
+    'dimensions', r.dimensions,
+    'dimension_unit', r.dimension_unit,
+    'material_preference', r.material_preference,
+    'color_preference', r.color_preference,
+    'customer_name', r.customer_name,
+    'files', coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'kind', f.kind,
+        'original_name', f.original_name,
+        'mime_type', f.mime_type
+      ) ORDER BY f.created_at)
+      FROM public.custom_request_files f
+      WHERE f.request_id = r.id
+    ), '[]'::jsonb),
+    'quotes', coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'version', q.version,
+        'public_token', q.public_token,
+        'price_dzd', q.price_dzd,
+        'currency_code', q.currency_code,
+        'delivery_price_dzd', q.delivery_price_dzd,
+        'production_lead_days', q.production_lead_days,
+        'valid_until', q.valid_until,
+        'terms', q.terms,
+        'status', q.status,
+        'source', q.source,
+        'breakdown', public.customer_quote_breakdown(q.breakdown),
+        'created_at', q.created_at
+      ) ORDER BY q.version DESC)
+      FROM public.custom_quotes q
+      WHERE q.request_id = r.id
+    ), '[]'::jsonb),
+    'order_number', (
+      SELECT o.order_number
+      FROM public.custom_quotes q
+      JOIN public.orders o ON o.id = q.order_id
+      WHERE q.request_id = r.id AND q.order_id IS NOT NULL
+      LIMIT 1
+    )
+  )
+  INTO v_result
+  FROM public.custom_requests r
+  WHERE r.tracking_token = p_token;
+
+  IF v_result IS NULL THEN
+    RAISE EXCEPTION 'DEMANDE_INTROUVABLE';
+  END IF;
+
+  RETURN v_result;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.get_custom_request_by_token(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_custom_request_by_token(uuid) TO anon, authenticated;
+
+-- Tighten the public breakdown projection: only typed, non-negative aggregate
+-- fields are copied. Unknown keys, nested objects, strings and internal costs
+-- are discarded instead of being forwarded to the customer.
+CREATE OR REPLACE FUNCTION public.customer_quote_breakdown(p_breakdown jsonb)
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+SET search_path = pg_catalog
+AS $$
+  SELECT jsonb_build_object(
+    'lines',
+      CASE
+        WHEN p_breakdown IS NULL OR jsonb_typeof(p_breakdown) <> 'object'
+          THEN '[]'::jsonb
+        ELSE
+          (CASE
+            WHEN jsonb_typeof(p_breakdown->'unitPriceDzd') = 'number'
+              AND (p_breakdown->>'unitPriceDzd')::numeric >= 0
+            THEN jsonb_build_array(jsonb_build_object(
+              'label', 'Fabrication',
+              'amountDzd', round((p_breakdown->>'unitPriceDzd')::numeric)
+            ))
+            ELSE '[]'::jsonb
+          END)
+          ||
+          (CASE
+            WHEN jsonb_typeof(p_breakdown->'discountDzd') = 'number'
+              AND (p_breakdown->>'discountDzd')::numeric > 0
+            THEN jsonb_build_array(jsonb_build_object(
+              'label', 'Remise',
+              'amountDzd', -round((p_breakdown->>'discountDzd')::numeric)
+            ))
+            ELSE '[]'::jsonb
+          END)
+          ||
+          (CASE
+            WHEN jsonb_typeof(p_breakdown->'rushFeeDzd') = 'number'
+              AND (p_breakdown->>'rushFeeDzd')::numeric > 0
+            THEN jsonb_build_array(jsonb_build_object(
+              'label', 'Supplément urgence',
+              'amountDzd', round((p_breakdown->>'rushFeeDzd')::numeric)
+            ))
+            ELSE '[]'::jsonb
+          END)
+      END,
+    'unitPriceDzd', CASE
+      WHEN jsonb_typeof(p_breakdown->'unitPriceDzd') = 'number'
+       AND (p_breakdown->>'unitPriceDzd')::numeric >= 0
+      THEN p_breakdown->'unitPriceDzd' ELSE NULL END,
+    'quantity', CASE
+      WHEN jsonb_typeof(p_breakdown->'quantity') = 'number'
+       AND (p_breakdown->>'quantity')::numeric BETWEEN 1 AND 100000
+       AND trunc((p_breakdown->>'quantity')::numeric) = (p_breakdown->>'quantity')::numeric
+      THEN p_breakdown->'quantity' ELSE NULL END,
+    'subtotalDzd', CASE
+      WHEN jsonb_typeof(p_breakdown->'subtotalDzd') = 'number'
+       AND (p_breakdown->>'subtotalDzd')::numeric >= 0
+      THEN p_breakdown->'subtotalDzd' ELSE NULL END,
+    'discountPercent', CASE
+      WHEN jsonb_typeof(p_breakdown->'discountPercent') = 'number'
+       AND (p_breakdown->>'discountPercent')::numeric BETWEEN 0 AND 100
+      THEN p_breakdown->'discountPercent' ELSE NULL END,
+    'discountDzd', CASE
+      WHEN jsonb_typeof(p_breakdown->'discountDzd') = 'number'
+       AND (p_breakdown->>'discountDzd')::numeric >= 0
+      THEN p_breakdown->'discountDzd' ELSE NULL END,
+    'rushFeeDzd', CASE
+      WHEN jsonb_typeof(p_breakdown->'rushFeeDzd') = 'number'
+       AND (p_breakdown->>'rushFeeDzd')::numeric >= 0
+      THEN p_breakdown->'rushFeeDzd' ELSE NULL END,
+    'totalDzd', CASE
+      WHEN jsonb_typeof(p_breakdown->'totalDzd') = 'number'
+       AND (p_breakdown->>'totalDzd')::numeric >= 0
+      THEN p_breakdown->'totalDzd' ELSE NULL END,
+    'geometryVerified', CASE
+      WHEN jsonb_typeof(p_breakdown->'geometryVerified') = 'boolean'
+      THEN p_breakdown->'geometryVerified' ELSE NULL END
+  );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.customer_quote_breakdown(jsonb)
+  FROM PUBLIC, anon, authenticated;
+
+NOTIFY pgrst, 'reload schema';

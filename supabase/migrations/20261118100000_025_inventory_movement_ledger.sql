@@ -22,16 +22,18 @@ CREATE TABLE IF NOT EXISTS public.inventory_movements (
   product_id uuid,
   variant_id uuid,
   movement_sequence integer NOT NULL CHECK (movement_sequence > 0),
-  movement_type text NOT NULL CHECK (movement_type IN ('reserved', 'released')),
+  movement_type text NOT NULL CHECK (movement_type IN ('reserved', 'released', 'consumed')),
   quantity integer NOT NULL CHECK (quantity > 0),
-  quantity_delta integer NOT NULL CHECK (quantity_delta <> 0),
-  reason text NOT NULL CHECK (reason IN ('checkout', 'cancellation', 'archive', 'restore')),
+  quantity_delta integer NOT NULL,
+  reason text NOT NULL CHECK (reason IN ('checkout', 'cancellation', 'archive', 'restore', 'delivery')),
   actor_id uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
   CHECK (
     (movement_type = 'reserved' AND quantity_delta = -quantity)
     OR
     (movement_type = 'released' AND quantity_delta = quantity)
+    OR
+    (movement_type = 'consumed' AND quantity_delta = 0)
   )
 );
 
@@ -75,10 +77,11 @@ UPDATE public.order_items i
 SET stock_reserved = (
       i.stock_tracked
       AND o.archived_at IS NULL
-      AND o.status <> 'cancelled'
+      AND o.status NOT IN ('cancelled', 'delivered')
+      AND o.archived_at IS NULL
     ),
     inventory_movement_sequence = CASE
-      WHEN i.stock_tracked AND (o.archived_at IS NOT NULL OR o.status = 'cancelled') THEN 2
+      WHEN i.stock_tracked AND (o.archived_at IS NOT NULL OR o.status IN ('cancelled', 'delivered')) THEN 2
       WHEN i.stock_tracked THEN 1
       ELSE 0
     )
@@ -146,6 +149,20 @@ FROM public.order_items i
 JOIN public.orders o ON o.id = i.order_id
 WHERE i.stock_tracked
   AND (o.archived_at IS NOT NULL OR o.status = 'cancelled')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.inventory_movements (
+  order_id, order_item_id, order_number, product_id, variant_id,
+  movement_sequence, movement_type, quantity, quantity_delta, reason
+)
+SELECT
+  o.id, i.id, o.order_number, i.stock_product_id_snapshot, i.stock_variant_id_snapshot,
+  2, 'consumed', i.quantity, 0, 'delivery'
+FROM public.order_items i
+JOIN public.orders o ON o.id = i.order_id
+WHERE i.stock_tracked
+  AND o.status = 'delivered'
+  AND o.archived_at IS NULL
 ON CONFLICT DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.record_order_item_stock_reservation()
@@ -244,8 +261,8 @@ BEGIN
     RAISE EXCEPTION 'ACCES_REFUSE';
   END IF;
 
-  IF p_action NOT IN ('release', 'reserve')
-     OR p_reason NOT IN ('cancellation', 'archive', 'restore') THEN
+  IF p_action NOT IN ('release', 'reserve', 'consume')
+     OR p_reason NOT IN ('cancellation', 'archive', 'restore', 'delivery') THEN
     RAISE EXCEPTION 'MOUVEMENT_STOCK_INVALIDE';
   END IF;
 
@@ -327,10 +344,25 @@ BEGIN
         v_item.stock_product_id_snapshot, v_item.stock_variant_id_snapshot,
         v_next_sequence, 'reserved', v_item.quantity, -v_item.quantity, p_reason, auth.uid()
       );
+    ELSIF p_action = 'consume' AND v_item.stock_reserved THEN
+      v_next_sequence := v_item.inventory_movement_sequence + 1;
+      UPDATE public.order_items
+      SET stock_reserved = false,
+          inventory_movement_sequence = v_next_sequence
+      WHERE id = v_item.id;
+
+      INSERT INTO public.inventory_movements (
+        order_id, order_item_id, order_number, product_id, variant_id,
+        movement_sequence, movement_type, quantity, quantity_delta, reason, actor_id
+      ) VALUES (
+        v_order.id, v_item.id, v_order.order_number,
+        v_item.stock_product_id_snapshot, v_item.stock_variant_id_snapshot,
+        v_next_sequence, 'consumed', v_item.quantity, 0, p_reason, auth.uid()
+      );
     END IF;
   END LOOP;
 END;
-$$;
+$;
 
 REVOKE ALL ON FUNCTION public.apply_order_inventory_movement(uuid, text, text)
   FROM PUBLIC, anon, authenticated;
@@ -374,6 +406,8 @@ BEGIN
 
   IF p_status = 'cancelled' THEN
     PERFORM public.apply_order_inventory_movement(p_order_id, 'release', 'cancellation');
+  ELSIF p_status = 'delivered' THEN
+    PERFORM public.apply_order_inventory_movement(p_order_id, 'consume', 'delivery');
   END IF;
 
   UPDATE public.orders

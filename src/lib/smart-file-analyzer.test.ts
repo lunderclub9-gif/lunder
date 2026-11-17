@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeMaterialsCsv, validateExtractedMaterial } from './smart-file-analyzer'
+import { analyzeMaterialsCsv, compareSupplierQuotes, validateExtractedMaterial } from './smart-file-analyzer'
 
 describe('smart file analyzer CSV extraction', () => {
   it('extracts BOM material rows with semicolon delimiters and quoted values', () => {
@@ -40,4 +40,28 @@ describe('smart file analyzer CSV extraction', () => {
     expect(() => analyzeMaterialsCsv('Material,Quantity,Unit Price\n"PVC,2,100')).toThrow('CSV_GUILLEMET_NON_FERME')
     expect(() => analyzeMaterialsCsv('  ')).toThrow('FICHIER_VIDE')
   })
+  it('compares matched supplier prices and reports unmatched materials', () => {
+    const first = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price,Supplier\\nPVC Board,1,piece,1500,Alpha\\nAluminum,1,meter,450,Alpha')
+    const second = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price,Supplier\\nPVC Board,1,piece,1350,Beta\\nSteel,1,kg,700,Beta')
+    const result = compareSupplierQuotes(first, second)
+    expect(result.matched).toHaveLength(1)
+    expect(result.matched[0]).toMatchObject({
+      materialName: 'PVC Board',
+      firstPriceDzd: 1500,
+      secondPriceDzd: 1350,
+      differenceDzd: -150,
+      cheaper: 'second',
+      firstSupplier: 'Alpha',
+      secondSupplier: 'Beta',
+    })
+    expect(result.onlyFirst).toEqual(['Aluminum'])
+    expect(result.onlySecond).toEqual(['Steel'])
+  })
+
+  it('rejects duplicate normalized materials in a supplier quotation', () => {
+    const first = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price\\nPVC Board,1,piece,1500\\nPVC Board,2,piece,1400')
+    const second = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price\\nPVC Board,1,piece,1300')
+    expect(() => compareSupplierQuotes(first, second)).toThrow('MATERIAU_DUPLIQUE_DANS_DEVIS_FOURNISSEUR')
+  })
+
 })

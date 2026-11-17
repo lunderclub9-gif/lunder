@@ -27,6 +27,8 @@ type Quote = {
   price_dzd: number
   currency_code: string
   delivery_price_dzd: number | null
+  accepted_at: string | null
+  accepted_snapshot_hash: string | null
   production_lead_days: number | null
   valid_until: string
   terms: string | null

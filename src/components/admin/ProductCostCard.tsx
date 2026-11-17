@@ -62,7 +62,7 @@ export default function ProductCostCard({ productId }: { productId: string }) {
   useEffect(() => {
     ;(async () => {
       const [{ data: mats }, { data: cost }] = await Promise.all([
-        supabase.from('materials').select('id, name, cost_per_kg_dzd').eq('is_active', true).order('name'),
+        supabase.from('materials').select('id, name, cost_per_kg_dzd').eq('is_active', true).eq('unit_type', 'kg').eq('unit_cost_configured', true).order('name'),
         supabase.from('product_costs').select('*').eq('product_id', productId).maybeSingle(),
       ])
       setMaterials((mats as Material[]) ?? [])

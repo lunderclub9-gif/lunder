@@ -108,7 +108,7 @@ export default function SmartFileAnalyzerPage() {
         ...patch,
         issues: [],
         confidence: 'high',
-        reviewDecision: 'pending',
+        reviewDecision: patch.reviewDecision ?? 'pending',
       } : row),
     }) : current)
   }

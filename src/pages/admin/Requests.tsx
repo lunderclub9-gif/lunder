@@ -25,6 +25,8 @@ type Quote = {
   id: string
   version: number
   price_dzd: number
+  currency_code: string
+  delivery_price_dzd: number | null
   production_lead_days: number | null
   valid_until: string
   terms: string | null

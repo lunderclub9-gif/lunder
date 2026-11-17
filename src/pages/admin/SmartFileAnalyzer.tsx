@@ -82,7 +82,7 @@ export default function SmartFileAnalyzerPage() {
     setComparisonAnalysis(null)
     setComparisonFileName('')
     if (!file) return
-    if (file.size > 5 * 1024 * 1024 || !/\\.(csv|tsv)$/i.test(file.name)) {
+    if (file.size > 5 * 1024 * 1024 || !/\.(csv|tsv)$/i.test(file.name)) {
       setComparisonError('Le second fichier doit être CSV/TSV et ne pas dépasser 5 Mo.')
       return
     }

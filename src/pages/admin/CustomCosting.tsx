@@ -126,10 +126,7 @@ export default function CustomCostingPage() {
     setSettings((current) => ({ ...current, [key]: Number(value) }))
   }
 
-  const saveSettings = async () => {
-    setSavingSettings(true)
-    setError(null)
-    setNotice(null)
+  const persistSettings = async (): Promise<boolean> => {
     const { error: saveError } = await supabase.from('manufacturing_cost_settings').upsert({
       id: true,
       labor_hour_rate_dzd: Math.round(settings.laborHourRateDzd),
@@ -142,8 +139,16 @@ export default function CustomCostingPage() {
       minimum_quote_dzd: Math.round(settings.minimumQuoteDzd),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' })
+    return !saveError
+  }
+
+  const saveSettings = async () => {
+    setSavingSettings(true)
+    setError(null)
+    setNotice(null)
+    const saved = await persistSettings()
     setSavingSettings(false)
-    if (saveError) setError('Impossible d’enregistrer les paramètres de coût.')
+    if (!saved) setError('Impossible d’enregistrer les paramètres de coût.')
     else setNotice('Paramètres de fabrication enregistrés.')
   }
 
@@ -157,6 +162,12 @@ export default function CustomCostingPage() {
     setCreatingQuote(true)
     setError(null)
     setNotice(null)
+    const settingsSaved = await persistSettings()
+    if (!settingsSaved) {
+      setCreatingQuote(false)
+      setError('Les paramètres affichés n’ont pas pu être enregistrés. Le devis n’a pas été créé afin d’éviter un écart entre l’aperçu et le prix serveur.')
+      return
+    }
     const { data, error: quoteError } = await supabase.rpc('create_custom_quote_from_costing', {
       p_request_id: requestId,
       p_material_lines: materialLines.map((line) => ({ material_id: line.materialId, quantity: line.quantity })),

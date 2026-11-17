@@ -250,7 +250,8 @@ export default function CustomCostingPage() {
             ['Coût de revient', estimate.value.costBeforeMarginDzd],
             ['Bénéfice brut', estimate.value.profitDzd],
             ['Taxes', estimate.value.taxDzd],
-          ] as Array<[string, number]>).map(([label, value]) => <div key={label} className="rounded-lg bg-charcoal-950 p-3"><p className="text-xs text-charcoal-400">{label}</p><p className="mt-1 font-semibold text-offwhite">{formatDzd(value)}</p></div>)}
+            ['Temps de production estimé', estimate.value.estimatedProductionHours],
+          ] as Array<[string, number]>).map(([label, value]) => <div key={label} className="rounded-lg bg-charcoal-950 p-3"><p className="text-xs text-charcoal-400">{label}</p><p className="mt-1 font-semibold text-offwhite">{label === 'Temps de production estimé' ? `${value.toFixed(2)} h` : formatDzd(value)}</p></div>)}
           <div className="rounded-lg border border-brand-red/30 bg-brand-red/5 p-3 sm:col-span-2 lg:col-span-3"><p className="text-xs text-charcoal-300">Prix de vente estimé (DZD)</p><p className="mt-1 text-2xl font-bold text-offwhite">{formatDzd(estimate.value.finalPriceDzd)}</p><p className="text-xs text-charcoal-400">Marge brute {estimate.value.marginPercent}% · perte {estimate.value.wastePercent}% · taxe {estimate.value.taxPercent}%</p></div>
         </div> : <p className="text-sm text-amber-300">Aperçu indisponible : {estimate.error}. Configurez les taux et les prix des matières, ou complétez les quantités.</p>}
         <div className="grid gap-3 sm:grid-cols-2">

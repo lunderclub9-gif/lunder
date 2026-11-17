@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowDownWideNarrow, Package, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
 import { supabase, type Product, type Category } from '@/lib/supabase'
@@ -13,6 +13,8 @@ export default function ProductsPage() {
   const [failed, setFailed] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('q') ?? '')
+  const requestSequence = useRef(0)
   const [activeCategory, setActiveCategory] = useState<string>('')
   const [sortOrder, setSortOrder] = useState<'newest' | 'price-asc' | 'price-desc'>('newest')
 
@@ -40,7 +42,13 @@ export default function ProductsPage() {
     setSearch((current) => (current === urlQuery ? current : urlQuery))
   }, [urlQuery])
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 250)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
   const loadProducts = useCallback(async () => {
+    const requestId = ++requestSequence.current
     setLoading(true)
     setFailed(false)
     let query = supabase
@@ -50,7 +58,7 @@ export default function ProductsPage() {
 
     if (activeCategory) query = query.eq('category_id', activeCategory)
 
-    const term = sanitizeSearchTerm(search)
+    const term = sanitizeSearchTerm(debouncedSearch)
     if (term) query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`)
 
     if (sortOrder === 'price-asc') query = query.order('price_dzd', { ascending: true })
@@ -58,6 +66,7 @@ export default function ProductsPage() {
     else query = query.order('created_at', { ascending: false })
 
     const { data, error } = await query
+    if (requestId !== requestSequence.current) return
     if (error) {
       console.error('[LUNDER] chargement des produits impossible', error.code ?? 'erreur inconnue')
       setProducts([])
@@ -69,7 +78,7 @@ export default function ProductsPage() {
     setProducts((data as Product[]) ?? [])
     setFailed(false)
     setLoading(false)
-  }, [activeCategory, search, sortOrder])
+  }, [activeCategory, debouncedSearch, sortOrder])
 
   useEffect(() => {
     void loadProducts()

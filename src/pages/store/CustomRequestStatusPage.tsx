@@ -10,6 +10,8 @@ type Quote = {
   version: number
   public_token: string
   price_dzd: number
+  currency_code: string
+  delivery_price_dzd: number | null
   production_lead_days: number | null
   valid_until: string
   terms: string | null
@@ -253,6 +255,26 @@ export default function CustomRequestStatusPage() {
                   : ''}
                 {quote.source === 'automatic' ? ' · estimation automatique' : ' · devis manuel'}
               </p>
+              {quote.delivery_price_dzd != null ? (
+                <div className="mt-2 rounded-lg border border-charcoal-700 bg-charcoal-900/60 px-3 py-2 text-xs">
+                  <div className="flex justify-between gap-3 text-charcoal-300">
+                    <span>Fabrication</span>
+                    <span>{formatDzd(quote.price_dzd)}</span>
+                  </div>
+                  <div className="mt-1 flex justify-between gap-3 text-charcoal-300">
+                    <span>Livraison</span>
+                    <span>{formatDzd(quote.delivery_price_dzd)}</span>
+                  </div>
+                  <div className="mt-2 flex justify-between gap-3 border-t border-charcoal-700 pt-2 font-semibold text-offwhite">
+                    <span>Total à payer à la livraison</span>
+                    <span>{formatDzd(quote.price_dzd + quote.delivery_price_dzd)}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-amber-300">
+                  Les frais de livraison de cette ancienne version ne sont pas figés. Contactez le studio pour recevoir un devis actualisé.
+                </p>
+              )}
               {quote.breakdown?.lines && quote.breakdown.lines.length > 0 && (
                 <ul className="mt-2 space-y-0.5 text-xs text-charcoal-300">
                   {quote.breakdown.lines.map((line, index) => (
@@ -288,7 +310,7 @@ export default function CustomRequestStatusPage() {
                   Ce devis a expiré. Contactez le studio pour demander une nouvelle version.
                 </p>
               )}
-              {canCustomerDecideCustomQuote({ quoteStatus: quote.status, validUntil: quote.valid_until, today }) && (
+              {quote.delivery_price_dzd != null && canCustomerDecideCustomQuote({ quoteStatus: quote.status, validUntil: quote.valid_until, today }) && (
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <button
                     type="button"

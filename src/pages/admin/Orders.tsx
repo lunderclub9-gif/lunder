@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
-import { ChevronDown, Loader2, Package, Printer, Search, Trash2 } from 'lucide-react'
+import { ArchiveRestore, ChevronDown, Loader2, Package, Printer, Search, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
@@ -157,6 +157,27 @@ export default function AdminOrders() {
       return
     }
     setDeleteError(null)
+    await load(searchText)
+  }
+
+  const restoreOrder = async (order: OrderRow) => {
+    setDeleteError(null)
+    if (!(await confirmAction({
+      title: 'Restaurer cette commande ?',
+      description: order.status === 'cancelled'
+        ? `La commande ${order.order_number} sera retirée des archives. Le stock ne sera pas réservé car elle est annulée.`
+        : `La commande ${order.order_number} sera restaurée et son stock sera réservé à nouveau. La restauration échouera si le stock disponible est insuffisant.`,
+      confirmLabel: 'Restaurer',
+    }))) return
+    setDeletingId(order.id)
+    const { error: rpcError } = await supabase.rpc('restore_archived_order', {
+      p_order_id: order.id,
+    })
+    setDeletingId(null)
+    if (rpcError) {
+      setDeleteError(orderErrorMessage(rpcError.message, 'Impossible de restaurer cette commande.'))
+      return
+    }
     await load(searchText)
   }
 
@@ -326,7 +347,23 @@ export default function AdminOrders() {
                       {order.note && <p className="mt-1 text-charcoal-400">Note : {order.note}</p>}
                     </div>
 
-                    {(NEXT_ACTIONS[order.status] ?? []).length > 0 && (
+                    {order.archived_at && (
+                      <button
+                        type="button"
+                        disabled={deletingId === order.id}
+                        onClick={() => restoreOrder(order)}
+                        className="btn-primary"
+                      >
+                        {deletingId === order.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArchiveRestore className="h-4 w-4" />
+                        )}
+                        Restaurer la commande
+                      </button>
+                    )}
+
+                    {!order.archived_at && (NEXT_ACTIONS[order.status] ?? []).length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {(NEXT_ACTIONS[order.status] ?? []).map((action) => (
                           <button

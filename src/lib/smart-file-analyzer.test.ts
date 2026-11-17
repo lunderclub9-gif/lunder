@@ -41,8 +41,8 @@ describe('smart file analyzer CSV extraction', () => {
     expect(() => analyzeMaterialsCsv('  ')).toThrow('FICHIER_VIDE')
   })
   it('compares matched supplier prices and reports unmatched materials', () => {
-    const first = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price,Supplier\\nPVC Board,1,piece,1500,Alpha\\nAluminum,1,meter,450,Alpha')
-    const second = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price,Supplier\\nPVC Board,1,piece,1350,Beta\\nSteel,1,kg,700,Beta')
+    const first = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price,Supplier\nPVC Board,1,piece,1500,Alpha\nAluminum,1,meter,450,Alpha')
+    const second = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price,Supplier\nPVC Board,1,piece,1350,Beta\nSteel,1,kg,700,Beta')
     const result = compareSupplierQuotes(first, second)
     expect(result.matched).toHaveLength(1)
     expect(result.matched[0]).toMatchObject({
@@ -59,8 +59,8 @@ describe('smart file analyzer CSV extraction', () => {
   })
 
   it('rejects duplicate normalized materials in a supplier quotation', () => {
-    const first = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price\\nPVC Board,1,piece,1500\\nPVC Board,2,piece,1400')
-    const second = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price\\nPVC Board,1,piece,1300')
+    const first = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price\nPVC Board,1,piece,1500\nPVC Board,2,piece,1400')
+    const second = analyzeMaterialsCsv('Material,Quantity,Unit,Unit Price\nPVC Board,1,piece,1300')
     expect(() => compareSupplierQuotes(first, second)).toThrow('MATERIAU_DUPLIQUE_DANS_DEVIS_FOURNISSEUR')
   })
 

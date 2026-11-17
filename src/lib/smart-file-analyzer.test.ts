@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeMaterialsCsv, compareSupplierQuotes, validateExtractedMaterial } from './smart-file-analyzer'
+import { analyzeMaterialsCsv, compareSupplierQuotes, findDuplicateMaterialRows, validateExtractedMaterial } from './smart-file-analyzer'
 
 describe('smart file analyzer CSV extraction', () => {
   it('extracts BOM material rows with semicolon delimiters and quoted values', () => {

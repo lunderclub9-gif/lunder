@@ -29,8 +29,8 @@ export default function ProductCostMaterialsPage() {
   const addMaterial = async () => {
     setError(null)
     const cost = Number(materialCost)
-    if (!materialName.trim() || !Number.isFinite(cost) || cost < 0) {
-      setError('Renseignez un nom de matière et un coût au kilo valide.')
+    if (!materialName.trim() || !Number.isFinite(cost) || cost <= 0) {
+      setError('Renseignez un nom de matière et un coût strictement positif par unité.')
       return
     }
     setBusy(true)
@@ -93,7 +93,7 @@ export default function ProductCostMaterialsPage() {
             {materials.map((material) => <li key={material.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <div><p className="text-sm font-medium text-offwhite">{material.name}</p><p className="text-xs text-charcoal-500">{material.unit_cost_configured ? `Prix configuré · ${material.unit_type === 'piece' ? 'pièce' : material.unit_type === 'meter' ? 'mètre' : material.unit_type === 'm2' ? 'm²' : 'kg'}` : 'Prix à configurer avant tout devis'}</p></div>
               <div className="flex items-center gap-2">
-                <label className="sr-only" htmlFor={`material-cost-${material.id}`}>Coût au kilo de {material.name}</label>
+                <label className="sr-only" htmlFor={`material-cost-${material.id}`}>Coût par unité de {material.name}</label>
                 <input id={`material-cost-${material.id}`} type="number" min={0} step={1} defaultValue={material.unit_cost_dzd} onBlur={(event) => void updateMaterialCost(material, event.target.value)} className="input-field w-32 py-2" />
                 <span className="text-xs text-charcoal-400">DA / {material.unit_type === 'piece' ? 'pièce' : material.unit_type === 'meter' ? 'm' : material.unit_type === 'm2' ? 'm²' : 'kg'}</span>
                 <button type="button" onClick={() => void deleteMaterial(material)} className="btn-icon-danger" aria-label={`Supprimer ${material.name}`}><Trash2 className="h-4 w-4" /></button>

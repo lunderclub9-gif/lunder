@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X, FileSpreadsheet,
-  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins,
+  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins, Users,
   BarChart3, PanelLeftClose, PanelLeftOpen, Palette, ChevronRight,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -15,6 +15,7 @@ const navGroups = [
   { label: 'Vue d’ensemble', items: [{ to: '/admin/dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
   { label: 'Ventes & opérations', items: [
     { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },
+    { to: '/admin/clients', label: 'Clients', icon: Users },
     { to: '/admin/livraison', label: 'Livraison', icon: Truck },
     { to: '/admin/demandes', label: 'Demandes sur mesure', icon: ClipboardList, badge: true },
   ] },

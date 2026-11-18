@@ -148,7 +148,6 @@ export default function AdminCustomers() {
           : visible.length === 0 ? <div className="py-16 text-center"><Users className="mx-auto mb-3 h-9 w-9 text-charcoal-600" /><p className="font-semibold text-white">Aucun client trouvé</p><p className="mt-1 text-xs text-charcoal-500">Les clients apparaissent après leur première commande.</p></div>
           : <div className="space-y-3">
             {visible.map((customer) => {
-              const latest = customer.orders[0]
               const isExpanded = expanded === customer.key
               const phoneHref = toTelHref(customer.phone)
               const whatsappHref = toWhatsAppHref(customer.phone)

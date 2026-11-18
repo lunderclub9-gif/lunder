@@ -151,6 +151,7 @@ export default function AdminRequests() {
     const allRequests: RequestRow[] = []
     let offset = 0
     let queryError: Error | null = null
+    let materialError: Error | null = null
     let mats: { name: string }[] | null = null
 
     while (true) {
@@ -175,9 +176,7 @@ export default function AdminRequests() {
         queryError = requestResult.error
         break
       }
-      if (materialResult?.error) {
-        setError('Les demandes sont chargées, mais la liste des matières est indisponible.')
-      }
+      if (materialResult?.error) materialError = materialResult.error
       if (materialResult) mats = (materialResult.data as { name: string }[]) ?? []
       const batch = (requestResult.data as RequestRow[]) ?? []
       allRequests.push(...batch)
@@ -190,10 +189,11 @@ export default function AdminRequests() {
       setError('Impossible de charger toutes les demandes.')
       setRequests([])
     } else {
-      setError(null)
+      setError(materialError ? 'Les demandes sont chargées, mais la liste des matières est indisponible.' : null)
       setRequests(allRequests)
     }
     if (mats) setMaterials(mats)
+    else if (materialError) setMaterials([])
     setLoading(false)
   }, [view])
 

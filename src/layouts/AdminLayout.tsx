@@ -88,6 +88,22 @@ export default function AdminLayout() {
 
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
 
+  // Keep the document itself from scrolling: the admin content and sidebar
+  // already own their scroll areas, so the browser-level scrollbar is redundant.
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const previousHtmlOverflow = html.style.overflow
+    const previousBodyOverflow = body.style.overflow
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow
+      body.style.overflow = previousBodyOverflow
+    }
+  }, [])
+
   const handleSignOut = async () => {
     await supabase.rpc('log_owner_event', { p_action: 'proprietaire.deconnexion' })
     await signOut()

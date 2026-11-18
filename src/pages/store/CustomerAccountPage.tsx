@@ -2,12 +2,47 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight, CheckCircle2, CircleUserRound, ClipboardList, Eye, EyeOff,
-  KeyRound, Loader2, LogOut, Mail, PackageSearch, ShieldCheck, Sparkles, UserRound,
+  FileText, KeyRound, Loader2, LogOut, Mail, PackageSearch, RefreshCw, ShieldCheck, Sparkles, UserRound,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
 type Mode = 'login' | 'register'
+
+type AccountOrder = {
+  id: string
+  order_number: string
+  status: string
+  total_dzd: number
+  created_at: string
+  order_items: { product_name: string; quantity: number }[] | null
+}
+
+type AccountRequest = {
+  id: string
+  request_number: string
+  title: string
+  status: string
+  created_at: string
+  custom_quotes: { version: number; status: string; price_dzd: number; valid_until: string }[] | null
+}
+
+const orderStatusLabels: Record<string, string> = {
+  pending: 'En attente', confirmed: 'Confirmée', shipped: 'Expédiée',
+  delivered: 'Livrée', cancelled: 'Annulée',
+}
+const requestStatusLabels: Record<string, string> = {
+  new: 'Nouvelle', reviewing: 'En étude', quoted: 'Devis envoyé',
+  approved: 'Approuvée', rejected: 'Refusée', closed: 'Clôturée',
+}
+const quoteStatusLabels: Record<string, string> = {
+  sent: 'À consulter', approved: 'Accepté', rejected: 'Refusé', expired: 'Expiré',
+}
+const formatAccountDate = (value: string) => new Intl.DateTimeFormat('fr-DZ', {
+  dateStyle: 'medium',
+}).format(new Date(value))
+const formatAccountPrice = (value: number) => new Intl.NumberFormat('fr-DZ').format(value) + ' DA'
+
 
 export default function CustomerAccountPage() {
   const { session, profile, loading: authLoading, profileUnavailable, signOut } = useAuth()
@@ -24,10 +59,58 @@ export default function CustomerAccountPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [resetEmailSent, setResetEmailSent] = useState(false)
+  const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([])
+  const [accountRequests, setAccountRequests] = useState<AccountRequest[]>([])
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [activityError, setActivityError] = useState<string | null>(null)
 
   useEffect(() => {
     setEditName(profile?.full_name ?? '')
   }, [profile?.full_name])
+  
+  useEffect(() => {
+    const userId = session?.user.id
+    if (!userId) {
+      setAccountOrders([])
+      setAccountRequests([])
+      return
+    }
+
+    let active = true
+    const loadActivity = async () => {
+      setActivityLoading(true)
+      setActivityError(null)
+      const [ordersResult, requestsResult] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('id, order_number, status, total_dzd, created_at, order_items(product_name, quantity)')
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('custom_requests')
+          .select('id, request_number, title, status, created_at, custom_quotes(version, status, price_dzd, valid_until)')
+          .order('created_at', { ascending: false })
+          .limit(20),
+      ])
+
+      if (!active) return
+      if (ordersResult.error || requestsResult.error) {
+        setActivityError('Impossible de charger tout votre historique. Vérifiez votre connexion puis actualisez la page.')
+      } else {
+        setAccountOrders((ordersResult.data ?? []) as AccountOrder[])
+        setAccountRequests((requestsResult.data ?? []) as AccountRequest[])
+      }
+      setActivityLoading(false)
+    }
+
+    void loadActivity().catch(() => {
+      if (!active) return
+      setActivityError('Une erreur inattendue a empêché le chargement de votre historique.')
+      setActivityLoading(false)
+    })
+
+    return () => { active = false }
+  }, [session?.user.id])
 
   const handleAuth = async (event: FormEvent) => {
     event.preventDefault()
@@ -179,6 +262,7 @@ export default function CustomerAccountPage() {
           </form>
         </section>
       ) : (
+        <>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,.75fr)]">
           <section className="rounded-2xl border border-white/10 bg-charcoal-800/80 p-5 sm:p-7">
             <div className="mb-6 flex items-center gap-3">
@@ -211,9 +295,77 @@ export default function CustomerAccountPage() {
               <span className="min-w-0 flex-1"><strong className="block text-sm text-white">Nouvelle demande sur mesure</strong><span className="mt-1 block text-xs text-charcoal-400">Décrivez votre idée et recevez une estimation</span></span><ArrowRight className="h-4 w-4 text-charcoal-500 transition group-hover:translate-x-1 group-hover:text-brand-red-light" />
             </Link>
             <button type="button" onClick={handleSignOut} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-charcoal-300 transition hover:border-red-400/30 hover:bg-red-500/5 hover:text-red-200"><LogOut className="h-4 w-4" /> Se déconnecter</button>
-            <p className="px-1 text-[11px] leading-5 text-charcoal-500">Le suivi des commandes invitées reste accessible avec votre référence de commande et votre numéro de téléphone.</p>
+            <p className="px-1 text-[11px] leading-5 text-charcoal-500">Les commandes invitées restent consultables avec leur référence et le numéro de téléphone utilisé.</p>
           </section>
         </div>
+
+        <section className="mt-6 rounded-2xl border border-white/10 bg-charcoal-800/70 p-5 sm:p-7">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-bold text-white"><FileText className="h-5 w-5 text-brand-red-light" /> Mes commandes et demandes</h2>
+              <p className="mt-1 text-xs text-charcoal-400">Historique associé à ce compte, visible uniquement après connexion.</p>
+            </div>
+            <button type="button" onClick={() => window.location.reload()} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-charcoal-200 transition hover:border-brand-red/40 hover:text-white" aria-label="Actualiser l’historique">
+              <RefreshCw className="h-3.5 w-3.5" /> Actualiser
+            </button>
+          </div>
+
+          {activityLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-charcoal-400"><Loader2 className="h-5 w-5 animate-spin text-brand-red" /> Chargement de votre historique…</div>
+          ) : activityError ? (
+            <div role="alert" className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 text-sm text-amber-200">{activityError}</div>
+          ) : (
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-bold text-white">Commandes</h3><span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-charcoal-300">{accountOrders.length}</span></div>
+                {accountOrders.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-white/10 px-4 py-7 text-center text-xs text-charcoal-400">Aucune commande liée à ce compte pour le moment.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {accountOrders.map((order) => (
+                      <li key={order.id} className="rounded-xl border border-white/10 bg-charcoal-950/40 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div><p className="text-sm font-bold text-white">{order.order_number}</p><p className="mt-1 text-[11px] text-charcoal-400">{formatAccountDate(order.created_at)}</p></div>
+                          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-charcoal-200">{orderStatusLabels[order.status] ?? order.status}</span>
+                        </div>
+                        <p className="mt-3 text-xs text-charcoal-300">{(order.order_items ?? []).reduce((sum, item) => sum + item.quantity, 0)} article(s) · {formatAccountPrice(order.total_dzd)}</p>
+                        <Link to="/boutique/suivi" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-red-light hover:text-white">Détails et suivi <ArrowRight className="h-3.5 w-3.5" /></Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-bold text-white">Fabrication sur mesure</h3><span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-charcoal-300">{accountRequests.length}</span></div>
+                {accountRequests.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-white/10 px-4 py-7 text-center text-xs text-charcoal-400">Aucune demande liée à ce compte pour le moment.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {accountRequests.map((request) => (
+                      <li key={request.id} className="rounded-xl border border-white/10 bg-charcoal-950/40 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0"><p className="text-sm font-bold text-white">{request.request_number}</p><p className="mt-1 truncate text-xs text-charcoal-300">{request.title}</p></div>
+                          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-charcoal-200">{requestStatusLabels[request.status] ?? request.status}</span>
+                        </div>
+                        <p className="mt-2 text-[11px] text-charcoal-400">{formatAccountDate(request.created_at)}</p>
+                        {(request.custom_quotes ?? []).length > 0 && (
+                          <div className="mt-3 space-y-1 border-t border-white/10 pt-3">
+                            {(request.custom_quotes ?? []).map((quote) => (
+                              <p key={quote.version} className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="text-charcoal-300">Devis v{quote.version} · {quoteStatusLabels[quote.status] ?? quote.status}</span><strong className="text-white">{formatAccountPrice(quote.price_dzd)}</strong></p>
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+          <p className="mt-5 border-t border-white/10 pt-4 text-[11px] leading-5 text-charcoal-500">Les demandes et commandes créées avant l’activation de cette liaison ne sont pas automatiquement attribuées à un compte. Elles restent accessibles via leur suivi habituel.</p>
+        </section>
+        </>
       )) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.8fr)]">
           <section className="rounded-2xl border border-white/10 bg-charcoal-800/80 p-5 sm:p-7">

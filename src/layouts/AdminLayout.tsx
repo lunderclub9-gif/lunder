@@ -1,9 +1,10 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X, FileSpreadsheet,
-  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins, BarChart3, PanelLeftClose, PanelLeftOpen, Palette,
+  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins,
+  BarChart3, PanelLeftClose, PanelLeftOpen, Palette, ChevronRight,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { AdminNotificationsProvider } from '@/components/admin/AdminNotificationsProvider'
@@ -12,35 +13,57 @@ import { AdminConfirmProvider } from '@/components/admin/AdminConfirmProvider'
 
 const navGroups = [
   { label: 'Vue d’ensemble', items: [{ to: '/admin/dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
-  { label: 'Ventes et opérations', items: [
+  { label: 'Ventes & opérations', items: [
     { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },
     { to: '/admin/livraison', label: 'Livraison', icon: Truck },
-    { to: '/admin/demandes', label: 'Demandes sur mesure', icon: ClipboardList },
+    { to: '/admin/demandes', label: 'Demandes sur mesure', icon: ClipboardList, badge: true },
   ] },
   { label: 'Catalogue', items: [
     { to: '/admin/produits', label: 'Produits', icon: Package },
     { to: '/admin/categories', label: 'Catégories', icon: Tag },
   ] },
-  { label: 'Tarification', items: [
+  { label: 'Atelier & tarification', items: [
     { to: '/admin/couts-produits', label: 'Matières premières', icon: Coins },
-    { to: '/admin/tarification', label: 'Fabrication sur mesure', icon: Calculator },
+    { to: '/admin/tarification', label: 'Règles de fabrication', icon: Calculator },
     { to: '/admin/analyse-fichiers', label: 'Analyse de fichiers', icon: FileSpreadsheet },
     { to: '/admin/calcul-devis', label: 'Calculateur de devis', icon: Calculator },
   ] },
-  { label: 'Finances', items: [{ to: '/admin/finances', label: 'Centre financier', icon: BarChart3 }] },
-  { label: 'Configuration', items: [
+  { label: 'Pilotage', items: [{ to: '/admin/finances', label: 'Finances & rentabilité', icon: BarChart3 }] },
+  { label: 'Personnalisation', items: [
     { to: '/admin/visual-identity', label: 'Studio visuel', icon: Palette },
     { to: '/admin/parametres', label: 'Paramètres du magasin', icon: Settings },
   ] },
-  { label: 'Suivi', items: [{ to: '/admin/historique', label: 'Historique', icon: History }] },
+  { label: 'Journal', items: [{ to: '/admin/historique', label: 'Historique', icon: History }] },
 ]
+
+const routeTitles = navGroups.flatMap((group) => group.items).reduce<Record<string, string>>((result, item) => {
+  result[item.to] = item.label
+  return result
+}, {})
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return window.localStorage.getItem('lunder-admin-sidebar') === 'collapsed' }
+    catch { return false }
+  })
   const [newRequests, setNewRequests] = useState(0)
   const { signOut, profile } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const pageTitle = useMemo(() => {
+    const exact = routeTitles[location.pathname]
+    if (exact) return exact
+    if (location.pathname.startsWith('/admin/produits/')) return 'Fiche produit'
+    if (location.pathname.startsWith('/admin/visual-identity')) return 'Studio visuel'
+    return 'Espace propriétaire'
+  }, [location.pathname])
+
+  useEffect(() => {
+    try { window.localStorage.setItem('lunder-admin-sidebar', sidebarCollapsed ? 'collapsed' : 'expanded') }
+    catch { /* Storage may be unavailable; navigation still works. */ }
+  }, [sidebarCollapsed])
 
   useEffect(() => {
     let active = true
@@ -49,19 +72,21 @@ export default function AdminLayout() {
         .from('custom_requests')
         .select('*', { count: 'exact', head: true })
         .in('status', ['new', 'reviewing'])
-        .not('estimate_accepted_at', 'is', null)
+        .is('deletion_started_at', null)
       if (active) setNewRequests(count ?? 0)
     }
-    refresh()
-    const timer = setInterval(refresh, 60000)
-    const onFocus = () => refresh()
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 60000)
+    const onFocus = () => void refresh()
     window.addEventListener('focus', onFocus)
     return () => {
       active = false
-      clearInterval(timer)
+      window.clearInterval(timer)
       window.removeEventListener('focus', onFocus)
     }
   }, [])
+
+  useEffect(() => { setSidebarOpen(false) }, [location.pathname])
 
   const handleSignOut = async () => {
     await supabase.rpc('log_owner_event', { p_action: 'proprietaire.deconnexion' })
@@ -71,85 +96,78 @@ export default function AdminLayout() {
 
   return (
     <AdminConfirmProvider>
-    <AdminNotificationsProvider ownerId={profile?.id ?? null} navigate={navigate}>
-    <div className="admin-shell flex h-screen overflow-hidden bg-charcoal-950">
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
+      <AdminNotificationsProvider ownerId={profile?.id ?? null} navigate={navigate}>
+        <div className="admin-shell flex h-screen overflow-hidden bg-charcoal-950">
+          {sidebarOpen && (
+            <button type="button" aria-label="Fermer le menu" className="fixed inset-0 z-30 bg-black/70 backdrop-blur-sm md:hidden" onClick={() => setSidebarOpen(false)} />
+          )}
 
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 flex h-screen w-64 flex-col transform overflow-hidden border-r border-charcoal-400/10 bg-charcoal-900 transition-all duration-200 md:relative md:translate-x-0 ${sidebarCollapsed ? 'md:w-[4.75rem]' : 'md:w-64'} ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-charcoal-400/10 px-4">
-          <Link to="/admin/dashboard" className="flex items-center gap-2.5" onClick={() => setSidebarOpen(false)}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-red">
-              <Printer className="h-4 w-4 text-white" />
+          <aside className={`fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-white/[0.07] bg-[#111318] shadow-2xl transition-[width,transform] duration-300 md:relative md:translate-x-0 ${sidebarCollapsed ? 'md:w-[5rem]' : 'md:w-[17rem]'} w-[17rem] ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className="flex h-[4.5rem] shrink-0 items-center justify-between border-b border-white/[0.07] px-4">
+              <Link to="/admin/dashboard" className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-red shadow-lg shadow-brand-red/20"><Printer className="h-5 w-5 text-white" /></span>
+                <span className={`min-w-0 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
+                  <span className="block truncate text-sm font-black tracking-[0.12em] text-white">LUNDER</span>
+                  <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-charcoal-500">Studio de gestion</span>
+                </span>
+              </Link>
+              <button type="button" className="rounded-lg p-2 text-charcoal-400 hover:bg-white/5 md:hidden" onClick={() => setSidebarOpen(false)} aria-label="Fermer"><X className="h-5 w-5" /></button>
+              <button type="button" className="hidden rounded-lg p-2 text-charcoal-400 transition hover:bg-white/5 hover:text-white md:inline-flex" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? 'Développer la navigation' : 'Réduire la navigation'} title={sidebarCollapsed ? 'Développer' : 'Réduire'}>
+                {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              </button>
             </div>
-            <span className={`text-xs font-bold tracking-wide text-offwhite ${sidebarCollapsed ? "md:hidden" : ""}`}>LUNDER'S 3D</span>
-          </Link>
-          <button className="md:hidden" onClick={() => setSidebarOpen(false)} aria-label="Fermer">
-            <X className="h-5 w-5 text-charcoal-300" />
-          </button>
-          <button
-            type="button"
-            className="hidden rounded-lg p-2 text-charcoal-300 transition-colors hover:bg-charcoal-800 hover:text-offwhite md:inline-flex"
-            onClick={() => setSidebarCollapsed((current) => !current)}
-            aria-label={sidebarCollapsed ? "Développer la navigation" : "Réduire la navigation"}
-            title={sidebarCollapsed ? "Développer la navigation" : "Réduire la navigation"}
-          >
-            {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </button>
-        </div>
 
-        <nav aria-label="Navigation administrative" className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 pb-4 scrollbar-thin">
-          {navGroups.map((group) => (
-            <section key={group.label} aria-label={group.label}>
-              <h2 className={`mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-charcoal-500 ${sidebarCollapsed ? "md:sr-only" : ""}`}>{group.label}</h2>
-              <div className="flex flex-col gap-1">
-                {group.items.map((item) => (
-                  <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} title={sidebarCollapsed ? item.label : undefined} aria-label={sidebarCollapsed ? item.label : undefined} className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${sidebarCollapsed ? "md:justify-center md:px-2 md:relative" : ""} ${
-                      isActive ? 'bg-brand-red/10 text-brand-red' : 'text-charcoal-300 hover:bg-charcoal-800 hover:text-offwhite'
-                    }`
-                  }>
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    <span className={sidebarCollapsed ? "md:hidden" : ""}>{item.label}</span>
-                    {item.to === '/admin/demandes' && newRequests > 0 && <span className={`ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white ${sidebarCollapsed ? "md:absolute md:right-1 md:top-1" : ""}`}>{newRequests}</span>}
-                  </NavLink>
-                ))}
+            <nav aria-label="Navigation administrative" className="min-h-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-5 scrollbar-thin">
+              {navGroups.map((group) => (
+                <section key={group.label} aria-label={group.label}>
+                  <h2 className={`mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.2em] text-charcoal-500 ${sidebarCollapsed ? 'md:sr-only' : ''}`}>{group.label}</h2>
+                  <div className="space-y-1">
+                    {group.items.map((item) => (
+                      <NavLink key={item.to} to={item.to} title={sidebarCollapsed ? item.label : undefined} aria-label={sidebarCollapsed ? item.label : undefined} className={({ isActive }) => `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200 ${sidebarCollapsed ? 'md:justify-center md:px-2' : ''} ${isActive ? 'bg-brand-red/10 text-white ring-1 ring-inset ring-brand-red/20' : 'text-charcoal-400 hover:bg-white/[0.045] hover:text-white'}`}>
+                        {({ isActive }) => (
+                          <>
+                            {isActive && <span className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full bg-brand-red" />}
+                            <item.icon className={`h-[17px] w-[17px] shrink-0 ${isActive ? 'text-brand-red-light' : 'text-charcoal-500 group-hover:text-charcoal-200'}`} />
+                            <span className={`min-w-0 flex-1 truncate ${sidebarCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
+                            {item.badge && newRequests > 0 && <span className={`rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white ${sidebarCollapsed ? 'md:absolute md:-right-1 md:-top-1 md:px-1.5' : ''}`}>{newRequests > 99 ? '99+' : newRequests}</span>}
+                          </>
+                        )}
+                      </NavLink>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </nav>
+
+            <div className="shrink-0 border-t border-white/[0.07] p-3">
+              <div className={`mb-2 flex items-center gap-3 rounded-xl bg-white/[0.035] p-3 ${sidebarCollapsed ? 'md:justify-center md:px-1' : ''}`}>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-charcoal-700 text-[11px] font-bold text-charcoal-200">LD</span>
+                <span className={`min-w-0 flex-1 ${sidebarCollapsed ? 'md:hidden' : ''}`}><span className="block truncate text-xs font-semibold text-white">Propriétaire</span><span className="block truncate text-[10px] text-charcoal-500">{profile?.email ?? 'Compte administrateur'}</span></span>
               </div>
-            </section>
-          ))}
-        </nav>
+              <button onClick={handleSignOut} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold text-charcoal-400 transition hover:bg-red-500/10 hover:text-red-300 ${sidebarCollapsed ? 'md:justify-center md:px-2' : ''}`} title={sidebarCollapsed ? 'Déconnexion' : undefined}>
+                <LogOut className="h-4 w-4" /><span className={sidebarCollapsed ? 'md:hidden' : ''}>Déconnexion</span>
+              </button>
+            </div>
+          </aside>
 
-        <div className="shrink-0 border-t border-charcoal-400/10 bg-charcoal-900 p-3">
-          <button
-            onClick={handleSignOut}
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-charcoal-300 transition-colors hover:bg-charcoal-800 hover:text-offwhite ${sidebarCollapsed ? "md:justify-center md:px-2" : ""}`} title={sidebarCollapsed ? "Déconnexion" : undefined}
-          >
-            <LogOut className="h-4 w-4" />
-            <span className={sidebarCollapsed ? "md:hidden" : ""}>Déconnexion</span>
-          </button>
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <header className="z-20 flex h-[4.5rem] shrink-0 items-center justify-between border-b border-white/[0.07] bg-charcoal-950/95 px-4 backdrop-blur-xl md:px-7">
+              <div className="flex min-w-0 items-center gap-3">
+                <button className="rounded-xl border border-white/10 p-2 text-charcoal-200 hover:bg-white/5 md:hidden" onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu"><Menu className="h-5 w-5" /></button>
+                <div className="min-w-0">
+                  <div className="hidden items-center gap-1 text-[10px] font-medium uppercase tracking-[0.16em] text-charcoal-500 sm:flex"><span>LUNDER</span><ChevronRight className="h-3 w-3" /><span>Administration</span></div>
+                  <h1 className="truncate text-sm font-bold text-white md:text-base">{pageTitle}</h1>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-3"><span className="hidden rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1.5 text-[10px] font-semibold text-emerald-300 sm:inline-flex">Espace sécurisé</span><NotificationCenter /></div>
+            </header>
+
+            <main className="min-h-0 flex-1 overflow-y-auto scrollbar-thin bg-[radial-gradient(ellipse_at_top_left,rgba(190,35,52,0.055),transparent_38%)] p-4 md:p-7 xl:p-8">
+              <div className="mx-auto w-full max-w-[1600px]"><Outlet /></div>
+            </main>
+          </div>
         </div>
-      </aside>
-
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 items-center justify-between border-b border-charcoal-400/10 bg-charcoal-900 px-4 md:px-6">
-          <button className="md:hidden" onClick={() => setSidebarOpen(true)} aria-label="Menu">
-            <Menu className="h-6 w-6 text-charcoal-200" />
-          </button>
-          <span className="text-sm text-charcoal-400">Espace propriétaire</span>
-          <NotificationCenter />
-        </header>
-
-        <main className="flex-1 overflow-y-auto scrollbar-thin p-4 md:p-6">
-          <Outlet />
-        </main>
-      </div>
-    </div>
-    </AdminNotificationsProvider>
+      </AdminNotificationsProvider>
     </AdminConfirmProvider>
   )
 }

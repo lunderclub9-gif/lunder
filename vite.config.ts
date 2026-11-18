@@ -10,4 +10,17 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (/[\\/](@?react|react-dom|react-router|scheduler)[\\/]/.test(id)) return 'vendor-react'
+          if (id.includes('@supabase')) return 'vendor-supabase'
+          if (id.includes('posthog-js')) return 'vendor-analytics'
+          return undefined
+        },
+      },
+    },
+  },
 });

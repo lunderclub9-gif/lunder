@@ -10,12 +10,14 @@ manufacturing requests with versioned quotes, and an owner-only admin area at `/
 
 ## Status
 
-The repository contains the storefront, owner back office, custom-manufacturing workflow, finance MVP,
-security hardening, migration regression checks and unit tests. The 22 repository migrations have **not** been validated as one clean
-sequence against a disposable database. Two connected Supabase projects contain the LUNDER schema and
-data, but their migration histories differ (one records only two separate super-admin migrations; the
-other records none). The active deployment target has not been conclusively identified. Do not run
-`supabase db push` against either project until its migration baseline is reconciled.
+The `tayeb` branch contains the storefront, owner back office, custom-manufacturing workflow, finance MVP,
+customer account area, visual identity studio, security hardening, unit tests and seven SQL regression suites.
+Its 31 ordered migration files were replayed from a clean baseline in an isolated local Supabase CI job, and
+all seven SQL suites passed on the baseline commit `f1953917a038ef88db119b732a0c460c9447069f`. This validates
+the repository migration chain on a disposable database; it does **not** prove that either connected hosted
+Supabase project has the same schema or migration history. The connected projects have different migration
+histories. Do not run `supabase db push` against either live project until its identity, baseline and schema
+diff are reconciled and the production migration plan is explicitly approved.
 
 ## Architecture and trust boundaries
 
@@ -42,7 +44,7 @@ Every write that carries money, stock, privacy or status is only reachable throu
 | `create_custom_request(payload)` | `SECURITY DEFINER` | anon | Validates phone, dimensions, delivery and acceptance, computes the estimate server-side, verifies each uploaded path really exists in the private bucket before recording it |
 | `create_custom_quote(...)` | `SECURITY DEFINER` | owner | Computes the next version server-side and expires the previous `sent` quote, so only one version is ever approvable |
 | `create_custom_quote_from_estimate(request)` | `SECURITY DEFINER` | owner | Issues the next quote version directly from the stored automatic estimate, keeping the immutable snapshot |
-| `owner_approve_custom_request(quote, note)` | `SECURITY DEFINER` | owner | The only path from a valid `sent` or `accepted` quote to an order: locks quote and request, re-quotes delivery, creates exactly one order derived from the quote id, and is idempotent |
+| `owner_approve_custom_request(quote, note)` | `SECURITY DEFINER` | owner | The only path from the latest, unexpired customer-accepted quote with a valid immutable snapshot to an order; locks quote/request and is idempotent |
 | `owner_reject_custom_request(request, reason)` | `SECURITY DEFINER` | owner | Refuses the request and any open quote with an optional reason, without creating an order |
 | `delete_delivered_order(id, reason)` | `SECURITY DEFINER` | owner | Hard-deletes a `delivered` order only, after inserting an audit entry; related items/history are removed by cascade |
 | `get_order_by_token(token)` | `SECURITY DEFINER` | anon | Returns a full order only for a 128-bit token; there is no table access for guests |
@@ -98,9 +100,9 @@ checks `is_owner()` inside them; guest token/checkout/estimate endpoints are exp
 2. The customer may accept or refuse a valid `sent` quote, but acceptance is only a communication
    status and never creates an order. A refusal invalidates the quote but does not reject the request;
    only the owner can make the final request decision.
-3. The owner may approve an eligible, unexpired `sent` or `accepted` quote without waiting for the
-   customer's acceptance. Older quote versions expire when a new one is issued.
-4. Approval locks the quote and request rows, validates delivery and final DZD totals, and uses a
+3. The customer must accept the latest valid `sent` quote version. A quote that has not been accepted
+   cannot be approved by the owner; older versions expire when a new quote is issued.
+4. Owner approval then locks the quote and request rows, verifies the immutable accepted snapshot, validates delivery and final DZD totals, and uses a
    unique quote-linked idempotency key; retries return the existing order.
 
 ### Limits of this model
@@ -177,6 +179,15 @@ have been reconciled. Later files depend on `public.is_owner()` and earlier tabl
 | `20261116180000_020_custom_upload_storage_limits.sql` | server-side custom-upload folder path, file-count and aggregate-size limits | 019 |
 | `20261116190000_021_rls_performance_and_fk_indexes.sql` | consolidate overlapping read policies, cache auth identity in RLS, and index uncovered foreign keys | 020 |
 | `20261116200000_022_guest_estimate_rate_limits.sql` | IP/user throttling for public manufacturing estimates and repeated model-spec saves; only rate-limited estimate wrappers remain public | 021 |
+| `20261117230000_023_customer_quote_breakdown_allowlist.sql` | customer-safe allowlist for quote cost breakdowns | 022 |
+| `20261118000656_revoke_anon_access_to_private_tables.sql` | revoke anonymous direct access to private business tables | 023 |
+| `20261118090000_024_immutable_custom_quotations.sql` | immutable accepted quote snapshots, latest-version owner approval and safe quote-to-order creation | 023 |
+| `20261118100000_025_inventory_movement_ledger.sql` | auditable stock reservation/release/consumption ledger and safe archive/restore transitions | 024 |
+| `20261118110000_026_storage_atomic_quotas.sql` | atomic per-request upload count and size quotas | 025 |
+| `20261118120000_027_tracking_attempt_serialization.sql` | serialized tracking attempt limits to prevent concurrent rate-limit bypass | 026 |
+| `20261118130000_028_manufacturing_cost_engine.sql` | configurable material/labour/machine costing, margin/tax calculation and immutable costing snapshots | 027 |
+| `20261118140000_029_visual_identity_studio.sql` | owner-only visual identity publishing, version history and restoration | 028 |
+| `20261118150000_030_customer_account_ownership.sql` | authenticated customer ownership links and safe account-history views; committed on `tayeb`, not confirmed applied to production | 029 |
 
 A post-migration privilege regression script is provided at `supabase/tests/security_regression.sql`.
 
@@ -280,23 +291,24 @@ pas supprimables par cette action.
 
 ## Known open items
 
-- **Database validation is pending.** The full 001–020 chain has not been applied to a disposable
-  PostgreSQL/Supabase database. Two connected projects have the same broad LUNDER schema but different
-  row counts and migration histories; one contains two unrelated super-admin migration records, the
-  other has no migration records. The actual Vercel-to-Supabase production connection remains unverified.
-  Do not apply these migrations to either live project until a baseline/diff is reviewed and approved.
-- **Automated coverage is partial.** `npm test` runs the Vitest unit suite; it does not exercise RLS,
-  Postgres RPC transactions, Storage permissions, end-to-end customer flows or mobile layouts.
-- **Admin notifications remain incomplete.** The dashboard now uses real counters through an owner-only
-  RPC, but there is no durable read/unread notification center or event-driven notification delivery.
+- **Hosted database rollout is pending.** The complete repository migration chain has passed clean-baseline
+  replay and seven SQL regression suites on an isolated local Supabase CI database. The connected hosted
+  projects still have different migration histories, and the production target has not been conclusively
+  reconciled. Migration 030 is branch-only until an approved production migration plan is executed.
+  Do not apply migrations to either live project without a schema/history diff and explicit approval.
+- **Automated coverage is partial.** `npm test` runs Vitest and CI replays all migrations plus seven SQL
+  regression suites; it still does not replace end-to-end browser tests, real-device checks or physical
+  printer verification.
+- **Notifications are in-app only.** The owner notification center supports durable read/unread state and
+  realtime refresh, but it does not send transactional email or SMS.
 - **Storage deletion race is not fully closed.** The final RPC checks that the known request objects are
   absent, but anonymous bucket inserts are not serialized against that check. Do not deploy request
   deletion until uploads are bound to server-issued sessions or an equivalent reconciliation/cleanup
   mechanism prevents a concurrent re-upload from becoming orphaned.
 - **Production stage is not tracked separately.** Orders support pending/confirmed/shipped/delivered;
   there is no distinct manufacturing-in-progress status, so the dashboard does not invent one.
-- **No transactional email or SMS.** No order confirmation, quote notification or password reset is
-  sent; guests must keep their tracking link. Password recovery is therefore hidden.
+- **No transactional order/quote email or SMS.** Guests must keep their tracking link. Customer password
+  recovery is implemented through Supabase Auth and depends on the hosted project's email delivery setup.
 - **Uploads:** the private custom-request bucket accepts anonymous inserts (guests must upload without
   an account). Migrations 018–020 add RPC throttling and server-side per-folder caps, but direct Storage
   uploads do not yet have a global per-IP quota. Abandoned/partially uploaded objects still need a

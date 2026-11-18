@@ -16,6 +16,7 @@ const TrackOrderPage = lazy(() => import('@/pages/store/TrackOrderPage'))
 const CustomRequestPage = lazy(() => import('@/pages/store/CustomRequestPage'))
 const CustomRequestStatusPage = lazy(() => import('@/pages/store/CustomRequestStatusPage'))
 const InfoPage = lazy(() => import('@/pages/store/InfoPage'))
+const CustomerAccountPage = lazy(() => import('@/pages/store/CustomerAccountPage'))
 const AdminLogin = lazy(() => import('@/pages/admin/AdminLogin'))
 const AdminLayout = lazy(() => import('@/layouts/AdminLayout'))
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'))
@@ -124,6 +125,7 @@ export default function App() {
                 <Route path="commande" element={<CheckoutPage />} />
                 <Route path="commande/confirmation" element={<OrderConfirmationPage />} />
                 <Route path="suivi" element={<TrackOrderPage />} />
+                <Route path="compte" element={<CustomerAccountPage />} />
                 <Route path="sur-mesure" element={<CustomRequestPage />} />
                 <Route path="sur-mesure/suivi" element={<CustomRequestStatusPage />} />
                 <Route path="informations" element={<InfoPage />} />

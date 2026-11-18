@@ -167,7 +167,7 @@ export default function CustomerAccountPage() {
 
       {message && <div role="status" className={`mb-6 rounded-xl border px-4 py-3 text-sm ${message.type === 'error' ? 'border-red-400/25 bg-red-500/10 text-red-200' : message.type === 'success' ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200' : 'border-sky-400/25 bg-sky-500/10 text-sky-100'}`}>{message.text}</div>}
 
-      {session ? recoveryMode ? (
+      {session ? (recoveryMode ? (
         <section className="mx-auto max-w-xl rounded-2xl border border-white/10 bg-charcoal-800/80 p-5 sm:p-7">
           <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-red/10 text-brand-red-light"><KeyRound className="h-6 w-6" /></div>
           <h2 className="text-xl font-bold text-white">Créer un nouveau mot de passe</h2>
@@ -214,7 +214,7 @@ export default function CustomerAccountPage() {
             <p className="px-1 text-[11px] leading-5 text-charcoal-500">Le suivi des commandes invitées reste accessible avec votre référence de commande et votre numéro de téléphone.</p>
           </section>
         </div>
-      ) : (
+      )) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.8fr)]">
           <section className="rounded-2xl border border-white/10 bg-charcoal-800/80 p-5 sm:p-7">
             <div className="mb-6 flex flex-wrap gap-2 rounded-xl bg-charcoal-950/70 p-1">
@@ -242,5 +242,7 @@ export default function CustomerAccountPage() {
             <div className="mt-7 border-t border-white/10 pt-5"><p className="text-xs text-charcoal-400">Vous préférez commander sans compte ?</p><Link to="/boutique/produits" className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-brand-red-light hover:text-white">Continuer comme invité <ArrowRight className="h-4 w-4" /></Link></div>
           </aside>
         </div>
-      )) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.8fr)]">
+      )}
+    </div>
+  )
+}

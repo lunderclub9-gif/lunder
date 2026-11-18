@@ -11,8 +11,10 @@ CREATE TABLE IF NOT EXISTS public.store_design_versions (
 CREATE INDEX IF NOT EXISTS idx_store_design_versions_created
   ON public.store_design_versions(created_at DESC);
 ALTER TABLE public.store_design_versions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.store_design_versions FROM PUBLIC, anon;
 GRANT SELECT, INSERT ON public.store_design_versions TO authenticated;
-GRANT USAGE, SELECT ON SEQUENCE public.store_design_versions_id_seq TO authenticated;
+REVOKE ALL ON SEQUENCE public.store_design_versions_id_seq FROM PUBLIC, anon;
+GRANT USAGE ON SEQUENCE public.store_design_versions_id_seq TO authenticated;
 DROP POLICY IF EXISTS owner_read_store_design_versions ON public.store_design_versions;
 CREATE POLICY owner_read_store_design_versions
   ON public.store_design_versions FOR SELECT TO authenticated

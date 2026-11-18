@@ -10,6 +10,14 @@ import { supabase } from '@/lib/supabase'
 import { AdminNotificationsProvider } from '@/components/admin/AdminNotificationsProvider'
 import NotificationCenter from '@/components/admin/NotificationCenter'
 import { AdminConfirmProvider } from '@/components/admin/AdminConfirmProvider'
+import AtelierTabs from '@/components/admin/AtelierTabs'
+
+const ATELIER_ROUTES = [
+  '/admin/couts-produits',
+  '/admin/tarification',
+  '/admin/analyse-fichiers',
+  '/admin/calcul-devis',
+]
 
 const navGroups = [
   { label: 'Vue d’ensemble', items: [{ to: '/admin/dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
@@ -192,7 +200,10 @@ export default function AdminLayout() {
             </header>
 
             <main className="min-h-0 flex-1 overflow-y-auto scrollbar-thin bg-[radial-gradient(ellipse_at_top_left,rgba(190,35,52,0.055),transparent_38%)] p-4 md:p-7 xl:p-8">
-              <div className="mx-auto w-full max-w-[1600px]"><Outlet /></div>
+              <div className="mx-auto w-full max-w-[1600px] space-y-5">
+                {ATELIER_ROUTES.includes(location.pathname) && <AtelierTabs />}
+                <Outlet />
+              </div>
             </main>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Clock3, ImagePlus, Loader2, Palette, RotateCcw, Save, Sparkles, Undo2, Upload, WandSparkles, ArrowRight } from 'lucide-react'
 import LiveStorePreview from '@/components/admin/LiveStorePreview'
+import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { validateImage } from '@/lib/media'
@@ -35,6 +36,7 @@ type Version = { id: number; created_at: string }
 
 export default function VisualIdentityStudio() {
   const { profile } = useAuth()
+  const confirmAction = useAdminConfirm()
   const [config, setConfig] = useState<VisualIdentity>(DEFAULT_VISUAL_IDENTITY)
   const [past, setPast] = useState<VisualIdentity[]>([])
   const [future, setFuture] = useState<VisualIdentity[]>([])
@@ -102,7 +104,12 @@ export default function VisualIdentityStudio() {
     const invalid = COLOR_FIELDS.find(({ key }) => !/^#[0-9a-f]{6}$/i.test(config.colors[key]))
     if (invalid) { setError('La couleur ' + invalid.label + ' doit être un code HEX #RRGGBB valide.'); return }
     if (contrastWarnings.length) { setError('Corrigez les problèmes de contraste avant publication.'); return }
-    if (!window.confirm('Publier ces changements sur la boutique publique ?')) return
+    const publishAccepted = await confirmAction({
+      title: 'Publier ce thème ?',
+      description: 'Les couleurs, médias, contenus et réglages de mouvement deviendront visibles immédiatement par les visiteurs. Le brouillon reste conservé.',
+      confirmLabel: 'Publier sur la boutique',
+    })
+    if (!publishAccepted) return
     setSaving(true)
     const { error: draftError } = await supabase.from('store_settings').upsert({
       key: 'visual_identity_draft', value: JSON.stringify(config), is_public: false,
@@ -117,7 +124,12 @@ export default function VisualIdentityStudio() {
   }
 
   const restoreVersion = async (id: number) => {
-    if (!window.confirm('Restaurer cette version ? Elle deviendra la version publique actuelle.')) return
+    const restoreAccepted = await confirmAction({
+      title: 'Restaurer cette version ?',
+      description: `La version #${id} deviendra l’identité publique actuelle. Une nouvelle entrée est ajoutée à l’historique : rien n’est effacé.`,
+      confirmLabel: 'Restaurer et publier',
+    })
+    if (!restoreAccepted) return
     setSaving(true); setError(''); setMessage('')
     const { error: restoreError } = await supabase.rpc('restore_visual_identity_version', { p_version_id: id })
     setSaving(false)

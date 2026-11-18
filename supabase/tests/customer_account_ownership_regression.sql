@@ -4,35 +4,66 @@
 DO $$
 DECLARE
   v_definition text;
-  v_policy_count integer;
-  v_table text;
   v_policy text;
+  v_view text;
+  v_options text[];
+  v_forbidden_column text;
 BEGIN
-  FOREACH v_table IN ARRAY ARRAY['orders', 'custom_requests'] LOOP
-    IF NOT EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = v_table
-        AND column_name = 'customer_user_id'
-        AND data_type = 'uuid'
-    ) THEN
-      RAISE EXCEPTION 'Customer ownership column is missing on public.%', v_table;
+  FOREACH v_view IN ARRAY ARRAY[
+    'customer_account_orders',
+    'customer_account_requests',
+    'customer_account_quotes'
+  ] LOOP
+    IF to_regclass('public.' || v_view) IS NULL THEN
+      RAISE EXCEPTION 'Customer-safe account view is missing: %', v_view;
+    END IF;
+
+    SELECT reloptions INTO v_options
+    FROM pg_class
+    WHERE oid = to_regclass('public.' || v_view);
+    IF NOT coalesce(v_options @> ARRAY['security_barrier=true'], false) THEN
+      RAISE EXCEPTION 'Customer account view must be a security barrier: %', v_view;
+    END IF;
+
+    IF has_table_privilege('anon', 'public.' || v_view, 'SELECT')
+       OR NOT has_table_privilege('authenticated', 'public.' || v_view, 'SELECT') THEN
+      RAISE EXCEPTION 'Customer account view grants are incorrect: %', v_view;
+    END IF;
+
+    SELECT pg_get_viewdef(to_regclass('public.' || v_view), true)
+      INTO v_definition;
+    IF position('auth.uid()' IN v_definition) = 0 THEN
+      RAISE EXCEPTION 'Customer account view is missing its authenticated-user filter: %', v_view;
     END IF;
   END LOOP;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_trigger
-    WHERE tgrelid = 'public.orders'::regclass
-      AND tgname = 'orders_link_customer'
-      AND NOT tgisinternal
-  ) OR NOT EXISTS (
-    SELECT 1 FROM pg_trigger
-    WHERE tgrelid = 'public.custom_requests'::regclass
-      AND tgname = 'custom_requests_link_customer'
-      AND NOT tgisinternal
-  ) THEN
-    RAISE EXCEPTION 'Automatic customer ownership triggers are missing.';
-  END IF;
+  FOREACH v_forbidden_column IN ARRAY ARRAY[
+    'customer_user_id',
+    'idempotency_key',
+    'stock_reserved',
+    'inventory_movement_sequence',
+    'estimate_breakdown',
+    'product_specs',
+    'pricing_snapshot',
+    'accepted_snapshot',
+    'specifications_snapshot',
+    'delivery_snapshot',
+    'public_token',
+    'breakdown'
+  ] LOOP
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name IN (
+          'customer_account_orders',
+          'customer_account_requests',
+          'customer_account_quotes'
+        )
+        AND column_name = v_forbidden_column
+    ) THEN
+      RAISE EXCEPTION 'A private business field leaked into a customer account view: %', v_forbidden_column;
+    END IF;
+  END LOOP;
 
   SELECT pg_get_functiondef('public.link_customer_to_order()'::regprocedure)
     INTO v_definition;
@@ -49,6 +80,20 @@ BEGIN
     RAISE EXCEPTION 'Custom request ownership trigger does not use auth.uid().';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid = 'public.orders'::regclass
+      AND tgname = 'orders_link_customer'
+      AND NOT tgisinternal
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid = 'public.custom_requests'::regclass
+      AND tgname = 'custom_requests_link_customer'
+      AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'Automatic customer ownership triggers are missing.';
+  END IF;
+
   FOREACH v_policy IN ARRAY ARRAY[
     'customer_read_own_orders',
     'customer_read_own_order_items',
@@ -57,12 +102,11 @@ BEGIN
     'customer_read_own_custom_quotes',
     'customer_read_own_custom_quote_events'
   ] LOOP
-    IF NOT EXISTS (
+    IF EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname = 'public' AND policyname = v_policy
-        AND roles @> ARRAY['authenticated']::name[]
     ) THEN
-      RAISE EXCEPTION 'Customer ownership RLS policy is missing: %', v_policy;
+      RAISE EXCEPTION 'Direct customer policy on a private table must not exist: %', v_policy;
     END IF;
   END LOOP;
 
@@ -88,7 +132,7 @@ BEGIN
      OR NOT has_table_privilege('authenticated', 'public.order_items', 'SELECT')
      OR NOT has_table_privilege('authenticated', 'public.custom_requests', 'SELECT')
      OR NOT has_table_privilege('authenticated', 'public.custom_quotes', 'SELECT') THEN
-    RAISE EXCEPTION 'Authenticated read grants required by the RLS-protected account page are missing.';
+    RAISE EXCEPTION 'Existing owner UI read grants were unexpectedly removed.';
   END IF;
 
   IF NOT EXISTS (

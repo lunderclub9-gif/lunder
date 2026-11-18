@@ -142,7 +142,7 @@ export default function AdminLayout() {
             <div className="shrink-0 border-t border-white/[0.07] p-3">
               <div className={`mb-2 flex items-center gap-3 rounded-xl bg-white/[0.035] p-3 ${sidebarCollapsed ? 'md:justify-center md:px-1' : ''}`}>
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-charcoal-700 text-[11px] font-bold text-charcoal-200">LD</span>
-                <span className={`min-w-0 flex-1 ${sidebarCollapsed ? 'md:hidden' : ''}`}><span className="block truncate text-xs font-semibold text-white">Propriétaire</span><span className="block truncate text-[10px] text-charcoal-500">{profile?.email ?? 'Compte administrateur'}</span></span>
+                <span className={`min-w-0 flex-1 ${sidebarCollapsed ? 'md:hidden' : ''}`}><span className="block truncate text-xs font-semibold text-white">Propriétaire</span><span className="block truncate text-[10px] text-charcoal-500">{'Compte administrateur'}</span></span>
               </div>
               <button onClick={handleSignOut} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold text-charcoal-400 transition hover:bg-red-500/10 hover:text-red-300 ${sidebarCollapsed ? 'md:justify-center md:px-2' : ''}`} title={sidebarCollapsed ? 'Déconnexion' : undefined}>
                 <LogOut className="h-4 w-4" /><span className={sidebarCollapsed ? 'md:hidden' : ''}>Déconnexion</span>

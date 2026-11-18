@@ -99,35 +99,72 @@ export default function CustomerAccountPage() {
     const loadActivity = async () => {
       setActivityLoading(true)
       setActivityError(null)
-      const [ordersResult, requestsResult, quotesResult] = await Promise.all([
-        supabase
-          .from('customer_account_orders')
-          .select('id, order_number, status, total_dzd, created_at, delivery_method, delivery_eta_min, delivery_eta_max, wilaya_name, commune_name, items')
-          .order('created_at', { ascending: false })
-          .limit(20),
-        supabase
-          .from('customer_account_requests')
-          .select('id, request_number, tracking_token, title, status, created_at')
-          .order('created_at', { ascending: false })
-          .limit(20),
-        supabase
-          .from('customer_account_quotes')
-          .select('request_id, version, status, price_dzd, valid_until')
-          .order('version', { ascending: false })
-          .limit(50),
+      // Fetch every page instead of silently truncating customer history at
+      // 20 orders / 20 requests / 50 quotes. Each page has a deterministic order
+      // so records are not skipped when the result spans multiple requests.
+      const loadAllOrders = async () => {
+        const rows: AccountOrder[] = []
+        for (let offset = 0; ; offset += 500) {
+          const { data, error } = await supabase
+            .from('customer_account_orders')
+            .select('id, order_number, status, total_dzd, created_at, delivery_method, delivery_eta_min, delivery_eta_max, wilaya_name, commune_name, items')
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .range(offset, offset + 499)
+          if (error) throw error
+          const page = (data ?? []) as AccountOrder[]
+          rows.push(...page)
+          if (page.length < 500) break
+        }
+        return rows
+      }
+
+      const loadAllRequests = async () => {
+        const rows: Omit<AccountRequest, 'custom_quotes'>[] = []
+        for (let offset = 0; ; offset += 500) {
+          const { data, error } = await supabase
+            .from('customer_account_requests')
+            .select('id, request_number, tracking_token, title, status, created_at')
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .range(offset, offset + 499)
+          if (error) throw error
+          const page = (data ?? []) as Omit<AccountRequest, 'custom_quotes'>[]
+          rows.push(...page)
+          if (page.length < 500) break
+        }
+        return rows
+      }
+
+      const loadAllQuotes = async () => {
+        const rows: AccountQuote[] = []
+        for (let offset = 0; ; offset += 500) {
+          const { data, error } = await supabase
+            .from('customer_account_quotes')
+            .select('request_id, version, status, price_dzd, valid_until')
+            .order('request_id', { ascending: true })
+            .order('version', { ascending: false })
+            .range(offset, offset + 499)
+          if (error) throw error
+          const page = (data ?? []) as AccountQuote[]
+          rows.push(...page)
+          if (page.length < 500) break
+        }
+        return rows
+      }
+
+      const [orders, requests, quotes] = await Promise.all([
+        loadAllOrders(),
+        loadAllRequests(),
+        loadAllQuotes(),
       ])
 
       if (!active) return
-      if (ordersResult.error || requestsResult.error || quotesResult.error) {
-        setActivityError('Impossible de charger tout votre historique. Vérifiez votre connexion puis actualisez la page.')
-      } else {
-        const quotes = (quotesResult.data ?? []) as AccountQuote[]
-        setAccountOrders((ordersResult.data ?? []) as AccountOrder[])
-        setAccountRequests(((requestsResult.data ?? []) as Omit<AccountRequest, 'custom_quotes'>[]).map((request) => ({
-          ...request,
-          custom_quotes: quotes.filter((quote) => quote.request_id === request.id),
-        })))
-      }
+      setAccountOrders(orders)
+      setAccountRequests(requests.map((request) => ({
+        ...request,
+        custom_quotes: quotes.filter((quote) => quote.request_id === request.id),
+      })))
       setActivityLoading(false)
     }
 

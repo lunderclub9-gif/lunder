@@ -60,12 +60,19 @@ export default function AdminSettings() {
 
 
   const load = useCallback(async () => {
-    const { data: settings } = await supabase.from('store_settings').select('key, value, is_public').order('key')
+    setLoading(true)
+    const { data: settings, error: queryError } = await supabase.from('store_settings').select('key, value, is_public').order('key')
+    if (queryError) {
+      setError('Impossible de charger les paramètres du magasin. Aucune valeur n’a été modifiée.')
+      setLoading(false)
+      return
+    }
     const next: Record<string, string> = {}
     ;((settings as Setting[]) ?? []).forEach((row) => {
       next[row.key] = row.value ?? ''
     })
     setValues(next)
+    setError(null)
     setLoading(false)
   }, [])
 

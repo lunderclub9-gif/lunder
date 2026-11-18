@@ -21,6 +21,7 @@ type AccountOrder = {
 type AccountRequest = {
   id: string
   request_number: string
+  tracking_token: string
   title: string
   status: string
   created_at: string
@@ -88,7 +89,7 @@ export default function CustomerAccountPage() {
           .limit(20),
         supabase
           .from('custom_requests')
-          .select('id, request_number, title, status, created_at, custom_quotes(version, status, price_dzd, valid_until)')
+          .select('id, request_number, tracking_token, title, status, created_at, custom_quotes(version, status, price_dzd, valid_until)')
           .order('created_at', { ascending: false })
           .limit(20),
       ])
@@ -349,6 +350,7 @@ export default function CustomerAccountPage() {
                           <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-charcoal-200">{requestStatusLabels[request.status] ?? request.status}</span>
                         </div>
                         <p className="mt-2 text-[11px] text-charcoal-400">{formatAccountDate(request.created_at)}</p>
+                        <Link to={`/boutique/sur-mesure/suivi?token=${encodeURIComponent(request.tracking_token)}`} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-red-light hover:text-white">Voir la demande et les devis <ArrowRight className="h-3.5 w-3.5" /></Link>
                         {(request.custom_quotes ?? []).length > 0 && (
                           <div className="mt-3 space-y-1 border-t border-white/10 pt-3">
                             {(request.custom_quotes ?? []).map((quote) => (

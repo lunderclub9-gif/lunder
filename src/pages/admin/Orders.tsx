@@ -38,6 +38,8 @@ type OrderRow = {
   order_items: { id: string; product_name: string; variant_label: string | null; quantity: number; unit_price_dzd: number; line_total_dzd: number }[]
 }
 
+const ORDER_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+
 const NEXT_ACTIONS: Record<string, { status: string; label: string; danger?: boolean }[]> = {
   pending: [
     { status: 'confirmed', label: 'Confirmer' },
@@ -57,12 +59,11 @@ export default function AdminOrders() {
   const { profile } = useAuth()
   const [searchParams] = useSearchParams()
   const requestedStatus = searchParams.get('status') ?? ''
-  const validStatuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [filter, setFilter] = useState(() => validStatuses.includes(requestedStatus) ? requestedStatus : '')
+  const [filter, setFilter] = useState(() => ORDER_STATUSES.includes(requestedStatus) ? requestedStatus : '')
   const [searchText, setSearchText] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [busy, setBusy] = useState(false)

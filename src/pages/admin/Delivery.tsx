@@ -58,30 +58,37 @@ export default function AdminDelivery() {
       .from('wilayas')
       .select('code, name_fr, is_active')
       .order('code')
-      .then(({ data }) => {
-        const list = (data as Wilaya[]) ?? []
-        setWilayas(list)
-        setWilayaCode((current) => current || String(list[0]?.code ?? ''))
+      .then(({ data, error: queryError }) => {
+        if (queryError) {
+          setError('Impossible de charger la liste des wilayas.')
+        } else {
+          const list = (data as Wilaya[]) ?? []
+          setWilayas(list)
+          setWilayaCode((current) => current || String(list[0]?.code ?? ''))
+          if (list.length === 0) setError('Aucune wilaya disponible dans la base de données.')
+        }
         setLoading(false)
       })
   }, [])
 
   const loadRates = useCallback(async (code: number) => {
-    const { data } = await supabase
+    const { data, error: queryError } = await supabase
       .from('delivery_rates')
       .select('*')
       .eq('wilaya_code', code)
       .order('method')
-    setRates((data as Rate[]) ?? [])
+    if (queryError) setError('Impossible de charger les tarifs de cette wilaya.')
+    else setRates((data as Rate[]) ?? [])
   }, [])
 
   const loadPoints = useCallback(async (code: number) => {
-    const { data } = await supabase
+    const { data, error: queryError } = await supabase
       .from('pickup_points')
       .select('*')
       .eq('wilaya_code', code)
       .order('name')
-    setPoints((data as PickupPoint[]) ?? [])
+    if (queryError) setError('Impossible de charger les points relais de cette wilaya.')
+    else setPoints((data as PickupPoint[]) ?? [])
   }, [])
 
   useEffect(() => {
@@ -96,7 +103,10 @@ export default function AdminDelivery() {
       .eq('wilaya_code', code)
       .eq('is_active', true)
       .order('name_fr')
-      .then(({ data }) => setCommunes((data as Commune[]) ?? []))
+      .then(({ data, error: queryError }) => {
+        if (queryError) setError('Impossible de charger les communes de cette wilaya.')
+        else setCommunes((data as Commune[]) ?? [])
+      })
     loadRates(code)
     loadPoints(code)
   }, [wilayaCode, loadRates, loadPoints])

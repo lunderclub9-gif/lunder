@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { History as HistoryIcon, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { History as HistoryIcon, Loader2, RefreshCw, Search, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 type AuditEntry = {
@@ -47,39 +47,66 @@ function summarize(details: Record<string, unknown> | null): string {
 export default function AdminHistory() {
   const [entries, setEntries] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    supabase
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data, error: queryError } = await supabase
       .from('audit_log')
       .select('id, action, entity, entity_id, details, created_at')
       .order('created_at', { ascending: false })
       .limit(200)
-      .then(({ data }) => {
-        setEntries((data as AuditEntry[]) ?? [])
-        setLoading(false)
-      })
+    if (queryError) {
+      setError('Impossible de charger le journal. Vérifiez votre connexion et vos droits.')
+    } else {
+      setError(null)
+      setEntries((data as AuditEntry[]) ?? [])
+    }
+    setLoading(false)
   }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  const filteredEntries = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase()
+    if (!term) return entries
+    return entries.filter((entry) => [
+      ACTION_LABELS[entry.action] ?? entry.action,
+      entry.action,
+      entry.entity,
+      entry.entity_id ?? '',
+      summarize(entry.details),
+    ].some((value) => value.toLocaleLowerCase().includes(term)))
+  }, [entries, search])
 
   return (
     <div className="animate-fade-in">
-      <h1 className="mb-2 text-2xl font-bold text-offwhite">Historique</h1>
-      <p className="mb-6 text-sm text-charcoal-400">
-        Journal en append-only des actions du propriétaire : produits, tarifs, paramètres, devis et
-        commandes. Les 200 dernières entrées sont affichées.
-      </p>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div><p className="admin-eyebrow">Traçabilité & sécurité</p><h1 className="text-2xl font-bold text-offwhite">Historique</h1>
+          <p className="mt-2 text-sm text-charcoal-400">Journal des actions du propriétaire. Les 200 dernières entrées sont affichées.</p>
+        </div>
+        <button type="button" onClick={() => void load()} disabled={loading} className="btn-secondary"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualiser</button>
+      </div>
+
+      {error && <div role="alert" className="admin-feedback admin-feedback-error mb-4"><AlertTriangle className="mr-2 inline h-4 w-4" />{error}</div>}
+      <label className="relative mb-5 block max-w-xl">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-500" />
+        <input value={search} onChange={(event) => setSearch(event.target.value)} className="input-field pl-10" placeholder="Rechercher une action, une table ou un identifiant…" aria-label="Rechercher dans l'historique" />
+      </label>
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand-red" />
         </div>
-      ) : entries.length === 0 ? (
+      ) : filteredEntries.length === 0 ? (
         <div className="admin-card py-16 text-center">
           <HistoryIcon className="mx-auto mb-4 h-12 w-12 text-charcoal-500" />
-          <p className="text-charcoal-400">Aucune action enregistrée pour le moment.</p>
+          <p className="text-charcoal-400">{search.trim() ? 'Aucune action ne correspond à cette recherche.' : 'Aucune action enregistrée pour le moment.'}</p>
         </div>
       ) : (
         <ul className="space-y-2">
-          {entries.map((entry) => (
+          {filteredEntries.map((entry) => (
             <li key={entry.id} className="admin-card p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="text-sm font-medium text-offwhite">
@@ -98,6 +125,7 @@ export default function AdminHistory() {
           ))}
         </ul>
       )}
+      <p className="mt-4 text-xs text-charcoal-500">{filteredEntries.length} entrée(s) affichée(s) sur {entries.length} chargée(s).</p>
     </div>
   )
 }

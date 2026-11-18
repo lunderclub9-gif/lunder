@@ -147,23 +147,53 @@ export default function AdminRequests() {
   const load = useCallback(async () => {
     const sequence = ++requestLoadSequence.current
     setLoading(true)
-    let requestQuery = supabase.from('custom_requests').select(REQUEST_SELECT)
-    requestQuery = view === 'approved'
-      ? requestQuery.eq('status', 'approved')
-      : requestQuery.neq('status', 'approved')
-    const [{ data, error: queryError }, { data: mats }] = await Promise.all([
-      requestQuery.order('created_at', { ascending: false }).limit(100),
-      supabase.from('manufacturing_materials').select('name').eq('is_available', true).order('name'),
-    ])
+    const pageSize = 100
+    const allRequests: RequestRow[] = []
+    let offset = 0
+    let queryError: Error | null = null
+    let mats: { name: string }[] | null = null
+
+    while (true) {
+      let requestQuery = supabase.from('custom_requests').select(REQUEST_SELECT)
+      requestQuery = view === 'approved'
+        ? requestQuery.eq('status', 'approved')
+        : requestQuery.neq('status', 'approved')
+      const query = requestQuery
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+
+      const [requestResult, materialResult] = offset === 0
+        ? await Promise.all([
+            query,
+            supabase.from('manufacturing_materials').select('name').eq('is_available', true).order('name'),
+          ])
+        : [await query, null]
+
+      if (sequence !== requestLoadSequence.current) return
+      if (requestResult.error) {
+        queryError = requestResult.error
+        break
+      }
+      if (materialResult?.error) {
+        setError('Les demandes sont chargées, mais la liste des matières est indisponible.')
+      }
+      if (materialResult) mats = (materialResult.data as { name: string }[]) ?? []
+      const batch = (requestResult.data as RequestRow[]) ?? []
+      allRequests.push(...batch)
+      if (batch.length < pageSize) break
+      offset += pageSize
+    }
+
     if (sequence !== requestLoadSequence.current) return
     if (queryError) {
-      setError('Impossible de charger les demandes.')
+      setError('Impossible de charger toutes les demandes.')
       setRequests([])
     } else {
       setError(null)
-      setRequests((data as RequestRow[]) ?? [])
+      setRequests(allRequests)
     }
-    setMaterials((mats as { name: string }[]) ?? [])
+    if (mats) setMaterials(mats)
     setLoading(false)
   }, [view])
 

@@ -747,3 +747,102 @@
 }
 .store-shell[data-motion="true"][data-motion-style="subtle"] [data-vi-float] { animation: none; }
 .store-shell[data-motion="false"] [data-vi-float], .store-shell[data-motion="false"] .group:hover { animation: none; transform: none; }
+
+
+/* LUNDER experience layer — consistent polish across every admin and customer page. */
+@layer components {
+  .admin-shell main > div > div,
+  .store-shell main > div {
+    animation: lunder-page-enter 420ms cubic-bezier(.2,.75,.25,1) both;
+  }
+
+  .admin-shell .admin-card {
+    position: relative;
+    border-color: rgb(255 255 255 / 0.075);
+    background:
+      linear-gradient(145deg, rgb(255 255 255 / 0.025), transparent 52%),
+      rgb(28 30 36 / 0.92);
+    box-shadow: 0 12px 34px rgb(0 0 0 / 0.12);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .admin-shell .admin-card:hover {
+    border-color: rgb(255 255 255 / 0.13);
+    box-shadow: 0 16px 38px rgb(0 0 0 / 0.18);
+  }
+
+  .admin-shell button:not(:disabled),
+  .admin-shell a,
+  .store-shell button:not(:disabled),
+  .store-shell a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .admin-shell button:not(:disabled):active,
+  .store-shell button:not(:disabled):active {
+    transform: translateY(1px) scale(.99);
+  }
+
+  .admin-shell input:not([type="checkbox"]):not([type="radio"]),
+  .admin-shell select,
+  .admin-shell textarea,
+  .store-shell input:not([type="checkbox"]):not([type="radio"]),
+  .store-shell select,
+  .store-shell textarea {
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  }
+
+  .admin-shell .input-field:focus,
+  .store-shell .input-field:focus {
+    box-shadow: 0 0 0 3px rgb(220 38 38 / 0.12);
+  }
+
+  .store-shell .card,
+  .store-shell .admin-card {
+    border-color: var(--vi-border, rgb(255 255 255 / 0.09));
+    box-shadow: 0 14px 38px rgb(0 0 0 / 0.12);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .store-shell .card:hover,
+  .store-shell .admin-card:hover {
+    border-color: color-mix(in srgb, var(--vi-primary, #dc2626) 35%, var(--vi-border, #333));
+    box-shadow: 0 18px 44px rgb(0 0 0 / 0.2);
+  }
+
+  .store-shell .btn-primary,
+  .store-shell .btn-secondary,
+  .store-shell .btn-ghost {
+    transition: transform 160ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease;
+  }
+
+  .store-shell .btn-primary:hover {
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--vi-glow, #dc2626) 24%, transparent);
+  }
+
+  .store-shell a:focus-visible,
+  .admin-shell a:focus-visible {
+    border-radius: .5rem;
+  }
+}
+
+@keyframes lunder-page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .admin-shell main { padding: 1rem; }
+  .admin-shell .admin-card { padding: 1rem; }
+  .store-shell main { overflow-wrap: anywhere; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell main > div > div,
+  .store-shell main > div { animation: none; }
+  .admin-shell .admin-card,
+  .store-shell .card,
+  .store-shell .admin-card,
+  .store-shell button,
+  .store-shell a { transition: none; }
+}

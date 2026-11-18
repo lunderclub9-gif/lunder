@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
-import { ChevronDown, FileText, Loader2, Trash2, Upload } from 'lucide-react'
+import { ChevronDown, FileText, Filter, Loader2, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
@@ -113,6 +113,8 @@ export default function AdminRequests() {
   const confirmAction = useAdminConfirm()
   const [searchParams] = useSearchParams()
   const [view, setView] = useState<'active' | 'approved'>(() => searchParams.get('view') === 'approved' ? 'approved' : 'active')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [requests, setRequests] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -168,6 +170,28 @@ export default function AdminRequests() {
   useEffect(() => {
     load()
   }, [load])
+
+  const filteredRequests = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase('fr')
+    return requests.filter((request) => {
+      const matchesSearch = !term || [
+        request.request_number,
+        request.customer_name,
+        request.title,
+        request.phone,
+        request.email ?? '',
+      ].some((value) => value.toLocaleLowerCase('fr').includes(term))
+      const matchesStatus = statusFilter === 'all' || request.status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+  }, [requests, search, statusFilter])
+
+  const requestCounts = useMemo(() => ({
+    total: requests.length,
+    new: requests.filter((request) => request.status === 'new').length,
+    reviewing: requests.filter((request) => request.status === 'reviewing').length,
+    quoted: requests.filter((request) => request.status === 'quoted' || request.custom_quotes.some((quote) => quote.status === 'sent')).length,
+  }), [requests])
 
   const requestedRequestId = searchParams.get('request')
   useEffect(() => {
@@ -415,21 +439,58 @@ export default function AdminRequests() {
   }
 
   return (
-    <div className="animate-fade-in">
-      <h1 className="mb-2 text-2xl font-bold text-offwhite">Demandes sur mesure</h1>
-      <p className="mb-6 text-sm text-charcoal-400">
-        Vérifiez la demande et les fichiers, créez une version de devis, puis attendez l’acceptation
-        du client avant d’approuver la fabrication. Seule la dernière version acceptée et vérifiée
-        peut être transformée en commande. Toute modification nécessite un nouveau devis et un nouvel accord.
-      </p>
+    <div className="animate-fade-in space-y-5">
+      <header className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#20232b] via-[#171a21] to-[#171318] p-5 md:p-7">
+        <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full bg-brand-red/10 blur-3xl" />
+        <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="admin-eyebrow">Atelier · Relation client</p>
+            <h1 className="text-2xl font-black text-white md:text-3xl">Demandes sur mesure</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-charcoal-300">
+              Centralisez les demandes, contrôlez les fichiers et spécifications, calculez un devis versionné et suivez son acceptation avant toute création de commande.
+            </p>
+          </div>
+          <button type="button" onClick={() => void load()} disabled={loading} className="btn-secondary shrink-0">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Actualiser
+          </button>
+        </div>
+      </header>
 
-      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filtrer les demandes">
-        <button type="button" aria-pressed={view === 'active'} onClick={() => setView('active')} className={view === 'active' ? 'btn-primary' : 'btn-secondary'}>
-          Demandes actives
-        </button>
-        <button type="button" aria-pressed={view === 'approved'} onClick={() => setView('approved')} className={view === 'approved' ? 'btn-primary' : 'btn-secondary'}>
-          Approuvées — historique
-        </button>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          { label: 'Demandes chargées', value: requestCounts.total, tone: 'text-white' },
+          { label: 'Nouvelles', value: requestCounts.new, tone: 'text-sky-300' },
+          { label: 'En étude', value: requestCounts.reviewing, tone: 'text-amber-300' },
+          { label: 'Devis envoyés', value: requestCounts.quoted, tone: 'text-violet-300' },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border border-white/[0.07] bg-charcoal-900/75 p-4">
+            <p className="text-[11px] text-charcoal-400">{item.label}</p>
+            <p className={`mt-1 text-2xl font-black tabular-nums ${item.tone}`}>{loading ? '—' : item.value.toLocaleString('fr-DZ')}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-charcoal-900/70 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Type de demandes">
+            <button type="button" aria-pressed={view === 'active'} onClick={() => { setView('active'); setStatusFilter('all') }} className={view === 'active' ? 'btn-primary' : 'btn-secondary'}>Demandes actives</button>
+            <button type="button" aria-pressed={view === 'approved'} onClick={() => { setView('approved'); setStatusFilter('all') }} className={view === 'approved' ? 'btn-primary' : 'btn-secondary'}>Historique approuvé</button>
+          </div>
+          <span className="text-xs text-charcoal-500">{filteredRequests.length} résultat(s) · maximum 100 demandes chargées</span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-500" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher par numéro, client, téléphone, projet…" className="input-field pl-10" aria-label="Rechercher une demande" />
+          </label>
+          <label className="relative block">
+            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-500" />
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input-field pl-10" aria-label="Filtrer par statut">
+              <option value="all">Tous les statuts</option>
+              {Object.entries(STATUS_LABELS).filter(([status]) => view === 'approved' ? status === 'approved' : status !== 'approved').map(([status, label]) => <option key={status} value={status}>{label}</option>)}
+            </select>
+          </label>
+        </div>
       </div>
 
       {error && (
@@ -447,14 +508,14 @@ export default function AdminRequests() {
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand-red" />
         </div>
-      ) : requests.length === 0 ? (
+      ) : filteredRequests.length === 0 ? (
         <div className="admin-card py-16 text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-charcoal-500" />
-          <p className="text-charcoal-400">{view === 'approved' ? 'Aucune demande approuvée dans l’historique.' : 'Aucune demande active pour le moment.'}</p>
+          <p className="text-charcoal-400">{search || statusFilter !== 'all' ? 'Aucun résultat pour ces filtres. Essayez une autre recherche.' : view === 'approved' ? 'Aucune demande approuvée dans l’historique.' : 'Aucune demande active pour le moment.'}</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {requests.map((request) => {
+          {filteredRequests.map((request) => {
             const open = expanded === request.id
             const latestQuote = [...request.custom_quotes].sort((a, b) => b.version - a.version)[0]
             return (

@@ -83,7 +83,7 @@ SET stock_reserved = (
       WHEN i.stock_tracked AND (o.archived_at IS NOT NULL OR o.status IN ('cancelled', 'delivered')) THEN 2
       WHEN i.stock_tracked THEN 1
       ELSE 0
-    )
+    END
 FROM public.orders o
 WHERE o.id = i.order_id;
 

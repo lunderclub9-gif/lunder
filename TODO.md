@@ -1,5 +1,13 @@
 # LUNDER — TODO de livraison
 
+## Sprint qualité produit — 19 novembre 2026
+- [x] Ajouter des expériences dédiées Décorer, Offrir, Prototyper et Personnaliser.
+- [x] Afficher de vraies recommandations catalogue quand Supabase répond, avec fallback de sélection récente en cas de recherche sans résultat.
+- [x] Tester les quatre routes dans le navigateur sandbox et vérifier l’action principale Personnaliser vers le formulaire sur mesure.
+- [x] Ajouter les quatre routes au manifeste `public/manus-routes.json`.
+- [ ] Exécuter les régressions SQL sur une base Supabase locale isolée : bloqué tant que Supabase CLI/Docker ne sont pas disponibles.
+- [ ] Tester les interactions sur viewport mobile réel et réseau dégradé : partiellement bloqué par l’absence d’un outil de redimensionnement browser dans cet environnement.
+
 ## Refonte storefront premium
 - [ ] Le storefront présente une identité cohérente de studio 3D, avec hero, hiérarchie éditoriale, appels à l’action et footer professionnel.
 - [ ] Les parcours Accueil, Boutique, Produit, Panier, Commande, Suivi, Compte et Sur mesure restent accessibles par la navigation desktop et mobile.

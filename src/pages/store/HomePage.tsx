@@ -149,10 +149,10 @@ export default function HomePage() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { icon: Sparkles, eyebrow: 'Décorer', title: 'Donner du caractère à un espace', text: 'Objets, détails et petites séries pour votre intérieur.', to: '/boutique/produits?q=d%C3%A9coration' },
-            { icon: Package, eyebrow: 'Offrir', title: 'Trouver une pièce qui reste', text: 'Une création originale, prête à rejoindre quelqu’un.', to: '/boutique/produits?q=cadeau' },
-            { icon: Printer, eyebrow: 'Prototyper', title: 'Passer de l’idée à la forme', text: 'Un fichier, une cote ou un premier modèle à tester.', to: '/boutique/sur-mesure' },
-            { icon: Layers3, eyebrow: 'Personnaliser', title: 'Fabriquer votre propre version', text: 'Matière, taille, couleur et détails selon votre projet.', to: '/boutique/sur-mesure' },
+            { icon: Sparkles, eyebrow: 'Décorer', title: 'Donner du caractère à un espace', text: 'Objets, détails et petites séries pour votre intérieur.', to: '/boutique/decouvrir/decorer' },
+            { icon: Package, eyebrow: 'Offrir', title: 'Trouver une pièce qui reste', text: 'Une création originale, prête à rejoindre quelqu’un.', to: '/boutique/decouvrir/offrir' },
+            { icon: Printer, eyebrow: 'Prototyper', title: 'Passer de l’idée à la forme', text: 'Un fichier, une cote ou un premier modèle à tester.', to: '/boutique/decouvrir/prototyper' },
+            { icon: Layers3, eyebrow: 'Personnaliser', title: 'Fabriquer votre propre version', text: 'Matière, taille, couleur et détails selon votre projet.', to: '/boutique/decouvrir/personnaliser' },
           ].map(({ icon: Icon, eyebrow, title, text, to }) => (
             <Link key={eyebrow} to={to} className="group rounded-2xl border border-charcoal-400/15 bg-charcoal-800/35 p-5 transition duration-200 hover:-translate-y-1 hover:border-brand-red/40 hover:bg-charcoal-800/70">
               <div className="mb-8 flex items-start justify-between"><Icon className="h-6 w-6 text-brand-red-light" /><ArrowRight className="h-4 w-4 text-charcoal-500 transition group-hover:translate-x-1 group-hover:text-brand-red-light" /></div>

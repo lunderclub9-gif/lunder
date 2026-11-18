@@ -7,6 +7,7 @@ import { isSupabaseConfigured, missingConfigKeys } from '@/lib/supabase'
 
 const StoreLayout = lazy(() => import('@/layouts/StoreLayout'))
 const HomePage = lazy(() => import('@/pages/store/HomePage'))
+const IntentLandingPage = lazy(() => import('@/pages/store/IntentLandingPage'))
 const ProductsPage = lazy(() => import('@/pages/store/ProductsPage'))
 const ProductDetailPage = lazy(() => import('@/pages/store/ProductDetailPage'))
 const CartPage = lazy(() => import('@/pages/store/CartPage'))
@@ -121,6 +122,7 @@ export default function App() {
               </Route>
               <Route path="/boutique" element={<StoreLayout />}>
                 <Route index element={<HomePage />} />
+                <Route path="decouvrir/:intent" element={<IntentLandingPage />} />
                 <Route path="produits" element={<ProductsPage />} />
                 <Route path="produits/:slug" element={<ProductDetailPage />} />
                 <Route path="panier" element={<CartPage />} />

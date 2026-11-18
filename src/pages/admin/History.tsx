@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { History as HistoryIcon, Loader2, RefreshCw, Search, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -49,19 +49,40 @@ export default function AdminHistory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const requestSequence = useRef(0)
 
   const load = useCallback(async () => {
+    const sequence = ++requestSequence.current
     setLoading(true)
-    const { data, error: queryError } = await supabase
-      .from('audit_log')
-      .select('id, action, entity, entity_id, details, created_at')
-      .order('created_at', { ascending: false })
-      .limit(200)
+    const pageSize = 500
+    const allEntries: AuditEntry[] = []
+    let offset = 0
+    let queryError: Error | null = null
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('audit_log')
+        .select('id, action, entity, entity_id, details, created_at')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+      if (sequence !== requestSequence.current) return
+      if (error) {
+        queryError = error
+        break
+      }
+      const batch = (data as AuditEntry[]) ?? []
+      allEntries.push(...batch)
+      if (batch.length < pageSize) break
+      offset += pageSize
+    }
+
+    if (sequence !== requestSequence.current) return
     if (queryError) {
-      setError('Impossible de charger le journal. Vérifiez votre connexion et vos droits.')
+      setError('Impossible de charger le journal complet. Vérifiez votre connexion et vos droits.')
     } else {
       setError(null)
-      setEntries((data as AuditEntry[]) ?? [])
+      setEntries(allEntries)
     }
     setLoading(false)
   }, [])
@@ -84,7 +105,7 @@ export default function AdminHistory() {
     <div className="animate-fade-in">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><p className="admin-eyebrow">Traçabilité & sécurité</p><h1 className="text-2xl font-bold text-offwhite">Historique</h1>
-          <p className="mt-2 text-sm text-charcoal-400">Journal des actions du propriétaire. Les 200 dernières entrées sont affichées.</p>
+          <p className="mt-2 text-sm text-charcoal-400">Journal complet des actions du propriétaire, chargé par lots pour préserver la consultation des anciennes opérations.</p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading} className="btn-secondary"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualiser</button>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { Plus, Trash2, Pencil, Tag, X, Loader2 } from 'lucide-react'
 import { supabase, type Category } from '@/lib/supabase'
@@ -14,17 +14,17 @@ export default function AdminCategories() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadCategories()
+  const loadCategories = useCallback(async () => {
+    setLoading(true)
+    const { data, error: queryError } = await supabase.from('categories').select('*').order('sort_order')
+    if (queryError) setError('Impossible de charger les catégories.')
+    else { setError(null); setCategories((data as Category[]) ?? []) }
+    setLoading(false)
   }, [])
 
-  const loadCategories = async () => {
-    setLoading(true)
-    const { data } = await supabase.from('categories').select('*').order('sort_order')
-    setCategories((data as Category[]) ?? [])
-    setLoading(false)
-  }
+  useEffect(() => { void loadCategories() }, [loadCategories])
 
   const resetForm = () => {
     setName('')
@@ -35,19 +35,25 @@ export default function AdminCategories() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) return
-    setSaving(true)
-    const slug = slugify(name)
-    if (editingId) {
-      const { error } = await supabase.from('categories').update({ name: name.trim(), slug, description: description || null }).eq('id', editingId)
-      if (!error && isPostHogEnabled) posthog.capture('category_updated', { category_id: editingId })
-    } else {
-      const { error } = await supabase.from('categories').insert({ name: name.trim(), slug, description: description || null, sort_order: categories.length })
-      if (!error && isPostHogEnabled) posthog.capture('category_created')
+    const cleanName = name.trim()
+    const slug = slugify(cleanName)
+    if (cleanName.length < 2 || !slug) {
+      setError('Le nom de catégorie doit contenir au moins 2 caractères valides.')
+      return
     }
+    setError(null)
+    setSaving(true)
+    const result = editingId
+      ? await supabase.from('categories').update({ name: cleanName, slug, description: description.trim() || null }).eq('id', editingId)
+      : await supabase.from('categories').insert({ name: cleanName, slug, description: description.trim() || null, sort_order: categories.length })
+    setSaving(false)
+    if (result.error) {
+      setError(result.error.code === '23505' ? 'Une catégorie avec ce nom ou cet identifiant existe déjà.' : 'Impossible d’enregistrer la catégorie.')
+      return
+    }
+    if (isPostHogEnabled) posthog.capture(editingId ? 'category_updated' : 'category_created', editingId ? { category_id: editingId } : undefined)
     resetForm()
     await loadCategories()
-    setSaving(false)
   }
 
   const handleEdit = (cat: Category) => {
@@ -59,8 +65,12 @@ export default function AdminCategories() {
 
   const handleDelete = async (id: string) => {
     if (!(await confirmAction({ title: 'Supprimer cette catégorie ?', description: 'Cette catégorie sera supprimée. Vérifiez les produits qui lui sont associés avant de continuer.', confirmLabel: 'Supprimer la catégorie', tone: 'danger' }))) return
-    const { error } = await supabase.from('categories').delete().eq('id', id)
-    if (error) return
+    const { error: deleteError } = await supabase.from('categories').delete().eq('id', id)
+    if (deleteError) {
+      setError(deleteError.code === '23503' ? 'Cette catégorie est encore utilisée par des produits. Réaffectez ces produits avant de la supprimer.' : 'Impossible de supprimer cette catégorie.')
+      return
+    }
+    setError(null)
     if (isPostHogEnabled) posthog.capture('category_deleted', { category_id: id })
     await loadCategories()
   }
@@ -76,12 +86,14 @@ export default function AdminCategories() {
   return (
     <div className="animate-fade-in">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-offwhite">Catégories</h1>
+        <div><p className="admin-eyebrow">Organisation du catalogue</p><h1 className="text-2xl font-bold text-offwhite">Catégories</h1><p className="mt-1 text-xs text-charcoal-500">{categories.length} catégorie(s)</p></div>
         <button onClick={() => setShowForm(!showForm)} className="btn-primary">
           <Plus className="h-4 w-4" />
           {showForm ? 'Annuler' : 'Ajouter une catégorie'}
         </button>
       </div>
+
+      {error && <div role="alert" className="admin-feedback admin-feedback-error mb-4">{error}</div>}
 
       {showForm && (
         <form onSubmit={handleSubmit} className="mb-6 admin-card animate-slide-up">
@@ -95,6 +107,8 @@ export default function AdminCategories() {
                 className="input-field"
                 placeholder="Ex: Décorations"
                 autoFocus
+                maxLength={80}
+                required
               />
             </div>
             <div>
@@ -105,6 +119,7 @@ export default function AdminCategories() {
                 onChange={(e) => setDescription(e.target.value)}
                 className="input-field"
                 placeholder="Description courte"
+                maxLength={300}
               />
             </div>
           </div>

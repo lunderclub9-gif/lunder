@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
-import { ChevronDown, FileText, Filter, Loader2, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
+import { Calculator, ChevronDown, FileText, Filter, Loader2, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
@@ -921,6 +921,11 @@ export default function AdminRequests() {
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
+                        {!['rejected', 'closed'].includes(request.status) && (
+                          <Link to={`/admin/calcul-devis?request=${encodeURIComponent(request.id)}`} className="btn-secondary">
+                            <Calculator className="h-4 w-4" />Calcul détaillé des coûts
+                          </Link>
+                        )}
                         {(request.product_specs?.length ?? 0) > 1 && <p className="w-full text-xs text-charcoal-400">Cette demande contient plusieurs modèles : utilisez « Créer le devis depuis l’estimation », qui additionne les calculs de chaque produit. Le devis technique manuel ne prend en charge qu’un seul produit.</p>}
                         <button
                           type="button"

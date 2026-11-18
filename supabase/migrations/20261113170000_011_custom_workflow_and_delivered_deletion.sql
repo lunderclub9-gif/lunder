@@ -218,7 +218,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.manufacturing_calculate_full(text, numeric, numeric, integer, jsonb, boolean) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.manufacturing_calculate_full(text, numeric, numeric, integer, jsonb, boolean) FROM PUBLIC;
 
 -- ─── ESTIMATION À PARTIR DES DIMENSIONS (PUBLIC) ──────────────────────────
 

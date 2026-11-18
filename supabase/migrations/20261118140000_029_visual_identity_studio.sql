@@ -29,7 +29,7 @@ BEGIN
   IF NOT public.is_owner() THEN RAISE EXCEPTION 'ACCES_REFUSE'; END IF;
   IF p_config IS NULL OR jsonb_typeof(p_config) <> 'object'
      OR octet_length(p_config::text) > 50000 OR p_config->>'version' <> '1'
-     OR jsonb_typeof(p_config->'colors') <> 'object'
+     OR jsonb_typeof(p_config->'colors') IS DISTINCT FROM 'object'
      OR EXISTS (
        SELECT 1 FROM jsonb_each_text(p_config->'colors') AS c(key, value)
        WHERE c.key IN ('primary','secondary','accent','background','surface','surfaceAlt','text','muted','border','header','footer','buttonText','glow','gradientStart','gradientEnd')
@@ -47,7 +47,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.restore_visual_identity_version(p_version_id bigint)
-RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS bigint LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE v_config jsonb;
 BEGIN
   IF NOT public.is_owner() THEN RAISE EXCEPTION 'ACCES_REFUSE'; END IF;

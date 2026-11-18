@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Clock3, ImagePlus, Loader2, Monitor, Palette, RotateCcw, Save, Smartphone, Sparkles, Undo2, Upload, WandSparkles, ArrowRight } from 'lucide-react'
+import { Check, Clock3, ImagePlus, Loader2, Palette, RotateCcw, Save, Sparkles, Undo2, Upload, WandSparkles, ArrowRight } from 'lucide-react'
+import LiveStorePreview from '@/components/admin/LiveStorePreview'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { validateImage } from '@/lib/media'
-import { contrastRatio, DEFAULT_VISUAL_IDENTITY, parseVisualIdentity, visualIdentityCssVars, VISUAL_PRESETS, type VisualIdentity } from '@/lib/visual-identity'
+import { contrastRatio, DEFAULT_VISUAL_IDENTITY, parseVisualIdentity, VISUAL_PRESETS, type VisualIdentity } from '@/lib/visual-identity'
 
 const COLOR_FIELDS: { key: keyof VisualIdentity['colors']; label: string }[] = [
   { key: 'primary', label: 'Couleur principale' }, { key: 'secondary', label: 'Couleur secondaire' },
@@ -24,6 +25,8 @@ const ASSET_FIELDS: { key: keyof VisualIdentity['assets']; label: string; hint: 
 const SECTION_FIELDS: { key: keyof VisualIdentity['sections']; label: string; detail: string }[] = [
   { key: 'benefits', label: 'Avantages', detail: 'Cartes de confiance' },
   { key: 'featured', label: 'Produits à la une', detail: 'Produits mis en avant' },
+  { key: 'categories', label: 'Catégories', detail: 'Univers de la boutique' },
+  { key: 'process', label: 'Parcours en 3 étapes', detail: 'Comment ça fonctionne' },
   { key: 'custom', label: 'Fabrication sur mesure', detail: 'Présentation du service' },
   { key: 'latest', label: 'Nouveautés', detail: 'Derniers produits publiés' },
   { key: 'finalCta', label: 'Bannière finale', detail: 'Appel à découvrir la boutique' },
@@ -36,7 +39,6 @@ export default function VisualIdentityStudio() {
   const [past, setPast] = useState<VisualIdentity[]>([])
   const [future, setFuture] = useState<VisualIdentity[]>([])
   const [versions, setVersions] = useState<Version[]>([])
-  const [preview, setPreview] = useState<'desktop' | 'mobile'>('desktop')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState<string | null>(null)
@@ -160,7 +162,6 @@ export default function VisualIdentityStudio() {
   }
 
   if (loading) return <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-brand-red" /></div>
-  const previewWidth = preview === 'mobile' ? 'min(100%, 390px)' : '100%'
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -201,7 +202,7 @@ export default function VisualIdentityStudio() {
             <div className="grid gap-4 sm:grid-cols-2">
               {([
                 ['heroTitle', 'Titre principal'], ['heroHighlight', 'Ligne mise en valeur'], ['primaryButton', 'Bouton principal'], ['secondaryButton', 'Bouton secondaire'],
-                ['featuredTitle', 'Titre produits à la une'], ['customTitle', 'Titre sur mesure'], ['latestTitle', 'Titre nouveautés'], ['ctaTitle', 'Titre bannière finale'],
+                ['featuredTitle', 'Titre produits à la une'], ['categoriesTitle', 'Titre catégories'], ['processTitle', 'Titre parcours'], ['customTitle', 'Titre sur mesure'], ['latestTitle', 'Titre nouveautés'], ['ctaTitle', 'Titre bannière finale'],
               ] as const).map(([key, label]) => <label key={key}><span className="label-text">{label}</span><input className="input-field" value={config.content[key]} onChange={(event) => update({ ...config, content: { ...config.content, [key]: event.target.value } })} maxLength={140} /></label>)}
               {(['heroDescription', 'ctaDescription'] as const).map((key) => <label key={key} className="sm:col-span-2"><span className="label-text">{key === 'heroDescription' ? 'Description principale' : 'Description bannière finale'}</span><textarea className="input-field min-h-24" value={config.content[key]} onChange={(event) => update({ ...config, content: { ...config.content, [key]: event.target.value } })} maxLength={500} /></label>)}
             </div>
@@ -237,15 +238,16 @@ export default function VisualIdentityStudio() {
 
         <aside className="space-y-4 2xl:sticky 2xl:top-4">
           <section className="admin-card">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><p className="admin-eyebrow">Aperçu instantané</p><h2 className="text-lg font-semibold text-offwhite">Prévisualisation du thème</h2></div><div className="flex rounded-lg border border-charcoal-400/20 p-1"><button type="button" onClick={() => setPreview('desktop')} className={'rounded-md p-2 ' + (preview === 'desktop' ? 'bg-brand-red text-white' : 'text-charcoal-400')} aria-label="Aperçu ordinateur"><Monitor className="h-4 w-4" /></button><button type="button" onClick={() => setPreview('mobile')} className={'rounded-md p-2 ' + (preview === 'mobile' ? 'bg-brand-red text-white' : 'text-charcoal-400')} aria-label="Aperçu mobile"><Smartphone className="h-4 w-4" /></button></div></div>
-            <div className="mx-auto overflow-hidden rounded-2xl border border-charcoal-400/20 bg-charcoal-950 p-2 transition-all" style={{ width: previewWidth }}>
-              <div className="overflow-hidden rounded-xl" style={{ ...visualIdentityCssVars(config), backgroundColor: 'var(--vi-background)', color: 'var(--vi-text)', fontFamily: 'var(--vi-body-font)', fontSize: 'var(--vi-base-size)' }} data-motion={config.motion.enabled ? 'true' : 'false'}>
-                <div className="flex items-center justify-between border-b px-3 py-3" style={{ background: 'var(--vi-header)', borderColor: 'var(--vi-border)' }}><div className="flex items-center gap-2">{config.assets.logo ? <img src={config.assets.logo} alt="Logo" className="h-7 max-w-24 object-contain" /> : <span className="grid h-7 w-7 place-items-center rounded-lg text-xs font-black text-white" style={{ background: 'var(--vi-primary)' }}>L</span>}<strong className="text-xs">LUNDER 3D</strong></div><span className="text-[10px]" style={{ color: 'var(--vi-muted)' }}>Studio · Boutique</span></div>
-                <div className="p-4 sm:p-6" style={{ background: 'radial-gradient(circle at 85% 10%, color-mix(in srgb, var(--vi-glow) 20%, transparent), transparent 55%)' }}><p className="mb-3 text-[9px] font-bold uppercase tracking-[.2em]" style={{ color: 'var(--vi-primary)' }}>Design · Print · Create</p><h3 className="text-2xl font-black leading-tight" style={{ fontFamily: 'var(--vi-heading-font)', fontWeight: config.typography.headingWeight }}>{config.content.heroTitle}<span className="block" style={{ color: 'var(--vi-primary)' }}>{config.content.heroHighlight}</span></h3><p className="mt-3 text-xs leading-6" style={{ color: 'var(--vi-muted)' }}>{config.content.heroDescription}</p>{config.assets.heroImage && <img src={config.assets.heroImage} alt="Aperçu couverture" className="mt-4 h-32 w-full rounded-xl object-cover" />}<div className="mt-4 flex flex-wrap gap-2"><span className="rounded-lg px-3 py-2 text-[10px] font-bold text-white" style={{ background: 'var(--vi-primary)', borderRadius: 'var(--vi-button-radius)' }}>{config.content.primaryButton}</span><span className="rounded-lg border px-3 py-2 text-[10px] font-bold" style={{ borderColor: 'var(--vi-border)', borderRadius: 'var(--vi-button-radius)' }}>{config.content.secondaryButton}</span></div><div className="mt-5 grid grid-cols-2 gap-2"><div className="rounded-xl border p-3" style={{ background: 'var(--vi-surface)', borderColor: 'var(--vi-border)', borderRadius: 'var(--vi-radius)' }}><div className="mb-2 h-14 rounded-lg" style={{ background: 'linear-gradient(135deg,var(--vi-gradient-start),var(--vi-gradient-end))' }} /><strong className="text-[10px]">Création premium</strong><p className="mt-1 text-[9px]" style={{ color: 'var(--vi-muted)' }}>Aperçu des cartes</p></div><div className="rounded-xl border p-3" style={{ background: 'var(--vi-surface)', borderColor: 'var(--vi-border)', borderRadius: 'var(--vi-radius)' }}><div className="mb-2 h-14 rounded-lg" style={{ background: 'var(--vi-surface-alt)' }} /><strong className="text-[10px]">Fabrication 3D</strong><p className="mt-1 text-[9px]" style={{ color: 'var(--vi-muted)' }}>Design personnalisé</p></div></div></div>
-                <div className="px-4 py-3 text-center text-[9px]" style={{ background: 'var(--vi-footer)', color: 'var(--vi-muted)' }}>LUNDER’S 3D STUDIO · DESIGN · PRINT · CREATE</div>
-              </div>
+            <div className="mb-3">
+              <p className="admin-eyebrow">Aperçu instantané</p>
+              <h2 className="text-lg font-semibold text-offwhite">La boutique, en direct</h2>
+              <p className="mt-1 text-xs text-charcoal-400">Le vrai storefront, avec le brouillon en cours appliqué.</p>
             </div>
-            <p className="mt-3 text-xs text-charcoal-500">Aperçu des tokens, du hero, des boutons et des cartes. La boutique publique conserve ses composants et ses actions réelles.</p>
+            <LiveStorePreview config={config} />
+            <p className="mt-3 text-[11px] leading-5 text-charcoal-500">
+              Cet aperçu applique les couleurs, les polices, les médias, les contenus et le mouvement du
+              brouillon sans rien publier. Seul « Publier » rend ces changements visibles aux visiteurs.
+            </p>
           </section>
         </aside>
       </div>

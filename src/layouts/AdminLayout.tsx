@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import {
   Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X, FileSpreadsheet,
   ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins, Users,
-  BarChart3, PanelLeftClose, PanelLeftOpen, Palette, ChevronRight,
+  BarChart3, PanelLeftClose, PanelLeftOpen, Palette, ChevronRight, Plus, Store,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -176,7 +176,19 @@ export default function AdminLayout() {
                   <h1 className="truncate text-sm font-bold text-white md:text-base">{pageTitle}</h1>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-3"><span className="hidden rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1.5 text-[10px] font-semibold text-emerald-300 sm:inline-flex">Espace sécurisé</span><NotificationCenter /></div>
+              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                <Link
+                  to="/boutique"
+                  className="hidden items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-[11px] font-semibold text-charcoal-300 transition hover:border-brand-red/40 hover:text-white lg:inline-flex"
+                >
+                  <Store className="h-3.5 w-3.5" /> Voir la boutique
+                </Link>
+                <Link to="/admin/produits/nouveau" className="btn-primary hidden sm:inline-flex">
+                  <Plus className="h-4 w-4" /> Nouveau produit
+                </Link>
+                <span className="hidden rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1.5 text-[10px] font-semibold text-emerald-300 xl:inline-flex">Espace sécurisé</span>
+                <NotificationCenter />
+              </div>
             </header>
 
             <main className="min-h-0 flex-1 overflow-y-auto scrollbar-thin bg-[radial-gradient(ellipse_at_top_left,rgba(190,35,52,0.055),transparent_38%)] p-4 md:p-7 xl:p-8">

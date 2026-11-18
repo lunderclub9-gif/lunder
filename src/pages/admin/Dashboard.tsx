@@ -6,6 +6,8 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { formatDzd } from '@/lib/format'
+import { orderStatusLabel } from '@/lib/checkout'
 
 type Stats = {
   products_total: number
@@ -70,10 +72,46 @@ const sections = [
 
 type StatKey = keyof Stats
 
+type PendingOrder = {
+  id: string
+  order_number: string
+  customer_name: string
+  total_dzd: number
+  status: string
+  created_at: string
+}
+
+type PendingRequest = {
+  id: string
+  request_number: string
+  customer_name: string
+  title: string
+  status: string
+}
+
+type LowStockProduct = {
+  id: string
+  name: string
+  stock_quantity: number
+}
+
+const REQUEST_STATUS_LABELS: Record<string, string> = {
+  new: 'Nouvelle',
+  reviewing: 'En étude',
+}
+
+const formatShortDate = (value: string) =>
+  new Intl.DateTimeFormat('fr-DZ', { day: '2-digit', month: 'short' }).format(new Date(value))
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
+  const [newRequests, setNewRequests] = useState<PendingRequest[]>([])
+  const [lowStock, setLowStock] = useState<LowStockProduct[]>([])
+  const [opsLoading, setOpsLoading] = useState(true)
+  const [opsError, setOpsError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -88,7 +126,45 @@ export default function AdminDashboard() {
     setLoading(false)
   }, [])
 
+  const loadOperations = useCallback(async () => {
+    setOpsLoading(true)
+    setOpsError(null)
+    const [ordersResult, requestsResult, stockResult] = await Promise.all([
+      supabase
+        .from('orders')
+        .select('id, order_number, customer_name, total_dzd, status, created_at')
+        .in('status', ['pending', 'confirmed'])
+        .is('archived_at', null)
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabase
+        .from('custom_requests')
+        .select('id, request_number, customer_name, title, status')
+        .in('status', ['new', 'reviewing'])
+        .is('deletion_started_at', null)
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabase
+        .from('products')
+        .select('id, name, stock_quantity')
+        .eq('status', 'published')
+        .eq('made_to_order', false)
+        .lte('stock_quantity', 5)
+        .order('stock_quantity', { ascending: true })
+        .limit(5),
+    ])
+
+    if (ordersResult.error || requestsResult.error || stockResult.error) {
+      setOpsError('Certaines opérations n’ont pas pu être chargées.')
+    }
+    setPendingOrders((ordersResult.data as PendingOrder[]) ?? [])
+    setNewRequests((requestsResult.data as PendingRequest[]) ?? [])
+    setLowStock((stockResult.data as LowStockProduct[]) ?? [])
+    setOpsLoading(false)
+  }, [])
+
   useEffect(() => { void load() }, [load])
+  useEffect(() => { void loadOperations() }, [loadOperations])
 
   const queue = [
     { label: 'Commandes à confirmer', key: 'orders_pending' as const, to: '/admin/commandes?status=pending', icon: ShoppingBag, tone: 'text-amber-300 bg-amber-300/10' },
@@ -125,6 +201,107 @@ export default function AdminDashboard() {
               <ArrowUpRight className="h-4 w-4 text-charcoal-600 transition group-hover:text-white" />
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section aria-label="Opérations à traiter" className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="admin-eyebrow">Opérations</p>
+            <h2 className="text-lg font-bold text-white">À traiter maintenant</h2>
+            <p className="mt-1 text-xs text-charcoal-500">Les files d’attente et alertes de stock en un coup d’œil.</p>
+          </div>
+          {opsError ? (
+            <button type="button" onClick={() => void loadOperations()} className="text-xs font-semibold text-red-300 hover:text-white">
+              {opsError} · Réessayer
+            </button>
+          ) : (
+            <span className="text-xs text-charcoal-500">Mise à jour automatique au chargement</span>
+          )}
+        </div>
+
+        <div className="grid gap-3 xl:grid-cols-3">
+          <div className="admin-card">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-white"><ShoppingBag className="h-4 w-4 text-amber-300" /> Commandes à confirmer</h3>
+              <Link to="/admin/commandes?status=pending" className="text-[11px] font-semibold text-brand-red-light hover:text-white">Tout voir</Link>
+            </div>
+            {opsLoading ? (
+              <div className="space-y-2">{Array.from({ length: 3 }, (_, index) => <div key={index} className="h-10 animate-pulse rounded-lg bg-white/5" />)}</div>
+            ) : pendingOrders.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-white/10 px-3 py-6 text-center text-xs text-charcoal-500">Aucune commande en attente. Tout est à jour.</p>
+            ) : (
+              <ul className="space-y-1">
+                {pendingOrders.map((order) => (
+                  <li key={order.id}>
+                    <Link to={`/admin/commandes?status=${order.status}`} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition hover:bg-white/[0.045]">
+                      <span className="min-w-0">
+                        <span className="block truncate font-mono text-[11px] text-brand-red-light">{order.order_number}</span>
+                        <span className="block truncate text-xs text-charcoal-200">{order.customer_name}</span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block text-xs font-semibold text-white">{formatDzd(order.total_dzd)}</span>
+                        <span className="block text-[10px] text-charcoal-500">{orderStatusLabel(order.status)} · {formatShortDate(order.created_at)}</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="admin-card">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-white"><FileText className="h-4 w-4 text-sky-300" /> Demandes à étudier</h3>
+              <Link to="/admin/demandes" className="text-[11px] font-semibold text-brand-red-light hover:text-white">Tout voir</Link>
+            </div>
+            {opsLoading ? (
+              <div className="space-y-2">{Array.from({ length: 3 }, (_, index) => <div key={index} className="h-10 animate-pulse rounded-lg bg-white/5" />)}</div>
+            ) : newRequests.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-white/10 px-3 py-6 text-center text-xs text-charcoal-500">Aucune nouvelle demande sur mesure.</p>
+            ) : (
+              <ul className="space-y-1">
+                {newRequests.map((request) => (
+                  <li key={request.id}>
+                    <Link to="/admin/demandes" className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition hover:bg-white/[0.045]">
+                      <span className="min-w-0">
+                        <span className="block truncate font-mono text-[11px] text-brand-red-light">{request.request_number}</span>
+                        <span className="block truncate text-xs text-charcoal-200">{request.title || request.customer_name}</span>
+                      </span>
+                      <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-charcoal-300">
+                        {REQUEST_STATUS_LABELS[request.status] ?? request.status}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="admin-card">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-white"><Package className="h-4 w-4 text-rose-300" /> Stock faible</h3>
+              <Link to="/admin/produits" className="text-[11px] font-semibold text-brand-red-light hover:text-white">Gérer</Link>
+            </div>
+            {opsLoading ? (
+              <div className="space-y-2">{Array.from({ length: 3 }, (_, index) => <div key={index} className="h-10 animate-pulse rounded-lg bg-white/5" />)}</div>
+            ) : lowStock.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-white/10 px-3 py-6 text-center text-xs text-charcoal-500">Aucun produit publié sous le seuil de 5 unités.</p>
+            ) : (
+              <ul className="space-y-1">
+                {lowStock.map((product) => (
+                  <li key={product.id}>
+                    <Link to={`/admin/produits/${product.id}`} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition hover:bg-white/[0.045]">
+                      <span className="min-w-0 truncate text-xs text-charcoal-200">{product.name}</span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${product.stock_quantity === 0 ? 'bg-red-500/10 text-red-300' : 'bg-amber-400/10 text-amber-300'}`}>
+                        {product.stock_quantity === 0 ? 'Rupture' : `${product.stock_quantity} restant${product.stock_quantity > 1 ? 's' : ''}`}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </section>
 

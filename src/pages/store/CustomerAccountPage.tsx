@@ -20,6 +20,10 @@ export default function CustomerAccountPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
   const [editName, setEditName] = useState('')
   const [editing, setEditing] = useState(false)
+  const [recoveryMode, setRecoveryMode] = useState(() => new URLSearchParams(window.location.search).get('mode') === 'recovery')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [resetEmailSent, setResetEmailSent] = useState(false)
 
   useEffect(() => {
     setEditName(profile?.full_name ?? '')
@@ -66,6 +70,51 @@ export default function CustomerAccountPage() {
     setMessage(data.session
       ? { type: 'success', text: 'Votre compte est créé. Bienvenue chez LUNDER !' }
       : { type: 'info', text: 'Votre compte est presque prêt : confirmez votre adresse e-mail depuis le message reçu.' })
+  }
+
+  const requestPasswordReset = async () => {
+    const cleanEmail = email.trim().toLowerCase()
+    if (!cleanEmail) {
+      setMessage({ type: 'error', text: 'Saisissez votre adresse e-mail pour recevoir le lien de réinitialisation.' })
+      return
+    }
+    setSaving(true)
+    setMessage(null)
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: `${window.location.origin}/boutique/compte?mode=recovery`,
+    })
+    setSaving(false)
+    if (error) {
+      setMessage({ type: 'error', text: 'Impossible d’envoyer le lien. Vérifiez votre adresse et réessayez.' })
+      return
+    }
+    setResetEmailSent(true)
+    setMessage({ type: 'success', text: 'Si cette adresse correspond à un compte, un lien de réinitialisation vient d’être envoyé.' })
+  }
+
+  const updatePassword = async (event: FormEvent) => {
+    event.preventDefault()
+    if (newPassword.length < 8) {
+      setMessage({ type: 'error', text: 'Le nouveau mot de passe doit contenir au moins 8 caractères.' })
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: 'error', text: 'Les deux mots de passe ne correspondent pas.' })
+      return
+    }
+    setSaving(true)
+    setMessage(null)
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    setSaving(false)
+    if (error) {
+      setMessage({ type: 'error', text: 'La mise à jour a échoué. Ouvrez à nouveau le lien reçu par e-mail et réessayez.' })
+      return
+    }
+    setRecoveryMode(false)
+    setNewPassword('')
+    setConfirmPassword('')
+    window.history.replaceState({}, '', '/boutique/compte')
+    setMessage({ type: 'success', text: 'Votre mot de passe a été modifié avec succès.' })
   }
 
   const saveProfile = async (event: FormEvent) => {
@@ -118,7 +167,18 @@ export default function CustomerAccountPage() {
 
       {message && <div role="status" className={`mb-6 rounded-xl border px-4 py-3 text-sm ${message.type === 'error' ? 'border-red-400/25 bg-red-500/10 text-red-200' : message.type === 'success' ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200' : 'border-sky-400/25 bg-sky-500/10 text-sky-100'}`}>{message.text}</div>}
 
-      {session ? (
+      {session ? recoveryMode ? (
+        <section className="mx-auto max-w-xl rounded-2xl border border-white/10 bg-charcoal-800/80 p-5 sm:p-7">
+          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-red/10 text-brand-red-light"><KeyRound className="h-6 w-6" /></div>
+          <h2 className="text-xl font-bold text-white">Créer un nouveau mot de passe</h2>
+          <p className="mt-2 text-sm leading-6 text-charcoal-400">Choisissez un mot de passe sécurisé d’au moins 8 caractères.</p>
+          <form onSubmit={updatePassword} className="mt-6 space-y-4">
+            <label className="block"><span className="label-text">Nouveau mot de passe</span><input className="input-field" type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} maxLength={128} autoComplete="new-password" required /></label>
+            <label className="block"><span className="label-text">Confirmer le mot de passe</span><input className="input-field" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} maxLength={128} autoComplete="new-password" required /></label>
+            <button type="submit" className="btn-primary w-full" disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Enregistrer le nouveau mot de passe</button>
+          </form>
+        </section>
+      ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,.75fr)]">
           <section className="rounded-2xl border border-white/10 bg-charcoal-800/80 p-5 sm:p-7">
             <div className="mb-6 flex items-center gap-3">
@@ -166,6 +226,7 @@ export default function CustomerAccountPage() {
               <label className="block"><span className="label-text">Adresse e-mail</span><span className="relative block"><Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-500" /><input className="input-field pl-10" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required maxLength={254} placeholder="vous@exemple.com" /></span></label>
               <label className="block"><span className="label-text">Mot de passe</span><span className="relative block"><KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-500" /><input className="input-field px-10" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={mode === 'register' ? 8 : 1} maxLength={128} placeholder="••••••••" /><button type="button" aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal-400 hover:text-white">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span></label>
               <button type="submit" disabled={saving} className="btn-primary w-full">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}{mode === 'login' ? 'Se connecter' : 'Créer mon compte'}</button>
+              {mode === 'login' && <button type="button" onClick={requestPasswordReset} disabled={saving || resetEmailSent} className="w-full text-center text-xs font-semibold text-brand-red-light transition hover:text-white disabled:opacity-50">{saving ? 'Envoi en cours…' : resetEmailSent ? 'Lien de réinitialisation envoyé' : 'Mot de passe oublié ? Recevoir un lien'}</button>}
             </form>
             <p className="mt-5 text-center text-[11px] leading-5 text-charcoal-500">Vos identifiants sont gérés par Supabase Auth. LUNDER ne stocke jamais votre mot de passe en clair.</p>
           </section>
@@ -181,7 +242,5 @@ export default function CustomerAccountPage() {
             <div className="mt-7 border-t border-white/10 pt-5"><p className="text-xs text-charcoal-400">Vous préférez commander sans compte ?</p><Link to="/boutique/produits" className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-brand-red-light hover:text-white">Continuer comme invité <ArrowRight className="h-4 w-4" /></Link></div>
           </aside>
         </div>
-      )}
-    </div>
-  )
-}
+      )) : (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.8fr)]">

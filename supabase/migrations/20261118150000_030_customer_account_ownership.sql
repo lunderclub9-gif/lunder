@@ -45,7 +45,10 @@ DECLARE
   v_quote_id uuid;
   v_customer_user_id uuid;
 BEGIN
-  IF NEW.idempotency_key LIKE 'devis:%' THEN
+  -- Only the trusted custom-order flow may inherit a request owner.
+  -- Store checkout accepts a client idempotency key, so its text prefix alone
+  -- must never be treated as proof that an order came from a custom quote.
+  IF NEW.source = 'custom' AND NEW.idempotency_key LIKE 'devis:%' THEN
     BEGIN
       v_quote_id := substring(NEW.idempotency_key FROM 7)::uuid;
     EXCEPTION WHEN invalid_text_representation THEN

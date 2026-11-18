@@ -168,7 +168,7 @@ have been reconciled. Later files depend on `public.is_owner()` and earlier tabl
 | `20261113150000_009_order_archive_source_and_security.sql` | order archive columns, source, soft-delete, owner-only quote generation | 008 |
 | `20261113160000_010_pricing_security_and_public_estimate.sql` | revoke public pricing access, safe materials view, public estimate RPC | 009 |
 | `20261113170000_011_custom_workflow_and_delivered_deletion.sql` | dimension estimate, client decision history, owner approval, delivered-order deletion | 010 |
-| `20261113180000_012_owner_approval_and_safe_request_deletion.sql` | remove legacy public order-creation RPC, allow owner approval of `sent` quotes, two-phase deletion of eligible unlinked requests | 011 |
+| `20261113180000_012_owner_approval_and_safe_request_deletion.sql` | remove legacy public order-creation RPC, add the intermediate owner-approval rule (superseded by immutable acceptance in 024), two-phase deletion of eligible unlinked requests | 011 |
 | `20261114224500_013_owner_notifications.sql` | durable owner notification records and insert triggers | 012 |
 | `20261116100000_014_multi_model_custom_requests.sql` | multi-file / multi-model product specs, geometry-aware estimation and exact-dimension server validation | 013 |
 | `20261116120000_015_profit_analytics.sql` | delivered timestamps, immutable order-item cost snapshots, business expenses and owner-only finance data | 014 |
@@ -273,7 +273,7 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
    détail interne, l'acceptation éventuelle du client et l'historique des devis. Il peut créer un
    devis depuis l'estimation, saisir un devis manuel ou un devis technique, puis l'envoyer.
 5. L'acceptation client ne crée aucune commande et n'est pas requise. Le propriétaire peut approuver
-   un devis valide `sent` ou `accepted` via `owner_approve_custom_request`; ce RPC vérifie la livraison,
+   un devis valide, accepté par le client et toujours à jour via `owner_approve_custom_request`; ce RPC vérifie la livraison,
    le montant, l'éligibilité de la demande et l'idempotence. La commande suit ensuite le système
    existant de suivi et de livraison.
 6. Une commande `delivered` affiche un bouton de suppression directement sur sa carte. La

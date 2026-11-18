@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowDownWideNarrow, Package, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
+import { AlertTriangle, ArrowDownWideNarrow, ChevronLeft, ChevronRight, Package, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
 import { supabase, type Product, type Category } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
 import { sanitizeSearchTerm } from '@/lib/format'
 import posthog, { isPostHogEnabled } from '@/lib/posthog'
+
+const PAGE_SIZE = 12
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -17,6 +19,8 @@ export default function ProductsPage() {
   const requestSequence = useRef(0)
   const [activeCategory, setActiveCategory] = useState<string>('')
   const [sortOrder, setSortOrder] = useState<'newest' | 'price-asc' | 'price-desc'>('newest')
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -47,6 +51,10 @@ export default function ProductsPage() {
     return () => window.clearTimeout(timer)
   }, [search])
 
+  useEffect(() => {
+    setPage(1)
+  }, [activeCategory, debouncedSearch, sortOrder])
+
   const loadProducts = useCallback(async () => {
     const requestId = ++requestSequence.current
     setLoading(true)
@@ -61,24 +69,28 @@ export default function ProductsPage() {
     const term = sanitizeSearchTerm(debouncedSearch)
     if (term) query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`)
 
-    if (sortOrder === 'price-asc') query = query.order('price_dzd', { ascending: true })
-    else if (sortOrder === 'price-desc') query = query.order('price_dzd', { ascending: false })
-    else query = query.order('created_at', { ascending: false })
+    if (sortOrder === 'price-asc') query = query.order('price_dzd', { ascending: true }).order('id', { ascending: true })
+    else if (sortOrder === 'price-desc') query = query.order('price_dzd', { ascending: false }).order('id', { ascending: true })
+    else query = query.order('created_at', { ascending: false }).order('id', { ascending: false })
 
-    const { data, error } = await query
+    const start = (page - 1) * PAGE_SIZE
+    const { data, error } = await query.range(start, start + PAGE_SIZE)
     if (requestId !== requestSequence.current) return
     if (error) {
       console.error('[LUNDER] chargement des produits impossible', error.code ?? 'erreur inconnue')
       setProducts([])
+      setHasMore(false)
       setFailed(true)
       setLoading(false)
       return
     }
 
-    setProducts((data as Product[]) ?? [])
+    const rows = (data as Product[]) ?? []
+    setHasMore(rows.length > PAGE_SIZE)
+    setProducts(rows.slice(0, PAGE_SIZE))
     setFailed(false)
     setLoading(false)
-  }, [activeCategory, debouncedSearch, sortOrder])
+  }, [activeCategory, debouncedSearch, page, sortOrder])
 
   useEffect(() => {
     void loadProducts()
@@ -127,7 +139,7 @@ export default function ProductsPage() {
             </div>
             <div className="flex items-center gap-2 text-xs text-charcoal-400">
               <Package className="h-4 w-4 text-brand-red-light" />
-              <span>{loading ? 'Mise à jour du catalogue…' : `${products.length} produit${products.length > 1 ? 's' : ''}`}</span>
+              <span>{loading ? 'Mise à jour du catalogue…' : `${products.length} produit${products.length > 1 ? 's' : ''} affiché${products.length > 1 ? 's' : ''}`}</span>
             </div>
           </div>
         </div>
@@ -212,6 +224,18 @@ export default function ProductsPage() {
             </div>
           )}
         </div>
+
+        {!loading && !failed && products.length > 0 && (page > 1 || hasMore) && (
+          <nav aria-label="Pagination des produits" className="mt-8 flex items-center justify-center gap-3">
+            <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1} className="btn-secondary min-w-28 justify-center disabled:cursor-not-allowed disabled:opacity-40">
+              <ChevronLeft className="h-4 w-4" /> Précédent
+            </button>
+            <span aria-live="polite" className="min-w-20 text-center text-xs font-semibold text-charcoal-300">Page {page}</span>
+            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={!hasMore} className="btn-secondary min-w-28 justify-center disabled:cursor-not-allowed disabled:opacity-40">
+              Suivant <ChevronRight className="h-4 w-4" />
+            </button>
+          </nav>
+        )}
 
         <div className="mt-12 rounded-2xl border border-brand-red/20 bg-brand-red/5 p-6 sm:flex sm:items-center sm:justify-between sm:gap-6">
           <div><h2 className="text-lg font-bold text-offwhite">Vous avez une idée à fabriquer ?</h2><p className="mt-1 text-sm text-charcoal-400">Envoyez une image ou un modèle 3D à notre atelier.</p></div>

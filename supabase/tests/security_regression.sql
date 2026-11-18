@@ -1,9 +1,11 @@
--- Run with psql / Supabase SQL editor after migrations 001–028 on an isolated test DB.
+-- Run with psql / Supabase SQL editor after all migrations on an isolated test DB.
 -- These assertions intentionally fail if a privileged RPC becomes public again.
 
 DO $$
 DECLARE
   v_view_options text[];
+  v_function_config text[];
+  v_is_definer boolean;
 BEGIN
   IF has_function_privilege('anon', 'public.manufacturing_calculate_full(text,numeric,numeric,integer,jsonb,boolean)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.manufacturing_calculate_full(text,numeric,numeric,integer,jsonb,boolean)', 'EXECUTE') THEN
@@ -73,6 +75,63 @@ BEGIN
   IF has_schema_privilege('anon', 'public', 'CREATE')
      OR has_schema_privilege('authenticated', 'public', 'CREATE') THEN
     RAISE EXCEPTION 'Client roles must not be able to create objects in the public schema.';
+  END IF;
+
+  -- Visual identity publishing is owner-only and must obey RLS as the caller.
+  IF has_function_privilege('anon', 'public.publish_visual_identity(jsonb)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.restore_visual_identity_version(bigint)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous callers can execute a visual identity publishing RPC.';
+  END IF;
+
+  IF NOT has_function_privilege('authenticated', 'public.publish_visual_identity(jsonb)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.restore_visual_identity_version(bigint)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Authenticated owner UI is missing visual identity RPC grants.';
+  END IF;
+
+  SELECT prosecdef, proconfig INTO v_is_definer, v_function_config
+  FROM pg_proc
+  WHERE oid = 'public.publish_visual_identity(jsonb)'::regprocedure;
+  IF coalesce(v_is_definer, true) OR NOT coalesce(v_function_config @> ARRAY['search_path=""'], false) THEN
+    RAISE EXCEPTION 'Visual identity publishing must use SECURITY INVOKER with an empty search_path.';
+  END IF;
+
+  SELECT prosecdef, proconfig INTO v_is_definer, v_function_config
+  FROM pg_proc
+  WHERE oid = 'public.restore_visual_identity_version(bigint)'::regprocedure;
+  IF coalesce(v_is_definer, true) OR NOT coalesce(v_function_config @> ARRAY['search_path=""'], false) THEN
+    RAISE EXCEPTION 'Visual identity rollback must use SECURITY INVOKER with an empty search_path.';
+  END IF;
+
+  IF has_table_privilege('anon', 'public.store_design_versions', 'SELECT')
+     OR has_table_privilege('anon', 'public.store_design_versions', 'INSERT')
+     OR has_table_privilege('authenticated', 'public.store_design_versions', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.store_design_versions', 'DELETE') THEN
+    RAISE EXCEPTION 'Visual identity history table has excessive or anonymous privileges.';
+  END IF;
+
+  IF NOT has_table_privilege('authenticated', 'public.store_design_versions', 'SELECT')
+     OR NOT has_table_privilege('authenticated', 'public.store_design_versions', 'INSERT') THEN
+    RAISE EXCEPTION 'Owner-only visual identity history grants are missing.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'store_design_versions'
+      AND policyname = 'owner_read_store_design_versions' AND qual ILIKE '%is_owner%'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'store_design_versions'
+      AND policyname = 'owner_insert_store_design_versions' AND with_check ILIKE '%is_owner%'
+  ) THEN
+    RAISE EXCEPTION 'Visual identity history is missing owner-only RLS policies.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE oid = 'public.restore_visual_identity_version(bigint)'::regprocedure
+      AND pg_get_functiondef(oid) ILIKE '%publish_visual_identity(v_config)%'
+  ) THEN
+    RAISE EXCEPTION 'Visual identity rollback does not publish a new immutable snapshot.';
   END IF;
 
   IF has_schema_privilege('anon', 'lunder_private', 'USAGE')

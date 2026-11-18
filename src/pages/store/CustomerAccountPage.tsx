@@ -15,7 +15,15 @@ type AccountOrder = {
   status: string
   total_dzd: number
   created_at: string
-  order_items: { product_name: string; quantity: number }[] | null
+  items: { product_name: string; quantity: number }[] | null
+}
+
+type AccountQuote = {
+  request_id: string
+  version: number
+  status: string
+  price_dzd: number
+  valid_until: string
 }
 
 type AccountRequest = {
@@ -25,7 +33,7 @@ type AccountRequest = {
   title: string
   status: string
   created_at: string
-  custom_quotes: { version: number; status: string; price_dzd: number; valid_until: string }[] | null
+  custom_quotes: AccountQuote[]
 }
 
 const orderStatusLabels: Record<string, string> = {
@@ -81,25 +89,34 @@ export default function CustomerAccountPage() {
     const loadActivity = async () => {
       setActivityLoading(true)
       setActivityError(null)
-      const [ordersResult, requestsResult] = await Promise.all([
+      const [ordersResult, requestsResult, quotesResult] = await Promise.all([
         supabase
-          .from('orders')
-          .select('id, order_number, status, total_dzd, created_at, order_items(product_name, quantity)')
+          .from('customer_account_orders')
+          .select('id, order_number, status, total_dzd, created_at, items')
           .order('created_at', { ascending: false })
           .limit(20),
         supabase
-          .from('custom_requests')
-          .select('id, request_number, tracking_token, title, status, created_at, custom_quotes(version, status, price_dzd, valid_until)')
+          .from('customer_account_requests')
+          .select('id, request_number, tracking_token, title, status, created_at')
           .order('created_at', { ascending: false })
           .limit(20),
+        supabase
+          .from('customer_account_quotes')
+          .select('request_id, version, status, price_dzd, valid_until')
+          .order('version', { ascending: false })
+          .limit(50),
       ])
 
       if (!active) return
-      if (ordersResult.error || requestsResult.error) {
+      if (ordersResult.error || requestsResult.error || quotesResult.error) {
         setActivityError('Impossible de charger tout votre historique. Vérifiez votre connexion puis actualisez la page.')
       } else {
+        const quotes = (quotesResult.data ?? []) as AccountQuote[]
         setAccountOrders((ordersResult.data ?? []) as AccountOrder[])
-        setAccountRequests((requestsResult.data ?? []) as AccountRequest[])
+        setAccountRequests(((requestsResult.data ?? []) as Omit<AccountRequest, 'custom_quotes'>[]).map((request) => ({
+          ...request,
+          custom_quotes: quotes.filter((quote) => quote.request_id === request.id),
+        })))
       }
       setActivityLoading(false)
     }
@@ -329,7 +346,7 @@ export default function CustomerAccountPage() {
                           <div><p className="text-sm font-bold text-white">{order.order_number}</p><p className="mt-1 text-[11px] text-charcoal-400">{formatAccountDate(order.created_at)}</p></div>
                           <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-charcoal-200">{orderStatusLabels[order.status] ?? order.status}</span>
                         </div>
-                        <p className="mt-3 text-xs text-charcoal-300">{(order.order_items ?? []).reduce((sum, item) => sum + item.quantity, 0)} article(s) · {formatAccountPrice(order.total_dzd)}</p>
+                        <p className="mt-3 text-xs text-charcoal-300">{(order.items ?? []).reduce((sum, item) => sum + item.quantity, 0)} article(s) · {formatAccountPrice(order.total_dzd)}</p>
                         <Link to="/boutique/suivi" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-red-light hover:text-white">Détails et suivi <ArrowRight className="h-3.5 w-3.5" /></Link>
                       </li>
                     ))}

@@ -85,20 +85,38 @@ export default function AdminOrders() {
   const load = useCallback(async (term: string) => {
     const sequence = ++requestSequence.current
     setLoading(true)
-    let query = supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .order('created_at', { ascending: false })
-      .limit(200)
-    const expression = buildOrderSearchExpression(term)
-    if (expression) query = query.or(expression)
-    const { data, error: queryError } = await query
+    const pageSize = 500
+    const allOrders: OrderRow[] = []
+    let offset = 0
+    let queryError: Error | null = null
+
+    while (true) {
+      let query = supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+      const expression = buildOrderSearchExpression(term)
+      if (expression) query = query.or(expression)
+      const { data, error } = await query
+      if (sequence !== requestSequence.current) return
+      if (error) {
+        queryError = error
+        break
+      }
+      const batch = (data as OrderRow[]) ?? []
+      allOrders.push(...batch)
+      if (batch.length < pageSize) break
+      offset += pageSize
+    }
+
     if (sequence !== requestSequence.current) return
     if (queryError) {
-      setError('Impossible de charger les commandes.')
+      setError('Impossible de charger toutes les commandes.')
     } else {
       setError(null)
-      setOrders((data as OrderRow[]) ?? [])
+      setOrders(allOrders)
     }
     setLoading(false)
   }, [])
@@ -253,7 +271,7 @@ export default function AdminOrders() {
           </button>
         ))}
       </section>
-      {showArchived && <p className="mb-4 text-xs text-charcoal-400">{archivedCount} commande(s) archivée(s) parmi les 200 dernières chargées.</p>}
+      {showArchived && <p className="mb-4 text-xs text-charcoal-400">{archivedCount} commande(s) archivée(s) dans le résultat chargé.</p>}
 
       <label className="relative mb-6 block max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />

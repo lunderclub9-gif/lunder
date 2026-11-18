@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowDownUp, ArrowRight, Mail, MessageCircle, Phone, RefreshCw,
@@ -46,22 +46,43 @@ export default function AdminCustomers() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortMode>('recent')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const requestSequence = useRef(0)
 
   const load = useCallback(async (quiet = false) => {
     if (quiet) setRefreshing(true)
     else setLoading(true)
-    const { data, error: queryError } = await supabase
-      .from('orders')
-      .select('id, order_number, customer_name, phone, email, total_dzd, status, created_at')
-      .is('archived_at', null)
-      .order('created_at', { ascending: false })
-      .limit(500)
+    const sequence = ++requestSequence.current
+    const pageSize = 500
+    const allOrders: OrderRecord[] = []
+    let offset = 0
+    let queryError: Error | null = null
 
+    while (true) {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_number, customer_name, phone, email, total_dzd, status, created_at')
+        .is('archived_at', null)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+
+      if (sequence !== requestSequence.current) return
+      if (error) {
+        queryError = error
+        break
+      }
+      const batch = (data as OrderRecord[]) ?? []
+      allOrders.push(...batch)
+      if (batch.length < pageSize) break
+      offset += pageSize
+    }
+
+    if (sequence !== requestSequence.current) return
     if (queryError) {
-      setError('Impossible de charger le répertoire client. Vérifiez vos droits et votre connexion.')
+      setError('Impossible de charger le répertoire client complet. Vérifiez vos droits et votre connexion.')
     } else {
       setError(null)
-      setOrders((data as OrderRecord[]) ?? [])
+      setOrders(allOrders)
     }
     setLoading(false)
     setRefreshing(false)
@@ -175,7 +196,7 @@ export default function AdminCustomers() {
               )
             })}
           </div>}
-        <p className="text-[11px] leading-5 text-charcoal-500">Répertoire calculé sur les 500 dernières commandes non archivées. Les montants affichés comme livrés ne comprennent que les commandes au statut « livrée » ; les commandes annulées restent visibles dans l’historique.</p>
+        <p className="text-[11px] leading-5 text-charcoal-500">Répertoire calculé sur toutes les commandes non archivées. Les montants affichés comme livrés ne comprennent que les commandes au statut « livrée » ; les commandes annulées restent visibles dans l’historique.</p>
         <p className="text-xs text-charcoal-400">{visible.length} client(s) affiché(s) sur {customers.length} chargé(s).</p>
       </div>
     </div>

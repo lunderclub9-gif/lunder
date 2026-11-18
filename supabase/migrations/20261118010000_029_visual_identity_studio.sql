@@ -11,14 +11,19 @@ CREATE TABLE IF NOT EXISTS public.store_design_versions (
 CREATE INDEX IF NOT EXISTS idx_store_design_versions_created
   ON public.store_design_versions(created_at DESC);
 ALTER TABLE public.store_design_versions ENABLE ROW LEVEL SECURITY;
-GRANT SELECT ON public.store_design_versions TO authenticated;
+GRANT SELECT, INSERT ON public.store_design_versions TO authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.store_design_versions_id_seq TO authenticated;
 DROP POLICY IF EXISTS owner_read_store_design_versions ON public.store_design_versions;
 CREATE POLICY owner_read_store_design_versions
   ON public.store_design_versions FOR SELECT TO authenticated
   USING (public.is_owner());
+DROP POLICY IF EXISTS owner_insert_store_design_versions ON public.store_design_versions;
+CREATE POLICY owner_insert_store_design_versions
+  ON public.store_design_versions FOR INSERT TO authenticated
+  WITH CHECK (public.is_owner());
 
 CREATE OR REPLACE FUNCTION public.publish_visual_identity(p_config jsonb)
-RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS bigint LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $
 DECLARE v_version_id bigint;
 BEGIN
   IF NOT public.is_owner() THEN RAISE EXCEPTION 'ACCES_REFUSE'; END IF;

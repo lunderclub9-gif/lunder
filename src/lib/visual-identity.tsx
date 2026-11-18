@@ -93,6 +93,7 @@ export function visualIdentityCssVars(config: VisualIdentity): CSSProperties {
     '--vi-line-height': String(config.typography.lineHeight),
     '--vi-motion-duration': String(Math.max(0.12, 0.55 / Math.max(0.4, config.motion.speed))) + 's',
     '--vi-motion-speed': String(config.motion.speed),
+    '--vi-float-duration': String(5 / Math.max(0.4, config.motion.speed)) + 's',
     '--vi-motion-distance': String(Math.round(12 * config.motion.intensity)) + 'px',
     '--vi-glow-strength': String(config.motion.glow),
   } as CSSProperties

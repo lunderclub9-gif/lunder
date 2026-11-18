@@ -729,7 +729,7 @@
 .store-shell .card, .store-shell .admin-card { border-radius: var(--vi-radius); border-color: var(--vi-border); background-color: var(--vi-surface); }
 .store-shell [class*="rounded-2xl"], .store-shell [class*="rounded-3xl"] { border-radius: var(--vi-radius); }
 .store-shell [data-vi-float] { transform-style: preserve-3d; }
-.store-shell[data-motion="true"] [data-vi-float] { animation: viFloat calc(5s / var(--vi-motion-speed, 1)) ease-in-out infinite; }
+.store-shell[data-motion="true"] [data-vi-float] { animation: viFloat var(--vi-float-duration, 5s) ease-in-out infinite; }
 .store-shell[data-motion="true"] .group { transition: transform var(--vi-motion-duration) ease, box-shadow var(--vi-motion-duration) ease; }
 .store-shell[data-motion="true"] .group:hover { transform: translateY(calc(var(--vi-motion-distance) * -0.25)); }
 .store-shell[data-motion="true"] .btn-primary:active, .store-shell[data-motion="true"] .btn-secondary:active { transform: scale(.98); }

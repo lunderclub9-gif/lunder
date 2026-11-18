@@ -70,7 +70,8 @@ BEGIN
   IF position('auth.uid()' IN v_definition) = 0
      OR position('devis:%' IN v_definition) = 0
      OR position('custom_quotes' IN v_definition) = 0
-     OR position('customer_user_id' IN v_definition) = 0 THEN
+     OR position('customer_user_id' IN v_definition) = 0
+     OR position('NEW.source = ''custom''' IN v_definition) = 0 THEN
     RAISE EXCEPTION 'Order ownership trigger does not use authenticated identity and quote origin.';
   END IF;
 

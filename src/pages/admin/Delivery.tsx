@@ -110,12 +110,27 @@ export default function AdminDelivery() {
     event.preventDefault()
     setError(null)
     const price = Number(form.price_dzd)
-    if (!Number.isFinite(price) || price < 0) {
-      setError('Le prix doit être un nombre entier de dinars positif.')
+    const minDays = form.days_min === '' ? null : Number(form.days_min)
+    const maxDays = form.days_max === '' ? null : Number(form.days_max)
+    if (!Number.isSafeInteger(price) || price < 0) {
+      setError('Le prix doit être un nombre entier de dinars positif ou nul.')
+      return
+    }
+    if (!wilayaCode || !Number.isInteger(Number(wilayaCode))) {
+      setError('Sélectionnez une wilaya valide.')
       return
     }
     if (form.scope === 'commune' && !form.commune_id) {
       setError('Sélectionnez la commune concernée.')
+      return
+    }
+    if ((minDays !== null && (!Number.isInteger(minDays) || minDays < 0)) ||
+        (maxDays !== null && (!Number.isInteger(maxDays) || maxDays < 0))) {
+      setError('Les délais doivent être des nombres entiers positifs ou nuls.')
+      return
+    }
+    if (minDays !== null && maxDays !== null && maxDays < minDays) {
+      setError('Le délai maximal doit être supérieur ou égal au délai minimal.')
       return
     }
 
@@ -126,8 +141,8 @@ export default function AdminDelivery() {
       method: form.method,
       price_dzd: Math.round(price),
       carrier: form.carrier.trim() || null,
-      estimated_days_min: form.days_min ? Number(form.days_min) : null,
-      estimated_days_max: form.days_max ? Number(form.days_max) : null,
+      estimated_days_min: minDays,
+      estimated_days_max: maxDays,
       is_active: form.is_active,
     }
 
@@ -206,6 +221,13 @@ export default function AdminDelivery() {
   }
 
   const deletePoint = async (id: string) => {
+    const point = points.find((item) => item.id === id)
+    if (!(await confirmAction({
+      title: 'Supprimer ce point relais ?',
+      description: point ? `Le point « ${point.name} » sera retiré de la liste des points relais.` : 'Ce point relais sera supprimé.',
+      confirmLabel: 'Supprimer le point',
+      tone: 'danger',
+    }))) return
     const { error: deleteError } = await supabase.from('pickup_points').delete().eq('id', id)
     if (deleteError) {
       setError('Impossible de supprimer ce point relais.')

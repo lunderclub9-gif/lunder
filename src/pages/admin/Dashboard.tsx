@@ -35,10 +35,10 @@ const sections = [
     icon: ShoppingBag,
     items: [
       { label: 'Toutes les commandes', key: 'orders_total', to: '/admin/commandes', icon: ShoppingBag },
-      { label: 'En attente', key: 'orders_pending', to: '/admin/commandes', icon: Clock3 },
-      { label: 'Confirmées', key: 'orders_confirmed', to: '/admin/commandes', icon: CheckCircle2 },
-      { label: 'Expédiées', key: 'orders_shipped', to: '/admin/livraison', icon: Truck },
-      { label: 'Livrées', key: 'orders_delivered', to: '/admin/commandes', icon: CheckCircle2 },
+      { label: 'En attente', key: 'orders_pending', to: '/admin/commandes?status=pending', icon: Clock3 },
+      { label: 'Confirmées', key: 'orders_confirmed', to: '/admin/commandes?status=confirmed', icon: CheckCircle2 },
+      { label: 'Expédiées', key: 'orders_shipped', to: '/admin/commandes?status=shipped', icon: Truck },
+      { label: 'Livrées', key: 'orders_delivered', to: '/admin/commandes?status=delivered', icon: CheckCircle2 },
     ],
   },
   {
@@ -91,7 +91,7 @@ export default function AdminDashboard() {
   useEffect(() => { void load() }, [load])
 
   const queue = [
-    { label: 'Commandes à confirmer', key: 'orders_pending' as const, to: '/admin/commandes', icon: ShoppingBag, tone: 'text-amber-300 bg-amber-300/10' },
+    { label: 'Commandes à confirmer', key: 'orders_pending' as const, to: '/admin/commandes?status=pending', icon: ShoppingBag, tone: 'text-amber-300 bg-amber-300/10' },
     { label: 'Nouvelles demandes', key: 'requests_new' as const, to: '/admin/demandes', icon: FileText, tone: 'text-sky-300 bg-sky-300/10' },
     { label: 'Devis en attente', key: 'quotes_pending' as const, to: '/admin/demandes', icon: Clock3, tone: 'text-violet-300 bg-violet-300/10' },
   ]

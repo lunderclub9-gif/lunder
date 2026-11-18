@@ -46,11 +46,16 @@ export default function VisualIdentityStudio() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data, error: settingsError }, { data: history }] = await Promise.all([
+    const [{ data, error: settingsError }, { data: history, error: historyError }] = await Promise.all([
       supabase.from('store_settings').select('key,value,is_public').in('key', ['visual_identity', 'visual_identity_draft']),
       supabase.from('store_design_versions').select('id,created_at').order('created_at', { ascending: false }).limit(8),
     ])
-    if (settingsError) setError('Impossible de charger les réglages. Vérifiez votre accès propriétaire.')
+    if (settingsError || historyError) {
+      setError('Impossible de charger les réglages ou l’historique. Vérifiez votre accès propriétaire puis réessayez.')
+      setLoading(false)
+      return
+    }
+    setError('')
     const rows = (data ?? []) as { key: string; value: string | null }[]
     const draft = rows.find((row) => row.key === 'visual_identity_draft')
     const published = rows.find((row) => row.key === 'visual_identity')
@@ -115,11 +120,26 @@ export default function VisualIdentityStudio() {
     const { error: restoreError } = await supabase.rpc('restore_visual_identity_version', { p_version_id: id })
     setSaving(false)
     if (restoreError) { setError('Impossible de restaurer cette version.'); return }
-    const { data: current } = await supabase.from('store_settings').select('value').eq('key', 'visual_identity').maybeSingle()
-    const restored = parseVisualIdentity(current?.value)
-    await supabase.from('store_settings').upsert({ key: 'visual_identity_draft', value: JSON.stringify(restored), is_public: false }, { onConflict: 'key' })
+    const { data: current, error: currentError } = await supabase
+      .from('store_settings')
+      .select('value')
+      .eq('key', 'visual_identity')
+      .maybeSingle()
+    if (currentError || !current?.value) {
+      setError('La version a été publiée, mais le studio n’a pas pu relire le thème public. Actualisez la page avant toute autre modification.')
+      return
+    }
+    const restored = parseVisualIdentity(current.value)
+    const { error: draftError } = await supabase.from('store_settings').upsert(
+      { key: 'visual_identity_draft', value: JSON.stringify(restored), is_public: false },
+      { onConflict: 'key' },
+    )
     setConfig(restored)
-    setMessage('Version restaurée et publiée.')
+    if (draftError) {
+      setError('La version publique a bien été restaurée, mais le brouillon privé n’a pas pu être synchronisé. Enregistrez le brouillon à nouveau.')
+      return
+    }
+    setMessage('Version restaurée et publiée. Le brouillon est synchronisé.')
     await load()
   }
 

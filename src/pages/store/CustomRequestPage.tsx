@@ -8,6 +8,7 @@ import { DELIVERY_METHOD_LABELS, normalizeAlgerianPhone, orderErrorMessage } fro
 import { formatDzd } from '@/lib/format'
 import { downloadTicketImage } from '@/lib/ticketImage'
 import { analyze3DModel, type ModelAnalysis } from '@/lib/model-analysis'
+import { ensureModelViewer } from '@/lib/model-viewer'
 
 type UploadedFile = { path: string; name: string; mime: string; size: number; kind: 'image' | 'model' }
 type ProductSpec = {
@@ -116,7 +117,7 @@ export default function CustomRequestPage() {
     modelViewerLoadStarted.current = true
     let active = true
     setModelViewerStatus('loading')
-    void import('@google/model-viewer')
+    void ensureModelViewer()
       .then(() => { if (active) setModelViewerStatus('ready') })
       .catch(() => { if (active) setModelViewerStatus('error') })
     return () => { active = false }
@@ -886,6 +887,7 @@ export default function CustomRequestPage() {
                       alt: `Aperçu 3D de ${product.fileName}`,
                       'camera-controls': true,
                       'auto-rotate': true,
+                      loading: 'lazy',
                       'shadow-intensity': '0.8',
                       style: { width: '100%', height: '260px', background: '#111827' },
                     })}

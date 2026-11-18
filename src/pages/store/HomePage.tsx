@@ -126,6 +126,21 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="border-b border-charcoal-400/10 bg-charcoal-900/80">
+        <div className="mx-auto grid max-w-7xl gap-px bg-charcoal-400/10 px-4 sm:grid-cols-3 sm:px-6 lg:px-8">
+          {[
+            { value: '01', title: 'Choisissez ou imaginez', text: 'Une création du catalogue ou une idée à fabriquer.' },
+            { value: '02', title: 'Validez les détails', text: 'Matière, dimensions, livraison : tout est expliqué.' },
+            { value: '03', title: 'Recevez en Algérie', text: 'Un suivi clair, du premier clic à la livraison.' },
+          ].map((item) => (
+            <div key={item.value} className="flex gap-4 bg-charcoal-900 py-6 sm:px-5 lg:py-7">
+              <span className="font-mono text-xs font-bold text-brand-red-light">{item.value}</span>
+              <div><h2 className="text-sm font-bold text-offwhite">{item.title}</h2><p className="mt-1 text-xs leading-5 text-charcoal-400">{item.text}</p></div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {config.sections.benefits && (
       <section className="mx-auto grid max-w-7xl gap-3 px-4 py-8 sm:grid-cols-3 sm:px-6 lg:px-8">
         {[

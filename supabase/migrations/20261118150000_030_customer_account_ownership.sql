@@ -43,6 +43,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_quote_id uuid;
+  v_customer_user_id uuid;
 BEGIN
   IF NEW.idempotency_key LIKE 'devis:%' THEN
     BEGIN
@@ -53,10 +54,11 @@ BEGIN
 
     IF v_quote_id IS NOT NULL THEN
       SELECT r.customer_user_id
-        INTO NEW.customer_user_id
+        INTO v_customer_user_id
       FROM public.custom_quotes q
       JOIN public.custom_requests r ON r.id = q.request_id
       WHERE q.id = v_quote_id;
+      NEW.customer_user_id := v_customer_user_id;
       RETURN NEW;
     END IF;
   END IF;

@@ -7,8 +7,10 @@ import {
 } from 'lucide-react'
 import { supabase, type Product } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
+import { useVisualIdentity } from '@/lib/visual-identity'
 
 export default function HomePage() {
+  const config = useVisualIdentity()
   const [featured, setFeatured] = useState<Product[]>([])
   const [recent, setRecent] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,19 +71,18 @@ export default function HomePage() {
               <span className="text-xs font-semibold tracking-wide text-brand-red-light">STUDIO D'IMPRESSION 3D · ALGÉRIE</span>
             </div>
             <h1 className="text-4xl font-black leading-[1.08] tracking-tight text-offwhite sm:text-5xl lg:text-6xl">
-              Vos idées prennent
-              <span className="block bg-gradient-to-r from-brand-red-light to-orange-300 bg-clip-text text-transparent">forme en 3D.</span>
+              {config.content.heroTitle}
+              <span className="block bg-gradient-to-r from-brand-red-light to-orange-300 bg-clip-text text-transparent">{config.content.heroHighlight}</span>
             </h1>
             <p className="mt-6 max-w-xl text-base leading-8 text-charcoal-300 sm:text-lg">
-              Des créations uniques, des pièces utiles et des projets fabriqués sur mesure.
-              Imaginez, choisissez, commandez — nous donnons vie à votre idée.
+              {config.content.heroDescription}
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/boutique/produits" className="btn-primary min-h-12 px-6">
-                Explorer la boutique <ArrowRight className="h-4 w-4" />
+                {config.content.primaryButton} <ArrowRight className="h-4 w-4" />
               </Link>
               <Link to="/boutique/sur-mesure" className="btn-secondary min-h-12 border-charcoal-300/30 px-6">
-                Créer mon projet <Box className="h-4 w-4" />
+                {config.content.secondaryButton} <Box className="h-4 w-4" />
               </Link>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-xs text-charcoal-400">
@@ -93,7 +94,7 @@ export default function HomePage() {
 
           <div className="relative mx-auto w-full max-w-xl">
             <div className="absolute inset-8 rounded-[2rem] bg-brand-red/20 blur-3xl" />
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-charcoal-700/80 via-charcoal-800 to-charcoal-950 p-6 shadow-2xl sm:p-8">
+            <div data-vi-float className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-charcoal-700/80 via-charcoal-800 to-charcoal-950 p-6 shadow-2xl sm:p-8">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold tracking-[0.24em] text-brand-red-light">DESIGN · PRINT · CREATE</p>
@@ -104,6 +105,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="relative my-8 flex aspect-[5/4] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.18),transparent_62%),linear-gradient(145deg,#292929,#111214)]">
+                {config.assets.heroImage && <img src={config.assets.heroImage} alt="Présentation LUNDER" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-35" />}
                 <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
                 <div className="relative flex h-44 w-44 items-center justify-center rounded-[2.5rem] border border-brand-red/40 bg-gradient-to-br from-brand-red/30 to-charcoal-900/80 shadow-[0_25px_80px_rgba(220,38,38,0.2)] sm:h-52 sm:w-52">
                   <Box className="h-24 w-24 text-brand-red-light drop-shadow-[0_0_24px_rgba(248,113,113,0.45)]" strokeWidth={1.1} />
@@ -124,6 +126,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {config.sections.benefits && (
       <section className="mx-auto grid max-w-7xl gap-3 px-4 py-8 sm:grid-cols-3 sm:px-6 lg:px-8">
         {[
           { icon: BadgeCheck, title: 'Créations soignées', text: 'Des produits sélectionnés et fabriqués avec attention.' },
@@ -136,11 +139,12 @@ export default function HomePage() {
           </div>
         ))}
       </section>
+      )}
 
-      {featured.length > 0 && (
+      {config.sections.featured && featured.length > 0 && (
         <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-end justify-between gap-4">
-            <div><p className="mb-2 text-xs font-bold tracking-[0.18em] text-brand-red-light">SÉLECTION LUNDER</p><h2 className="text-2xl font-bold text-offwhite sm:text-3xl">Nos coups de cœur</h2><p className="mt-2 text-sm text-charcoal-400">Des créations mises en avant dans notre boutique.</p></div>
+            <div><p className="mb-2 text-xs font-bold tracking-[0.18em] text-brand-red-light">SÉLECTION LUNDER</p><h2 className="text-2xl font-bold text-offwhite sm:text-3xl">{config.content.featuredTitle}</h2><p className="mt-2 text-sm text-charcoal-400">Des créations mises en avant dans notre boutique.</p></div>
             <Link to="/boutique/produits" className="hidden items-center gap-1 text-sm font-semibold text-brand-red-light hover:text-white sm:inline-flex">Tout voir <ChevronRight className="h-4 w-4" /></Link>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -149,11 +153,12 @@ export default function HomePage() {
         </section>
       )}
 
+      {config.sections.custom && (
       <section className="border-y border-charcoal-400/10 bg-charcoal-950/70">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:px-8">
           <div>
             <p className="mb-2 text-xs font-bold tracking-[0.18em] text-brand-red-light">VOTRE PROJET, VOTRE FORMAT</p>
-            <h2 className="text-2xl font-bold text-offwhite sm:text-3xl">Vous ne trouvez pas exactement ce que vous cherchez ?</h2>
+            <h2 className="text-2xl font-bold text-offwhite sm:text-3xl">{config.content.customTitle}</h2>
             <p className="mt-3 text-sm leading-7 text-charcoal-400">Envoyez votre modèle 3D, une image ou simplement votre idée. Décrivez le résultat souhaité et transmettez votre demande à notre atelier.</p>
             <Link to="/boutique/sur-mesure" className="btn-primary mt-6">Demander une fabrication <ArrowRight className="h-4 w-4" /></Link>
           </div>
@@ -170,10 +175,12 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
+      {config.sections.latest && (
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-end justify-between gap-4">
-          <div><p className="mb-2 text-xs font-bold tracking-[0.18em] text-brand-red-light">À DÉCOUVRIR</p><h2 className="text-2xl font-bold text-offwhite sm:text-3xl">Les nouveautés</h2><p className="mt-2 text-sm text-charcoal-400">Les derniers produits ajoutés à la boutique.</p></div>
+          <div><p className="mb-2 text-xs font-bold tracking-[0.18em] text-brand-red-light">À DÉCOUVRIR</p><h2 className="text-2xl font-bold text-offwhite sm:text-3xl">{config.content.latestTitle}</h2><p className="mt-2 text-sm text-charcoal-400">Les derniers produits ajoutés à la boutique.</p></div>
           <Link to="/boutique/produits" className="hidden items-center gap-1 text-sm font-semibold text-brand-red-light hover:text-white sm:inline-flex">Voir le catalogue <ChevronRight className="h-4 w-4" /></Link>
         </div>
         {loading ? (
@@ -186,13 +193,16 @@ export default function HomePage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{recent.map((product) => <ProductCard key={product.id} product={product} imageUrl={primaryImage(product)} />)}</div>
         )}
       </section>
+      )}
 
+      {config.sections.finalCta && (
       <section className="px-4 pb-16 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 rounded-3xl border border-brand-red/20 bg-gradient-to-r from-brand-red/15 via-charcoal-800 to-charcoal-800 p-7 text-center sm:flex-row sm:text-left sm:p-10">
-          <div><p className="text-xs font-bold tracking-[0.18em] text-brand-red-light">PRÊT À COMMENCER ?</p><h2 className="mt-2 text-2xl font-bold text-offwhite">Votre prochaine idée commence ici.</h2><p className="mt-2 text-sm text-charcoal-300">Parcourez les créations ou lancez un projet personnalisé.</p></div>
+          <div><p className="text-xs font-bold tracking-[0.18em] text-brand-red-light">PRÊT À COMMENCER ?</p><h2 className="mt-2 text-2xl font-bold text-offwhite">{config.content.ctaTitle}</h2><p className="mt-2 text-sm text-charcoal-300">{config.content.ctaDescription}</p></div>
           <Link to="/boutique/produits" className="btn-primary shrink-0">Découvrir LUNDER <ArrowRight className="h-4 w-4" /></Link>
         </div>
       </section>
+      )}
     </div>
   )
 }

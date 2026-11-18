@@ -5,6 +5,7 @@ import { useCart } from '@/lib/cart'
 import { supabase } from '@/lib/supabase'
 import { safeExternalUrl } from '@/lib/url'
 import { toMailtoHref, toTelHref, toWhatsAppHref } from '@/lib/contact'
+import { DEFAULT_VISUAL_IDENTITY, parseVisualIdentity, visualIdentityCssVars, VisualIdentityProvider, type VisualIdentity } from '@/lib/visual-identity'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium transition-colors ${isActive ? 'text-brand-red' : 'text-charcoal-200 hover:text-offwhite'}`
@@ -22,6 +23,7 @@ export default function StoreLayout() {
   const { count } = useCart()
   const navigate = useNavigate()
   const [settings, setSettings] = useState<Record<string, string>>({})
+  const [visualIdentity, setVisualIdentity] = useState<VisualIdentity>(DEFAULT_VISUAL_IDENTITY)
 
   useEffect(() => {
     supabase
@@ -42,6 +44,7 @@ export default function StoreLayout() {
           if (row.value) next[row.key] = row.value
         })
         setSettings(next)
+        setVisualIdentity(parseVisualIdentity(next.visual_identity))
       })
   }, [])
 
@@ -75,14 +78,18 @@ export default function StoreLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-charcoal-900 text-offwhite">
+    <VisualIdentityProvider value={visualIdentity}>
+    <div className="store-shell min-h-screen bg-charcoal-900 text-offwhite" style={visualIdentityCssVars(visualIdentity)} data-motion={visualIdentity.motion.enabled ? 'true' : 'false'} data-motion-style={visualIdentity.motion.style} data-mobile-reduce={visualIdentity.motion.mobileReduce ? 'true' : 'false'}>
       <a href="#main-content" className="sr-only z-[60] rounded-lg bg-white px-4 py-3 text-sm font-semibold text-charcoal-950 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Aller au contenu</a>
       <header className="sticky top-0 z-50 border-b border-charcoal-400/10 bg-charcoal-900/90 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/boutique" className="flex items-center gap-2.5" onClick={() => setMobileOpen(false)}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-red">
-              <Printer className="h-5 w-5 text-white" />
-            </div>
+            {visualIdentity.assets.logo ? (
+              <img src={visualIdentity.assets.logo} alt="LUNDER'S 3D STUDIO" className={visualIdentity.assets.mobileLogo ? 'hidden h-10 max-w-36 object-contain sm:block' : 'h-10 max-w-36 object-contain'} />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-red"><Printer className="h-5 w-5 text-white" /></div>
+            )}
+            {visualIdentity.assets.mobileLogo && <img src={visualIdentity.assets.mobileLogo} alt="LUNDER" className="h-9 w-9 object-contain sm:hidden" />}
             <div className="block min-w-0">
               <div className="text-[11px] font-bold tracking-wide text-offwhite sm:text-sm">LUNDER'S 3D STUDIO</div>
               <div className="text-[10px] font-medium tracking-widest text-charcoal-300">DESIGN · PRINT · CREATE</div>
@@ -209,11 +216,10 @@ export default function StoreLayout() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-red">
-                <Printer className="h-4 w-4 text-white" />
-              </div>
+              {visualIdentity.assets.logo ? <img src={visualIdentity.assets.logo} alt="LUNDER'S 3D STUDIO" className="h-8 max-w-28 object-contain" /> : <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-red"><Printer className="h-4 w-4 text-white" /></div>}
               <span className="text-sm font-bold tracking-wide">LUNDER'S 3D STUDIO</span>
             </div>
+            {visualIdentity.assets.footerImage && <img src={visualIdentity.assets.footerImage} alt="" loading="lazy" className="max-h-20 max-w-48 object-contain" />}
             <p className="text-xs text-charcoal-400">DESIGN · PRINT · CREATE — From Imagination to Reality</p>
             <p className="text-xs text-charcoal-500">Algérie · Paiement à la livraison</p>
             {(telHref || whatsappHref || mailHref || socials.length > 0) && (
@@ -284,5 +290,6 @@ export default function StoreLayout() {
         </div>
       </footer>
     </div>
+    </VisualIdentityProvider>
   )
 }

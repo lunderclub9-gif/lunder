@@ -691,3 +691,59 @@
     page-break-inside: avoid;
   }
 }
+
+
+/* LUNDER Visual Identity Studio — runtime design tokens, scoped to the public store. */
+.store-shell {
+  background: var(--vi-background, #101114);
+  color: var(--vi-text, #f5f5f5);
+  font-family: var(--vi-body-font, Inter, system-ui, sans-serif);
+  font-size: var(--vi-base-size, 16px);
+  line-height: var(--vi-line-height, 1.65);
+}
+.store-shell h1, .store-shell h2, .store-shell h3, .store-shell h4 {
+  font-family: var(--vi-heading-font, Inter, system-ui, sans-serif);
+}
+.store-shell [class~="bg-charcoal-900"], .store-shell [class*="bg-charcoal-900/"] { background-color: var(--vi-background) !important; }
+.store-shell [class~="bg-charcoal-950"], .store-shell [class*="bg-charcoal-950/"] { background-color: var(--vi-footer) !important; }
+.store-shell [class~="bg-charcoal-800"], .store-shell [class*="bg-charcoal-800/"] { background-color: var(--vi-surface) !important; }
+.store-shell [class~="text-offwhite"] { color: var(--vi-text) !important; }
+.store-shell [class~="text-charcoal-300"], .store-shell [class~="text-charcoal-400"] { color: var(--vi-muted) !important; }
+.store-shell [class~="text-brand-red"], .store-shell [class~="text-brand-red-light"] { color: var(--vi-primary) !important; }
+.store-shell [class~="bg-brand-red"], .store-shell [class*="bg-brand-red/"] { background-color: var(--vi-primary) !important; }
+.store-shell [class~="border-brand-red"], .store-shell [class*="border-brand-red/"] { border-color: var(--vi-primary) !important; }
+.store-shell [class*="border-charcoal-400"] { border-color: var(--vi-border) !important; }
+.store-shell [class*="bg-gradient-to-"] { background-image: linear-gradient(135deg, var(--vi-gradient-start), var(--vi-gradient-end)) !important; }
+.store-shell header { background-color: var(--vi-header); border-color: var(--vi-border); }
+.store-shell footer { background-color: var(--vi-footer); border-color: var(--vi-border); }
+.store-shell .btn-primary {
+  background-color: var(--vi-primary) !important;
+  color: var(--vi-button-text) !important;
+  border-radius: var(--vi-button-radius);
+  box-shadow: 0 8px 26px color-mix(in srgb, var(--vi-glow) calc(var(--vi-glow-strength) * 30%), transparent);
+  transition-duration: var(--vi-motion-duration);
+}
+.store-shell .btn-primary:hover { filter: brightness(1.08); }
+.store-shell .btn-secondary { border-radius: var(--vi-button-radius); border-color: var(--vi-border); }
+.store-shell .input-field { border-color: var(--vi-border); border-radius: var(--vi-button-radius); }
+.store-shell .card, .store-shell .admin-card { border-radius: var(--vi-radius); border-color: var(--vi-border); background-color: var(--vi-surface); }
+.store-shell [class*="rounded-2xl"], .store-shell [class*="rounded-3xl"] { border-radius: var(--vi-radius); }
+.store-shell [data-vi-float] { transform-style: preserve-3d; }
+.store-shell[data-motion="true"] [data-vi-float] { animation: viFloat calc(5s / var(--vi-motion-speed, 1)) ease-in-out infinite; }
+.store-shell[data-motion="true"] .group { transition: transform var(--vi-motion-duration) ease, box-shadow var(--vi-motion-duration) ease; }
+.store-shell[data-motion="true"] .group:hover { transform: translateY(calc(var(--vi-motion-distance) * -0.25)); }
+.store-shell[data-motion="true"] .btn-primary:active, .store-shell[data-motion="true"] .btn-secondary:active { transform: scale(.98); }
+@keyframes viFloat { 0%, 100% { transform: translate3d(0, 0, 0) rotateX(0deg); } 50% { transform: translate3d(0, calc(var(--vi-motion-distance) * -0.5), 0) rotateX(2deg); } }
+@media (max-width: 640px) {
+  .store-shell[data-motion="true"] [data-vi-float] { animation-duration: 8s; }
+  .store-shell[data-motion="true"][data-mobile-reduce="true"] .group:hover { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-shell *, .store-shell *::before, .store-shell *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+
+.store-shell[data-motion="true"][data-motion-style="tilt"] .group:hover {
+  transform: perspective(900px) rotateX(2deg) rotateY(-2deg) translateY(calc(var(--vi-motion-distance) * -0.2));
+}
+.store-shell[data-motion="true"][data-motion-style="subtle"] [data-vi-float] { animation: none; }
+.store-shell[data-motion="false"] [data-vi-float], .store-shell[data-motion="false"] .group:hover { animation: none; transform: none; }

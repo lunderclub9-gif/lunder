@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X, FileSpreadsheet,
-  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins, BarChart3, PanelLeftClose, PanelLeftOpen,
+  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins, BarChart3, PanelLeftClose, PanelLeftOpen, Palette,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -28,7 +28,10 @@ const navGroups = [
     { to: '/admin/calcul-devis', label: 'Calculateur de devis', icon: Calculator },
   ] },
   { label: 'Finances', items: [{ to: '/admin/finances', label: 'Centre financier', icon: BarChart3 }] },
-  { label: 'Configuration', items: [{ to: '/admin/parametres', label: 'Paramètres du magasin', icon: Settings }] },
+  { label: 'Configuration', items: [
+    { to: '/admin/visual-identity', label: 'Studio visuel', icon: Palette },
+    { to: '/admin/parametres', label: 'Paramètres du magasin', icon: Settings },
+  ] },
   { label: 'Suivi', items: [{ to: '/admin/historique', label: 'Historique', icon: History }] },
 ]
 

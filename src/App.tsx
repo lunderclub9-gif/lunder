@@ -30,6 +30,7 @@ const AdminProductCostMaterials = lazy(() => import('@/pages/admin/ProductCostMa
 const AdminSmartFileAnalyzer = lazy(() => import('@/pages/admin/SmartFileAnalyzer'))
 const AdminCustomCosting = lazy(() => import('@/pages/admin/CustomCosting'))
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'))
+const AdminVisualIdentity = lazy(() => import('@/pages/admin/VisualIdentityStudio'))
 const AdminHistory = lazy(() => import('@/pages/admin/History'))
 const AdminFinancialDashboard = lazy(() => import('@/pages/admin/FinancialDashboard'))
 
@@ -112,6 +113,7 @@ export default function App() {
                 <Route path="analyse-fichiers" element={<AdminSmartFileAnalyzer />} />
                 <Route path="calcul-devis" element={<AdminCustomCosting />} />
                 <Route path="parametres" element={<AdminSettings />} />
+                <Route path="visual-identity" element={<AdminVisualIdentity />} />
                 <Route path="historique" element={<AdminHistory />} />
               </Route>
               <Route path="/boutique" element={<StoreLayout />}>

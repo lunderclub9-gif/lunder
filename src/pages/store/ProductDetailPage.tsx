@@ -15,6 +15,7 @@ import {
 import { formatDzd } from '@/lib/format'
 import { recordRecentlyViewed } from '@/lib/recently-viewed'
 import Viewer3D from '@/components/Viewer3D'
+import WishlistButton from '@/components/store/WishlistButton'
 import RecentlyViewedProducts from '@/components/store/RecentlyViewedProducts'
 import { useCart } from '@/lib/cart'
 
@@ -490,6 +491,17 @@ export default function ProductDetailPage() {
                 <ShoppingCart className="h-4 w-4" />
                 {inStock ? 'Ajouter au panier' : combinationAvailable ? 'Indisponible' : 'Combinaison indisponible'}
               </button>
+              <WishlistButton
+                withLabel
+                className="w-full"
+                product={{
+                  id: product.id,
+                  slug: product.slug,
+                  name: product.name,
+                  priceDzd: displayPrice,
+                  imageUrl: activeImage,
+                }}
+              />
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Link to="/boutique/panier" className="inline-flex items-center gap-1.5 text-xs font-semibold text-charcoal-300 transition hover:text-white">
                   Voir le panier {inCart > 0 && <span className="rounded-full bg-brand-red/15 px-2 py-0.5 text-[10px] text-brand-red-light">{inCart}</span>}

@@ -1,11 +1,13 @@
-import { Link, Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Link, Outlet, NavLink } from 'react-router-dom'
 import {
   Printer, Menu, X, ShoppingCart, Search, Phone, MessageCircle, Mail,
   Instagram, Facebook, Music2, UserRound, ArrowUpRight, Sparkles, Home,
-  Grid2X2, Boxes, ArrowRight, ShieldCheck,
+  Grid2X2, Boxes, ArrowRight, ShieldCheck, Heart,
 } from 'lucide-react'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useCart } from '@/lib/cart'
+import { useWishlist } from '@/lib/wishlist'
+import StoreSearch from '@/components/store/StoreSearch'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { safeExternalUrl } from '@/lib/url'
@@ -41,10 +43,9 @@ const dockNavigation = [
 export default function StoreLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
   const { count } = useCart()
+  const { count: wishlistCount } = useWishlist()
   const { session } = useAuth()
-  const navigate = useNavigate()
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [visualIdentity, setVisualIdentity] = useState<VisualIdentity>(DEFAULT_VISUAL_IDENTITY)
 
@@ -104,14 +105,6 @@ export default function StoreLayout() {
   const socials = Object.keys(SOCIAL_LABELS)
     .map((key) => ({ key, label: SOCIAL_LABELS[key], url: safeExternalUrl(settings[key]) }))
     .filter((social): social is { key: string; label: string; url: string } => Boolean(social.url))
-
-  const submitSearch = (event: FormEvent) => {
-    event.preventDefault()
-    const term = searchTerm.trim()
-    setSearchOpen(false)
-    setMobileOpen(false)
-    navigate(term ? `/boutique/produits?q=${encodeURIComponent(term)}` : '/boutique/produits')
-  }
 
   const closeMenus = () => {
     setMobileOpen(false)
@@ -197,6 +190,14 @@ export default function StoreLayout() {
                 <Search className="h-[18px] w-[18px]" />
               </button>
               <Link
+                to="/boutique/favoris"
+                className="store-icon-button relative hidden sm:inline-flex"
+                aria-label={`Mes favoris${wishlistCount > 0 ? `, ${wishlistCount} pièce(s)` : ''}`}
+              >
+                <Heart className="h-[18px] w-[18px]" />
+                {wishlistCount > 0 && <span className="store-cart-count">{wishlistCount > 9 ? '9+' : wishlistCount}</span>}
+              </Link>
+              <Link
                 to="/boutique/compte"
                 className="store-icon-button hidden sm:inline-flex"
                 aria-label={session ? 'Ouvrir mon espace' : 'Se connecter'}
@@ -226,23 +227,11 @@ export default function StoreLayout() {
 
           {searchOpen && (
             <div id="store-search" className="border-t border-charcoal-400/10">
-              <form onSubmit={submitSearch} className="lz-container py-3.5" role="search">
-                <div className="relative mx-auto max-w-3xl">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
-                  <input
-                    type="search"
-                    value={searchTerm}
-                    autoFocus
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Rechercher une création, une matière, un usage…"
-                    aria-label="Rechercher un produit"
-                    className="input-field min-h-12 pl-11"
-                  />
-                  <span className="pointer-events-none absolute right-4 top-1/2 hidden -translate-y-1/2 text-[10px] font-semibold uppercase tracking-wider text-charcoal-500 sm:block">
-                    Entrée
-                  </span>
+              <div className="lz-container py-3.5">
+                <div className="mx-auto max-w-3xl">
+                  <StoreSearch autoFocus onClose={() => setSearchOpen(false)} />
                 </div>
-              </form>
+              </div>
             </div>
           )}
 
@@ -252,19 +241,9 @@ export default function StoreLayout() {
               className="store-mobile-nav px-4 py-4 lg:hidden"
               aria-label="Navigation mobile"
             >
-              <form onSubmit={submitSearch} className="mb-4" role="search">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
-                  <input
-                    type="search"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Rechercher dans la boutique"
-                    aria-label="Rechercher un produit"
-                    className="input-field pl-11"
-                  />
-                </div>
-              </form>
+              <div className="mb-4">
+                <StoreSearch idPrefix="mobile" onClose={() => setMobileOpen(false)} />
+              </div>
               <div className="grid gap-1">
                 {navigation.map((item) => (
                   <NavLink
@@ -281,6 +260,14 @@ export default function StoreLayout() {
                     {item.label}
                   </NavLink>
                 ))}
+                <NavLink
+                  to="/boutique/favoris"
+                  onClick={closeMenus}
+                  className="flex items-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold text-charcoal-200 transition hover:bg-white/5 hover:text-white"
+                >
+                  <Heart className="h-4 w-4" /> Mes favoris
+                  {wishlistCount > 0 && <span className="rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white">{wishlistCount}</span>}
+                </NavLink>
                 <NavLink
                   to="/boutique/compte"
                   onClick={closeMenus}
@@ -369,6 +356,7 @@ export default function StoreLayout() {
                 <p className="footer-heading">Votre commande</p>
                 <div className="mt-4 grid gap-3">
                   <Link to="/boutique/panier" className="footer-link">Panier</Link>
+                  <Link to="/boutique/favoris" className="footer-link">Mes favoris</Link>
                   <Link to="/boutique/suivi" className="footer-link">Suivre une commande</Link>
                   <Link to="/boutique/compte" className="footer-link">Espace client</Link>
                   <Link to="/boutique/sur-mesure/suivi" className="footer-link">Suivi d’une demande</Link>

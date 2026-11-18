@@ -3,6 +3,7 @@ import { ArrowUpRight, Box, CheckCircle2, Clock3, PackageX } from 'lucide-react'
 import type { Product } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import posthog, { isPostHogEnabled } from '@/lib/posthog'
+import WishlistButton from '@/components/store/WishlistButton'
 
 type Props = {
   product: Product
@@ -26,20 +27,7 @@ export default function ProductCard({ product, imageUrl }: Props) {
   ].filter(Boolean).join(' · ')
 
   return (
-    <Link
-      to={`/boutique/produits/${product.slug}`}
-      onClick={() => {
-        if (isPostHogEnabled) {
-          posthog.capture('product_selected', {
-            product_id: product.id,
-            category_id: product.category_id,
-            made_to_order: product.made_to_order,
-          })
-        }
-      }}
-      aria-label={`Voir ${product.name}, ${formatDzd(product.price_dzd)}`}
-      className="lz-card group flex h-full flex-col overflow-hidden"
-    >
+    <article className="lz-card group relative flex h-full flex-col overflow-hidden">
       <div className="relative aspect-[4/5] overflow-hidden bg-charcoal-900">
         {imageUrl ? (
           <img
@@ -64,9 +52,14 @@ export default function ProductCard({ product, imageUrl }: Props) {
           ) : (
             <span />
           )}
-          <span className="flex h-8 w-8 translate-y-1 items-center justify-center rounded-full border border-white/15 bg-charcoal-950/70 text-white opacity-0 shadow-lg backdrop-blur transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-            <ArrowUpRight className="h-4 w-4" />
-          </span>
+          <div className="flex items-center gap-1.5">
+            <WishlistButton
+              product={{ id: product.id, slug: product.slug, name: product.name, priceDzd: product.price_dzd, imageUrl }}
+            />
+            <span className="flex h-8 w-8 translate-y-1 items-center justify-center rounded-full border border-white/15 bg-charcoal-950/70 text-white opacity-0 shadow-lg backdrop-blur transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+              <ArrowUpRight className="h-4 w-4" />
+            </span>
+          </div>
         </div>
 
         <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2">
@@ -79,8 +72,23 @@ export default function ProductCard({ product, imageUrl }: Props) {
       </div>
 
       <div className="flex flex-1 flex-col p-4 sm:p-[1.1rem]">
-        <h3 className="line-clamp-2 text-[0.9375rem] font-semibold leading-[1.35] text-offwhite transition-colors duration-200 group-hover:text-brand-red-light">
-          {product.name}
+        <h3 className="line-clamp-2 text-[0.9375rem] font-semibold leading-[1.35]">
+          <Link
+            to={`/boutique/produits/${product.slug}`}
+            onClick={() => {
+              if (isPostHogEnabled) {
+                posthog.capture('product_selected', {
+                  product_id: product.id,
+                  category_id: product.category_id,
+                  made_to_order: product.made_to_order,
+                })
+              }
+            }}
+            aria-label={`Voir ${product.name}, ${formatDzd(product.price_dzd)}`}
+            className="text-offwhite transition-colors duration-200 after:absolute after:inset-0 after:z-0 after:rounded-[inherit] group-hover:text-brand-red-light"
+          >
+            {product.name}
+          </Link>
         </h3>
         <p className="mt-1.5 line-clamp-1 text-[11px] text-charcoal-400">
           {meta || (product.description ? product.description : 'Création LUNDER’S 3D STUDIO')}
@@ -95,6 +103,6 @@ export default function ProductCard({ product, imageUrl }: Props) {
         </div>
       </div>
       {!available && <span className="sr-only">Produit indisponible</span>}
-    </Link>
+    </article>
   )
 }

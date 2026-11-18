@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { CartProvider } from '@/lib/cart'
+import { WishlistProvider } from '@/lib/wishlist'
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Loader2, Settings2 } from 'lucide-react'
 import { isSupabaseConfigured, missingConfigKeys } from '@/lib/supabase'
@@ -18,6 +19,7 @@ const CustomRequestPage = lazy(() => import('@/pages/store/CustomRequestPage'))
 const CustomRequestStatusPage = lazy(() => import('@/pages/store/CustomRequestStatusPage'))
 const InfoPage = lazy(() => import('@/pages/store/InfoPage'))
 const CustomerAccountPage = lazy(() => import('@/pages/store/CustomerAccountPage'))
+const WishlistPage = lazy(() => import('@/pages/store/WishlistPage'))
 const AdminLogin = lazy(() => import('@/pages/admin/AdminLogin'))
 const AdminLayout = lazy(() => import('@/layouts/AdminLayout'))
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'))
@@ -90,6 +92,7 @@ export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
+        <WishlistProvider>
         <BrowserRouter>
           <Suspense fallback={<FullPageLoader />}>
             <Routes>
@@ -124,6 +127,7 @@ export default function App() {
                 <Route index element={<HomePage />} />
                 <Route path="decouvrir/:intent" element={<IntentLandingPage />} />
                 <Route path="produits" element={<ProductsPage />} />
+                <Route path="favoris" element={<WishlistPage />} />
                 <Route path="produits/:slug" element={<ProductDetailPage />} />
                 <Route path="panier" element={<CartPage />} />
                 <Route path="commande" element={<CheckoutPage />} />
@@ -139,6 +143,7 @@ export default function App() {
             </Routes>
           </Suspense>
         </BrowserRouter>
+        </WishlistProvider>
       </CartProvider>
     </AuthProvider>
   )

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowDownWideNarrow, ChevronLeft, ChevronRight, Package,
+  AlertTriangle, ArrowDownWideNarrow, ChevronLeft, ChevronRight, Layers, Package,
   RefreshCw, Search, SlidersHorizontal, X,
 } from 'lucide-react'
 import { supabase, type Product, type Category } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
 import { sanitizeSearchTerm } from '@/lib/format'
+import {
+  PRICE_BUCKETS, collectMaterials, parsePriceBucket, priceBucketLabel,
+  priceBucketRange, resolveMaterial,
+} from '@/lib/catalog-filters'
 import posthog, { isPostHogEnabled } from '@/lib/posthog'
 
 const PAGE_SIZE = 12
@@ -47,6 +51,8 @@ export default function ProductsPage() {
 
   const urlQuery = searchParams.get('q') ?? ''
   const urlCategorySlug = searchParams.get('c') ?? ''
+  const materialParam = searchParams.get('mat') ?? ''
+  const priceParam = parsePriceBucket(searchParams.get('price'))
   const sortOrder = parseSort(searchParams.get('sort'))
   const stock = parseStock(searchParams.get('stock'))
   const page = parsePage(searchParams.get('page'))
@@ -54,6 +60,8 @@ export default function ProductsPage() {
   const [search, setSearch] = useState(urlQuery)
   const [debouncedSearch, setDebouncedSearch] = useState(urlQuery)
   const [activeCategory, setActiveCategory] = useState('')
+  const [materials, setMaterials] = useState<string[]>([])
+  const [materialFilter, setMaterialFilter] = useState('')
   const requestSequence = useRef(0)
 
   useEffect(() => {
@@ -94,6 +102,26 @@ export default function ProductsPage() {
     if (match) setActiveCategory(match.id)
   }, [categories, urlCategorySlug])
 
+  // Matières réellement utilisées par le catalogue publié.
+  useEffect(() => {
+    let active = true
+    void supabase
+      .from('products')
+      .select('material')
+      .eq('status', 'published')
+      .not('material', 'is', null)
+      .limit(500)
+      .then(({ data, error }) => {
+        if (!active || error) return
+        setMaterials(collectMaterials(((data as { material: string | null }[]) ?? []).map((row) => row.material)))
+      })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    setMaterialFilter(resolveMaterial(materialParam, materials))
+  }, [materialParam, materials])
+
   const updateParams = useCallback((patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams)
     Object.entries(patch).forEach(([key, value]) => {
@@ -114,8 +142,12 @@ export default function ProductsPage() {
       .eq('status', 'published')
 
     if (activeCategory) query = query.eq('category_id', activeCategory)
+    if (materialFilter) query = query.eq('material', materialFilter)
     if (stock === 'in') query = query.gt('stock_quantity', 0)
     if (stock === 'order') query = query.eq('made_to_order', true)
+    const priceRange = priceBucketRange(priceParam)
+    if (priceRange.min != null) query = query.gte('price_dzd', priceRange.min)
+    if (priceRange.max != null) query = query.lte('price_dzd', priceRange.max)
 
     const term = sanitizeSearchTerm(debouncedSearch)
     if (term) query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`)
@@ -140,7 +172,7 @@ export default function ProductsPage() {
     setProducts((data as Product[]) ?? [])
     setTotal(count ?? 0)
     setLoading(false)
-  }, [activeCategory, debouncedSearch, page, sortOrder, stock])
+  }, [activeCategory, debouncedSearch, materialFilter, page, priceParam, sortOrder, stock])
 
   useEffect(() => {
     void loadProducts()
@@ -173,7 +205,7 @@ export default function ProductsPage() {
   }
 
   const activeCategoryName = categories.find((category) => category.id === activeCategory)?.name
-  const activeFilters = Boolean(urlQuery || urlCategorySlug || stock !== 'all')
+  const activeFilters = Boolean(urlQuery || urlCategorySlug || materialFilter || priceParam !== 'all' || stock !== 'all')
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(page * PAGE_SIZE, total)
@@ -296,15 +328,61 @@ export default function ProductsPage() {
               </div>
             </div>
           </div>
+
+          <div className="flex flex-col gap-3 border-t border-charcoal-400/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="hidden shrink-0 items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-charcoal-500 sm:inline-flex">
+                <Layers className="h-3.5 w-3.5" /> Matière
+              </span>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-thin">
+                <button
+                  type="button"
+                  onClick={() => updateParams({ mat: null, page: null })}
+                  aria-pressed={!materialFilter}
+                  className="lz-chip shrink-0"
+                >
+                  Toutes
+                </button>
+                {materials.map((material) => (
+                  <button
+                    key={material}
+                    type="button"
+                    onClick={() => updateParams({ mat: material, page: null })}
+                    aria-pressed={materialFilter === material}
+                    className="lz-chip shrink-0"
+                  >
+                    {material}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="relative block shrink-0 sm:w-56">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-charcoal-500 sm:sr-only">Budget</span>
+              <select
+                value={priceParam}
+                onChange={(event) => updateParams({ price: event.target.value === 'all' ? null : event.target.value, page: null })}
+                className="input-field min-h-10 py-2 text-xs"
+                aria-label="Filtrer par budget"
+              >
+                {PRICE_BUCKETS.map((bucket) => (
+                  <option key={bucket.id} value={bucket.id}>{bucket.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
 
         {activeFilters && (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-charcoal-300">
               {urlQuery ? <>Recherche <strong className="text-offwhite">« {urlQuery} »</strong></> : null}
-              {urlQuery && (activeCategoryName || stock !== 'all') ? ' · ' : null}
+              {urlQuery && (activeCategoryName || materialFilter || priceParam !== 'all' || stock !== 'all') ? ' · ' : null}
               {activeCategoryName ? <strong className="text-offwhite">{activeCategoryName}</strong> : null}
-              {activeCategoryName && stock !== 'all' ? ' · ' : null}
+              {activeCategoryName && (materialFilter || priceParam !== 'all' || stock !== 'all') ? ' · ' : null}
+              {materialFilter ? <strong className="text-offwhite">{materialFilter}</strong> : null}
+              {materialFilter && (priceParam !== 'all' || stock !== 'all') ? ' · ' : null}
+              {priceParam !== 'all' ? <strong className="text-offwhite">{priceBucketLabel(priceParam)}</strong> : null}
+              {priceParam !== 'all' && stock !== 'all' ? ' · ' : null}
               {stock !== 'all' ? <strong className="text-offwhite">{STOCK_OPTIONS.find((option) => option.value === stock)?.label}</strong> : null}
             </p>
             <button

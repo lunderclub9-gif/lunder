@@ -101,8 +101,19 @@ BEGIN
      OR has_table_privilege('anon', 'public.order_items', 'SELECT')
      OR has_table_privilege('anon', 'public.business_expenses', 'SELECT')
      OR has_table_privilege('anon', 'public.tracking_attempts', 'SELECT')
-     OR has_table_privilege('anon', 'public.tracking_attempts', 'INSERT') THEN
-    RAISE EXCEPTION 'Anonymous callers have direct access to private order, finance or tracking tables.';
+     OR has_table_privilege('anon', 'public.tracking_attempts', 'INSERT')
+     OR has_table_privilege('anon', 'public.custom_requests', 'SELECT')
+     OR has_table_privilege('anon', 'public.custom_requests', 'INSERT')
+     OR has_table_privilege('anon', 'public.custom_quotes', 'SELECT')
+     OR has_table_privilege('anon', 'public.custom_quotes', 'INSERT')
+     OR has_table_privilege('anon', 'public.custom_request_files', 'SELECT')
+     OR has_table_privilege('anon', 'public.custom_quote_events', 'SELECT')
+     OR has_table_privilege('anon', 'public.audit_log', 'SELECT')
+     OR has_table_privilege('anon', 'public.materials', 'SELECT')
+     OR has_table_privilege('anon', 'public.product_costs', 'SELECT')
+     OR has_table_privilege('anon', 'public.manufacturing_pricing', 'SELECT')
+     OR has_table_privilege('anon', 'public.owner_notifications', 'SELECT') THEN
+    RAISE EXCEPTION 'Anonymous callers have direct privileges on private order, request, quote, finance, audit or tracking tables.';
   END IF;
 
   IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.manufacturing_materials'::regclass) THEN

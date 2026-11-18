@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Calculator, Loader2, Plus, Save, Trash2 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import {
   calculateCustomManufacturingCost,
@@ -37,6 +38,8 @@ const unitLabel: Record<ManufacturingUnit, string> = {
 const formatDzd = (value: number) => `${new Intl.NumberFormat('fr-DZ').format(value)} DA`
 
 export default function CustomCostingPage() {
+  const [searchParams] = useSearchParams()
+  const requestedRequestId = searchParams.get('request')
   const [requests, setRequests] = useState<RequestOption[]>([])
   const [materials, setMaterials] = useState<MaterialRow[]>([])
   const [requestId, setRequestId] = useState('')
@@ -72,7 +75,16 @@ export default function CustomCostingPage() {
     if (requestResult.error || materialResult.error || settingsResult.error) {
       setError('Impossible de charger les demandes, matières ou paramètres. Vérifiez que la migration 028 est appliquée.')
     } else {
-      setRequests((requestResult.data ?? []) as RequestOption[])
+      let loadedRequests = (requestResult.data ?? []) as RequestOption[]
+      if (requestedRequestId && !loadedRequests.some((request) => request.id === requestedRequestId)) {
+        const { data: selectedRequest } = await supabase
+          .from('custom_requests')
+          .select('id, request_number, customer_name, title, status')
+          .eq('id', requestedRequestId)
+          .maybeSingle()
+        if (selectedRequest) loadedRequests = [selectedRequest as RequestOption, ...loadedRequests]
+      }
+      setRequests(loadedRequests)
       setMaterials(((materialResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({
         id: String(row.id),
         name: String(row.name),
@@ -97,9 +109,15 @@ export default function CustomCostingPage() {
       setError(null)
     }
     setLoading(false)
-  }, [])
+  }, [requestedRequestId])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (requestedRequestId && requests.some((request) => request.id === requestedRequestId)) {
+      setRequestId(requestedRequestId)
+    }
+  }, [requestedRequestId, requests])
 
   const input = useMemo<CustomManufacturingCostInput>(() => ({
     materials: materials.filter((material) => material.isActive),
@@ -156,6 +174,15 @@ export default function CustomCostingPage() {
     if (!requestId) { setError('Sélectionnez une demande client.'); return }
     if (!estimate.value) { setError('Corrigez les données de coût avant de créer le devis.'); return }
     if (!validUntil || validUntil < localDateAfterDays(0)) { setError('La date de validité doit être aujourd’hui ou ultérieure.'); return }
+    const parsedLeadDays = Number(leadDays)
+    if (!Number.isInteger(parsedLeadDays) || parsedLeadDays < 0 || parsedLeadDays > 365) {
+      setError('Le délai de fabrication doit être un nombre entier entre 0 et 365 jours.')
+      return
+    }
+    if (lines.some((line) => line.materialId && !line.quantity.trim())) {
+      setError('Renseignez la quantité de chaque matière sélectionnée.')
+      return
+    }
     const materialLines = input.lines
     if (materialLines.length === 0 && estimate.value.costBeforeMarginDzd <= 0) { setError('Ajoutez au moins un coût de production.'); return }
 
@@ -178,7 +205,7 @@ export default function CustomCostingPage() {
       p_packaging_dzd: Math.round(input.packagingDzd),
       p_transport_dzd: Math.round(input.transportDzd),
       p_extra_dzd: Math.round(input.extraDzd),
-      p_lead_days: Number(leadDays),
+      p_lead_days: parsedLeadDays,
       p_valid_until: validUntil,
       p_terms: terms.trim() || null,
     })
@@ -198,8 +225,9 @@ export default function CustomCostingPage() {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <header className="admin-page-header">
+      <header className="admin-page-header flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div><p className="admin-eyebrow">Tarification</p><h1 className="text-2xl font-bold text-offwhite">Calculateur de coûts sur mesure</h1><p className="mt-2 text-sm text-charcoal-400">Le navigateur fournit un aperçu. PostgreSQL recalcule les prix à partir des coûts actuels avant d’émettre chaque version du devis.</p></div>
+        <button type="button" onClick={() => void load()} disabled={loading || creatingQuote} className="btn-secondary shrink-0"><Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : 'hidden'}`} />Actualiser les données</button>
       </header>
       {error && <div role="alert" className="admin-feedback admin-feedback-error">{error}</div>}
       {notice && <div role="status" className="admin-feedback admin-feedback-success">{notice}</div>}

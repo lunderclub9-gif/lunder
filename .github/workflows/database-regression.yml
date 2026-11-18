@@ -75,6 +75,9 @@ jobs:
       - name: Run SQL regression suite — manufacturing costing
         run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/manufacturing_costing_regression.sql
 
+      - name: Run SQL regression suite — customer account ownership
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/customer_account_ownership_regression.sql
+
       - name: Record regression summary
         if: success()
         run: |
@@ -83,7 +86,7 @@ jobs:
             echo "- PostgreSQL: 17"
             echo "- Baseline: clean local Supabase stack"
             echo "- Migrations: all files in supabase/migrations, in timestamp order"
-            echo "- SQL suites passed: 6 / 6"
+            echo "- SQL suites passed: 7 / 7"
             echo "- Target: loopback-only local database; no Supabase hosted project credentials used"
           } >> "$GITHUB_STEP_SUMMARY"
 

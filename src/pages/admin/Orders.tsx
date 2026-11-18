@@ -56,11 +56,13 @@ export default function AdminOrders() {
   const confirmAction = useAdminConfirm()
   const { profile } = useAuth()
   const [searchParams] = useSearchParams()
+  const requestedStatus = searchParams.get('status') ?? ''
+  const validStatuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useState(() => validStatuses.includes(requestedStatus) ? requestedStatus : '')
   const [searchText, setSearchText] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -74,6 +76,10 @@ export default function AdminOrders() {
   useEffect(() => {
     setPrintPreferences(readAdminPreferences(profile?.id ?? null))
   }, [profile?.id])
+
+  useEffect(() => {
+    setFilter(validStatuses.includes(requestedStatus) ? requestedStatus : '')
+  }, [requestedStatus])
 
   const load = useCallback(async (term: string) => {
     const sequence = ++requestSequence.current

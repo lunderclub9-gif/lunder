@@ -79,7 +79,7 @@ export default function AdminOrders() {
   }, [profile?.id])
 
   useEffect(() => {
-    setFilter(validStatuses.includes(requestedStatus) ? requestedStatus : '')
+    setFilter(ORDER_STATUSES.includes(requestedStatus) ? requestedStatus : '')
   }, [requestedStatus])
 
   const load = useCallback(async (term: string) => {
@@ -211,6 +211,12 @@ export default function AdminOrders() {
   const visible = (filter ? orders.filter((order) => order.status === filter) : orders).filter(
     (order) => showArchived || !order.archived_at
   )
+  const activeOrders = orders.filter((order) => !order.archived_at)
+  const statusCounts = ORDER_STATUSES.reduce<Record<string, number>>((counts, status) => {
+    counts[status] = activeOrders.filter((order) => order.status === status).length
+    return counts
+  }, {})
+  const archivedCount = orders.filter((order) => Boolean(order.archived_at)).length
 
   return (
     <div className="animate-fade-in">
@@ -234,6 +240,20 @@ export default function AdminOrders() {
           <option value="cancelled">Annulées</option>
         </select>
       </div>
+
+      <section aria-label="Résumé des commandes" className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <button type="button" onClick={() => setFilter('')} aria-pressed={!filter} className={`rounded-xl border p-4 text-left transition ${!filter ? 'border-brand-red/40 bg-brand-red/10' : 'border-white/[.07] bg-charcoal-800/70 hover:border-white/15'}`}>
+          <span className="block text-[11px] font-medium text-charcoal-400">Commandes actives</span>
+          <strong className="mt-2 block text-2xl font-black tabular-nums text-white">{activeOrders.length}</strong>
+        </button>
+        {ORDER_STATUSES.slice(0, 4).map((status) => (
+          <button key={status} type="button" onClick={() => setFilter(filter === status ? '' : status)} aria-pressed={filter === status} className={`rounded-xl border p-4 text-left transition ${filter === status ? 'border-brand-red/40 bg-brand-red/10' : 'border-white/[.07] bg-charcoal-800/70 hover:border-white/15'}`}>
+            <span className="block text-[11px] font-medium text-charcoal-400">{orderStatusLabel(status)}</span>
+            <strong className="mt-2 block text-2xl font-black tabular-nums text-white">{statusCounts[status] ?? 0}</strong>
+          </button>
+        ))}
+      </section>
+      {showArchived && <p className="mb-4 text-xs text-charcoal-400">{archivedCount} commande(s) archivée(s) parmi les 200 dernières chargées.</p>}
 
       <label className="relative mb-6 block max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />

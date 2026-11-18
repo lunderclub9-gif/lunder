@@ -23,7 +23,7 @@ CREATE POLICY owner_insert_store_design_versions
   WITH CHECK (public.is_owner());
 
 CREATE OR REPLACE FUNCTION public.publish_visual_identity(p_config jsonb)
-RETURNS bigint LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $
+RETURNS bigint LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE v_version_id bigint;
 BEGIN
   IF NOT public.is_owner() THEN RAISE EXCEPTION 'ACCES_REFUSE'; END IF;

@@ -1,7 +1,8 @@
 import { Link, Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { Printer, Menu, X, ShoppingCart, Search, Phone, MessageCircle, Mail, Instagram, Facebook, Music2 } from 'lucide-react'
+import { Printer, Menu, X, ShoppingCart, Search, Phone, MessageCircle, Mail, Instagram, Facebook, Music2, UserRound } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useCart } from '@/lib/cart'
+import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { safeExternalUrl } from '@/lib/url'
 import { toMailtoHref, toTelHref, toWhatsAppHref } from '@/lib/contact'
@@ -21,6 +22,7 @@ export default function StoreLayout() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const { count } = useCart()
+  const { session } = useAuth()
   const navigate = useNavigate()
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [visualIdentity, setVisualIdentity] = useState<VisualIdentity>(DEFAULT_VISUAL_IDENTITY)
@@ -108,6 +110,9 @@ export default function StoreLayout() {
             </NavLink>
             <NavLink to="/boutique/suivi" className={navLinkClass}>
               Suivre ma commande
+            </NavLink>
+            <NavLink to="/boutique/compte" className={navLinkClass}>
+              {session ? 'Mon espace' : 'Connexion'}
             </NavLink>
           </nav>
 
@@ -204,6 +209,13 @@ export default function StoreLayout() {
             >
               Suivre ma commande
             </NavLink>
+            <NavLink
+              to="/boutique/compte"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 py-2 text-sm font-medium text-charcoal-200"
+            >
+              <UserRound className="h-4 w-4" /> {session ? 'Mon espace' : 'Connexion / Inscription'}
+            </NavLink>
           </nav>
         )}
       </header>
@@ -281,6 +293,9 @@ export default function StoreLayout() {
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/boutique/suivi" className="text-xs text-charcoal-400 underline-offset-4 hover:text-offwhite hover:underline">
                 Suivre ma commande
+              </Link>
+              <Link to="/boutique/compte" className="text-xs text-charcoal-400 underline-offset-4 hover:text-offwhite hover:underline">
+                Espace client
               </Link>
               <Link to="/boutique/informations" className="text-xs text-charcoal-400 underline-offset-4 hover:text-offwhite hover:underline">
                 Informations et politiques

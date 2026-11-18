@@ -141,6 +141,29 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+        <div className="mb-6 max-w-2xl">
+          <p className="mb-2 text-xs font-bold tracking-[0.18em] text-brand-red-light">COMMENCEZ PAR L’USAGE</p>
+          <h2 className="text-2xl font-bold text-offwhite sm:text-3xl">Une idée de pièce, pas seulement un catalogue.</h2>
+          <p className="mt-3 text-sm leading-7 text-charcoal-400">Choisissez votre point de départ. LUNDER vous emmène ensuite vers la bonne expérience : trouver, offrir, prototyper ou créer.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { icon: Sparkles, eyebrow: 'Décorer', title: 'Donner du caractère à un espace', text: 'Objets, détails et petites séries pour votre intérieur.', to: '/boutique/produits?q=d%C3%A9coration' },
+            { icon: Package, eyebrow: 'Offrir', title: 'Trouver une pièce qui reste', text: 'Une création originale, prête à rejoindre quelqu’un.', to: '/boutique/produits?q=cadeau' },
+            { icon: Printer, eyebrow: 'Prototyper', title: 'Passer de l’idée à la forme', text: 'Un fichier, une cote ou un premier modèle à tester.', to: '/boutique/sur-mesure' },
+            { icon: Layers3, eyebrow: 'Personnaliser', title: 'Fabriquer votre propre version', text: 'Matière, taille, couleur et détails selon votre projet.', to: '/boutique/sur-mesure' },
+          ].map(({ icon: Icon, eyebrow, title, text, to }) => (
+            <Link key={eyebrow} to={to} className="group rounded-2xl border border-charcoal-400/15 bg-charcoal-800/35 p-5 transition duration-200 hover:-translate-y-1 hover:border-brand-red/40 hover:bg-charcoal-800/70">
+              <div className="mb-8 flex items-start justify-between"><Icon className="h-6 w-6 text-brand-red-light" /><ArrowRight className="h-4 w-4 text-charcoal-500 transition group-hover:translate-x-1 group-hover:text-brand-red-light" /></div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-charcoal-500">{eyebrow}</p>
+              <h3 className="mt-2 text-sm font-bold leading-5 text-offwhite">{title}</h3>
+              <p className="mt-2 text-xs leading-6 text-charcoal-400">{text}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       {config.sections.benefits && (
       <section className="mx-auto grid max-w-7xl gap-3 px-4 py-8 sm:grid-cols-3 sm:px-6 lg:px-8">
         {[

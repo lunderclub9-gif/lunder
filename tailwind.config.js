@@ -22,6 +22,8 @@ export default {
           red: '#E32636',
           'red-dark': '#c41f2d',
           'red-light': '#f05362',
+          amber: '#F5A524',
+          'amber-soft': '#F7C873',
         },
         offwhite: '#F5F5F5',
         metallic: '#858585',
@@ -29,11 +31,17 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      letterSpacing: {
+        technical: '0.18em',
+        signature: '0.26em',
       },
       animation: {
         'fade-in': 'fadeIn 0.4s ease-out',
-        'slide-up': 'slideUp 0.4s ease-out',
+        'slide-up': 'slideUp 0.45s cubic-bezier(0.22,0.8,0.28,1)',
         'scale-in': 'scaleIn 0.3s ease-out',
+        'shimmer': 'shimmer 2.2s linear infinite',
       },
       keyframes: {
         fadeIn: {
@@ -41,12 +49,16 @@ export default {
           '100%': { opacity: '1' },
         },
         slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '0%': { opacity: '0', transform: 'translateY(14px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         scaleIn: {
-          '0%': { opacity: '0', transform: 'scale(0.95)' },
+          '0%': { opacity: '0', transform: 'scale(0.96)' },
           '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
         },
       },
     },

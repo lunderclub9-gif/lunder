@@ -294,6 +294,14 @@ export default function CustomerAccountPage() {
     setMessage({ type: 'success', text: 'Vous êtes déconnecté.' })
   }
 
+  const activeOrders = accountOrders.filter((order) =>
+    ['pending', 'confirmed', 'shipped'].includes(order.status)
+  ).length
+  const quotesToReview = accountRequests.reduce(
+    (total, request) => total + (request.custom_quotes ?? []).filter((quote) => quote.status === 'sent').length,
+    0
+  )
+
   if (authLoading) {
     return <div className="mx-auto flex min-h-[55vh] max-w-5xl items-center justify-center px-4"><Loader2 className="h-8 w-8 animate-spin text-brand-red" /></div>
   }
@@ -314,6 +322,25 @@ export default function CustomerAccountPage() {
       </div>
 
       {message && <div role="status" className={`mb-6 rounded-xl border px-4 py-3 text-sm ${message.type === 'error' ? 'border-red-400/25 bg-red-500/10 text-red-200' : message.type === 'success' ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200' : 'border-sky-400/25 bg-sky-500/10 text-sky-100'}`}>{message.text}</div>}
+
+      {session && !recoveryMode && (
+        <dl className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: 'Commandes', value: accountOrders.length, detail: 'Au total' },
+            { label: 'En cours', value: activeOrders, detail: 'À suivre' },
+            { label: 'Demandes 3D', value: accountRequests.length, detail: 'Sur mesure' },
+            { label: 'Devis à consulter', value: quotesToReview, detail: 'Action requise' },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded-xl border border-white/10 bg-charcoal-800/60 px-4 py-3">
+              <dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-charcoal-500">{stat.label}</dt>
+              <dd className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-black tabular-nums text-white">{stat.value}</span>
+                <span className="text-[10px] text-charcoal-500">{stat.detail}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {session ? (recoveryMode ? (
         <section className="mx-auto max-w-xl rounded-2xl border border-white/10 bg-charcoal-800/80 p-5 sm:p-7">

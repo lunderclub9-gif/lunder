@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Mail, MapPin, Phone } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Truck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { safeExternalUrl } from '@/lib/url'
 import { toMailtoHref, toTelHref } from '@/lib/contact'
@@ -35,71 +36,120 @@ export default function InfoPage() {
     .map((key) => ({ key, label: SOCIAL_LABELS[key], url: safeExternalUrl(settings[key]) }))
     .filter((social): social is { key: string; label: string; url: string } => Boolean(social.url))
 
+  const policies = [
+    { key: 'policy_terms', title: 'Conditions de vente' },
+    { key: 'policy_returns', title: 'Retours et échanges' },
+    { key: 'policy_privacy', title: 'Confidentialité' },
+  ].filter((section) => settings[section.key])
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-3xl font-bold text-offwhite">Informations</h1>
+    <div className="min-h-screen">
+      <section className="lz-hero">
+        <div className="lz-container py-10 sm:py-12">
+          <p className="lz-eyebrow mb-3">LUNDER’S 3D STUDIO</p>
+          <h1 className="lz-display text-[clamp(2rem,4vw,3rem)]">Informations & politiques</h1>
+          <p className="lz-lead mt-3 max-w-2xl">
+            Contacts de l’atelier, fonctionnement des commandes et politiques de la boutique.
+          </p>
+        </div>
+      </section>
 
-      <section className="admin-card mt-6 space-y-2 text-sm text-charcoal-300">
-        <h2 className="mb-2 text-lg font-semibold text-offwhite">Nous contacter</h2>
-        {telHref ? (
-          <p className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-brand-red" />
-            <a href={telHref} className="hover:text-offwhite">
-              {settings.phone}
-            </a>
-          </p>
-        ) : null}
-        {mailHref ? (
-          <p className="flex items-center gap-2">
-            <Mail className="h-4 w-4 text-brand-red" />
-            <a href={mailHref} className="hover:text-offwhite">
-              {settings.email}
-            </a>
-          </p>
-        ) : null}
-        {settings.address ? (
-          <p className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-brand-red" />
-            {settings.address}
-          </p>
-        ) : null}
-        {!telHref && !mailHref && !settings.address && (
-          <p className="text-charcoal-400">
-            Les coordonnées du studio ne sont pas encore renseignées.
-          </p>
-        )}
+      <div className="lz-container py-8">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <section className="lz-card p-5 sm:p-6">
+            <h2 className="text-lg font-bold text-offwhite">Nous contacter</h2>
+            <p className="mt-1 text-xs text-charcoal-400">
+              Une question sur une pièce, un fichier ou une livraison ? L’atelier vous répond.
+            </p>
 
-        {socials.length > 0 && (
-          <div className="flex flex-wrap gap-3 pt-2">
-            {socials.map((social) => (
-              <a
-                key={social.key}
-                href={social.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-brand-red underline-offset-4 hover:underline"
-              >
-                {social.label}
-              </a>
+            <div className="mt-5 space-y-3 text-sm">
+              {telHref && (
+                <a href={telHref} className="flex items-center gap-3 rounded-xl border border-charcoal-400/15 bg-charcoal-900/40 px-3.5 py-3 transition hover:border-brand-red/40">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red-light"><Phone className="h-4 w-4" /></span>
+                  <span>
+                    <span className="block text-[10px] uppercase tracking-wider text-charcoal-500">Téléphone</span>
+                    <span className="block font-semibold text-offwhite">{settings.phone}</span>
+                  </span>
+                </a>
+              )}
+              {mailHref && (
+                <a href={mailHref} className="flex items-center gap-3 rounded-xl border border-charcoal-400/15 bg-charcoal-900/40 px-3.5 py-3 transition hover:border-brand-red/40">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red-light"><Mail className="h-4 w-4" /></span>
+                  <span className="min-w-0">
+                    <span className="block text-[10px] uppercase tracking-wider text-charcoal-500">E-mail</span>
+                    <span className="block break-all font-semibold text-offwhite">{settings.email}</span>
+                  </span>
+                </a>
+              )}
+              {settings.address && (
+                <div className="flex items-center gap-3 rounded-xl border border-charcoal-400/15 bg-charcoal-900/40 px-3.5 py-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red-light"><MapPin className="h-4 w-4" /></span>
+                  <span>
+                    <span className="block text-[10px] uppercase tracking-wider text-charcoal-500">Atelier</span>
+                    <span className="block font-semibold text-offwhite">{settings.address}</span>
+                  </span>
+                </div>
+              )}
+              {!telHref && !mailHref && !settings.address && (
+                <p className="rounded-xl border border-dashed border-charcoal-400/20 px-4 py-6 text-center text-xs text-charcoal-500">
+                  Les coordonnées du studio seront bientôt disponibles.
+                </p>
+              )}
+            </div>
+
+            {socials.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-charcoal-400/10 pt-4">
+                {socials.map((social) => (
+                  <a
+                    key={social.key}
+                    href={social.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="lz-chip"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" /> {social.label}
+                  </a>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="lz-card p-5 sm:p-6">
+            <h2 className="text-lg font-bold text-offwhite">Commander en clair</h2>
+            <ul className="mt-4 space-y-3 text-sm leading-6 text-charcoal-300">
+              <li className="flex gap-2.5">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                Paiement en espèces à la réception. Aucune carte bancaire n’est demandée.
+              </li>
+              <li className="flex gap-2.5">
+                <Truck className="mt-0.5 h-4 w-4 shrink-0 text-brand-red-light" />
+                Livraison à domicile ou en point relais, selon les options actives dans votre wilaya.
+              </li>
+              <li className="flex gap-2.5">
+                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-brand-red-light" />
+                Chaque commande reçoit un numéro et un lien de suivi confidentiel, sans création de compte.
+              </li>
+            </ul>
+            <div className="mt-5 flex flex-wrap gap-2 border-t border-charcoal-400/10 pt-4">
+              <Link to="/boutique/suivi" className="btn-secondary">Suivre une commande</Link>
+              <Link to="/boutique/sur-mesure" className="btn-ghost">Demander un devis</Link>
+            </div>
+          </section>
+        </div>
+
+        {policies.length > 0 && (
+          <div className="mt-8 grid gap-4">
+            {policies.map((section) => (
+              <section key={section.key} className="lz-card p-5 sm:p-6">
+                <h2 className="text-lg font-bold text-offwhite">{section.title}</h2>
+                <p className="mt-3 whitespace-pre-line text-sm leading-7 text-charcoal-300">
+                  {settings[section.key]}
+                </p>
+              </section>
             ))}
           </div>
         )}
-      </section>
-
-      {[
-        { key: 'policy_terms', title: 'Conditions de vente' },
-        { key: 'policy_returns', title: 'Retours et échanges' },
-        { key: 'policy_privacy', title: 'Confidentialité' },
-      ]
-        .filter((section) => settings[section.key])
-        .map((section) => (
-          <section key={section.key} className="admin-card mt-4">
-            <h2 className="mb-2 text-lg font-semibold text-offwhite">{section.title}</h2>
-            <p className="whitespace-pre-line text-sm leading-relaxed text-charcoal-300">
-              {settings[section.key]}
-            </p>
-          </section>
-        ))}
+      </div>
     </div>
   )
 }

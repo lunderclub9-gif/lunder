@@ -1,0 +1,636 @@
+/* ============================================================================
+   LUNDER design system — storefront tokens, surfaces and primitives.
+   Single source of truth for the public store. The Visual Identity Studio
+   writes --vi-* variables; everything below derives from them, so a published
+   theme applies everywhere without a second settings system.
+   ========================================================================== */
+
+.store-shell {
+  --lz-bg: var(--vi-background, #0b0c10);
+  --lz-surface: var(--vi-surface, #15171c);
+  --lz-surface-2: var(--vi-surface-alt, #1d2026);
+  --lz-line: var(--vi-border, #3a3d45);
+  --lz-ink: var(--vi-text, #f4f4f5);
+  --lz-muted: var(--vi-muted, #a1a1aa);
+  --lz-signal: var(--vi-primary, #e32636);
+  --lz-accent: var(--vi-accent, #f5a524);
+  --lz-radius: var(--vi-radius, 16px);
+  --lz-btn-radius: var(--vi-button-radius, 12px);
+  --lz-glow: var(--vi-glow, #e32636);
+  --lz-hairline: color-mix(in srgb, var(--lz-line) 48%, transparent);
+  --lz-hairline-strong: color-mix(in srgb, var(--lz-line) 80%, transparent);
+
+  position: relative;
+  color: var(--lz-ink);
+  font-family: var(--vi-body-font, Inter, system-ui, sans-serif);
+  font-size: var(--vi-base-size, 16px);
+  line-height: var(--vi-line-height, 1.65);
+  background-color: var(--lz-bg);
+  background-image:
+    radial-gradient(58rem 34rem at 88% -12%, color-mix(in srgb, var(--lz-signal) 13%, transparent), transparent 68%),
+    radial-gradient(46rem 30rem at 2% 4%, color-mix(in srgb, var(--lz-accent) 6%, transparent), transparent 70%);
+  background-repeat: no-repeat;
+}
+
+.store-shell h1,
+.store-shell h2,
+.store-shell h3,
+.store-shell h4 {
+  font-family: var(--vi-heading-font, Inter, system-ui, sans-serif);
+  font-weight: var(--vi-heading-weight, 800);
+  color: var(--lz-ink);
+}
+
+.store-shell ::selection {
+  background: color-mix(in srgb, var(--lz-signal) 32%, transparent);
+  color: var(--lz-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   Legacy bridge: pages still express themselves with charcoal/brand utilities.
+   Only solid colours are remapped — gradients, presence and layout stay
+   authored by the components themselves.
+   ------------------------------------------------------------------------- */
+.store-shell [class~='bg-charcoal-900'],
+.store-shell [class*='bg-charcoal-900/'] { background-color: var(--lz-bg) !important; }
+.store-shell [class~='bg-charcoal-950'],
+.store-shell [class*='bg-charcoal-950/'] { background-color: var(--vi-footer, #09090b) !important; }
+.store-shell [class~='bg-charcoal-800'],
+.store-shell [class*='bg-charcoal-800/'] { background-color: var(--lz-surface) !important; }
+.store-shell [class~='bg-charcoal-700'],
+.store-shell [class*='bg-charcoal-700/'] { background-color: var(--lz-surface-2) !important; }
+.store-shell [class~='bg-charcoal-600'],
+.store-shell [class*='bg-charcoal-600/'] { background-color: color-mix(in srgb, var(--lz-line) 55%, var(--lz-surface-2)) !important; }
+
+.store-shell [class~='text-offwhite'] { color: var(--lz-ink) !important; }
+.store-shell [class~='text-charcoal-200'],
+.store-shell [class~='text-charcoal-300'] { color: color-mix(in srgb, var(--lz-muted) 72%, var(--lz-ink)) !important; }
+.store-shell [class~='text-charcoal-400'],
+.store-shell [class~='text-charcoal-500'] { color: var(--lz-muted) !important; }
+.store-shell [class~='text-white']:not([class*='bg-brand-red']):not([class*='btn-']) { color: var(--lz-ink) !important; }
+.store-shell [class~='text-brand-red'],
+.store-shell [class~='text-brand-red-light'] { color: var(--lz-signal) !important; }
+.store-shell [class~='bg-brand-red'],
+.store-shell [class*='bg-brand-red/'] { background-color: var(--lz-signal) !important; }
+.store-shell [class~='border-brand-red'],
+.store-shell [class*='border-brand-red/'] { border-color: color-mix(in srgb, var(--lz-signal) 60%, transparent) !important; }
+.store-shell [class*='border-charcoal-400'] { border-color: var(--lz-hairline) !important; }
+.store-shell [class~='bg-white/[0.03]'],
+.store-shell [class~='bg-white/5'],
+.store-shell [class~='bg-white/[0.045]'],
+.store-shell [class*='bg-white/'] { background-color: color-mix(in srgb, var(--lz-ink) 5%, transparent) !important; }
+
+.store-shell header {
+  background-color: var(--vi-header, var(--lz-bg));
+  border-color: var(--lz-hairline);
+}
+.store-shell footer {
+  background-color: var(--vi-footer, #09090b);
+  border-color: var(--lz-hairline);
+}
+
+.store-shell .card,
+.store-shell .admin-card {
+  border-color: var(--lz-hairline);
+  border-radius: var(--lz-radius);
+  background-color: var(--lz-surface);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.22);
+}
+
+.store-shell .input-field {
+  min-height: 2.875rem;
+  border-radius: var(--lz-btn-radius);
+  border-color: var(--lz-hairline-strong);
+  background-color: color-mix(in srgb, var(--lz-surface) 88%, transparent);
+  color: var(--lz-ink);
+}
+.store-shell .input-field::placeholder { color: var(--lz-muted); opacity: 0.8; }
+.store-shell .input-field:focus {
+  border-color: var(--lz-signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lz-signal) 16%, transparent);
+}
+.store-shell .label-text { color: var(--lz-muted); font-size: 0.8125rem; }
+
+.store-shell .btn-primary {
+  border-radius: var(--lz-btn-radius);
+  color: var(--vi-button-text, #fff);
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--lz-signal) 82%, white 18%),
+    var(--lz-signal) 58%,
+    color-mix(in srgb, var(--lz-signal) 78%, black 22%)
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 12px 30px color-mix(in srgb, var(--lz-glow) calc(var(--vi-glow-strength, 0.5) * 36%), transparent);
+  transition: transform 180ms ease, box-shadow 220ms ease, filter 180ms ease;
+}
+.store-shell .btn-primary:hover {
+  filter: brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 16px 38px color-mix(in srgb, var(--lz-glow) calc(var(--vi-glow-strength, 0.5) * 46%), transparent);
+}
+.store-shell .btn-primary:active,
+.store-shell .btn-secondary:active { transform: scale(0.985); }
+
+.store-shell .btn-secondary {
+  border-radius: var(--lz-btn-radius);
+  border-color: var(--lz-hairline-strong);
+  color: var(--lz-ink);
+  background-color: color-mix(in srgb, var(--lz-surface) 55%, transparent);
+}
+.store-shell .btn-secondary:hover {
+  border-color: color-mix(in srgb, var(--lz-signal) 70%, transparent);
+  background-color: color-mix(in srgb, var(--lz-signal) 10%, transparent);
+  color: var(--lz-ink);
+}
+.store-shell .btn-ghost { color: var(--lz-muted); border-radius: var(--lz-btn-radius); }
+.store-shell .btn-ghost:hover { color: var(--lz-ink); background-color: color-mix(in srgb, var(--lz-ink) 7%, transparent); }
+
+/* ---------------------------------------------------------------------------
+   Typography
+   ------------------------------------------------------------------------- */
+.lz-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--lz-signal);
+}
+.lz-eyebrow::before {
+  content: '';
+  width: 1.5rem;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+.lz-display {
+  font-size: clamp(2.4rem, 5.1vw, 4.15rem);
+  font-weight: 900;
+  letter-spacing: -0.038em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+.lz-h2 {
+  font-size: clamp(1.55rem, 2.5vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.028em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.lz-h3 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  line-height: 1.35;
+}
+.lz-lead {
+  color: var(--lz-muted);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.lz-meta {
+  color: var(--lz-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.lz-grad-text {
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--lz-signal) 92%, white 8%),
+    color-mix(in srgb, var(--lz-accent) 78%, white 22%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   Layout and surfaces
+   ------------------------------------------------------------------------- */
+.lz-container {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+@media (min-width: 640px) { .lz-container { padding-inline: 1.5rem; } }
+@media (min-width: 1024px) { .lz-container { padding-inline: 2rem; } }
+
+.lz-hairline {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, var(--lz-hairline-strong), transparent);
+}
+
+.lz-card {
+  position: relative;
+  border: 1px solid var(--lz-hairline);
+  border-radius: var(--lz-radius);
+  background-color: var(--lz-surface);
+  background-image: linear-gradient(158deg, color-mix(in srgb, var(--lz-ink) 4%, transparent), transparent 46%);
+  box-shadow: 0 18px 40px rgb(0 0 0 / 0.16);
+  transition: border-color 220ms ease, box-shadow 260ms ease, transform 260ms ease, background-color 220ms ease;
+}
+.lz-card:hover {
+  border-color: color-mix(in srgb, var(--lz-signal) 34%, var(--lz-hairline));
+  box-shadow: 0 26px 56px rgb(0 0 0 / 0.26);
+}
+
+.lz-panel {
+  border: 1px solid var(--lz-hairline);
+  border-radius: calc(var(--lz-radius) + 4px);
+  background-color: color-mix(in srgb, var(--lz-surface) 82%, transparent);
+  background-image:
+    linear-gradient(150deg, color-mix(in srgb, var(--lz-ink) 6%, transparent), transparent 52%),
+    radial-gradient(30rem 18rem at 92% 0%, color-mix(in srgb, var(--lz-signal) 10%, transparent), transparent 62%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 24px 60px rgb(0 0 0 / 0.24);
+  backdrop-filter: blur(14px);
+}
+
+.lz-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--lz-hairline-strong);
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--lz-surface) 70%, transparent);
+  padding: 0.45rem 0.9rem;
+  color: var(--lz-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+.lz-chip:hover { color: var(--lz-ink); border-color: color-mix(in srgb, var(--lz-signal) 45%, var(--lz-hairline)); }
+.lz-chip[aria-pressed='true'] {
+  border-color: transparent;
+  background-color: var(--lz-signal);
+  color: var(--vi-button-text, #fff);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--lz-signal) 26%, transparent);
+}
+
+.lz-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--lz-hairline-strong);
+  background-color: color-mix(in srgb, var(--lz-bg) 72%, transparent);
+  padding: 0.3rem 0.65rem;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--lz-muted);
+  backdrop-filter: blur(8px);
+}
+.lz-badge-signal { color: var(--lz-signal); border-color: color-mix(in srgb, var(--lz-signal) 40%, transparent); }
+.lz-badge-ok { color: #4ade80; border-color: rgb(74 222 128 / 0.35); }
+.lz-badge-warn { color: #fbbf24; border-color: rgb(251 191 36 / 0.35); }
+
+/* Layer-lines motif: a quiet nod to FDM print strata. */
+.lz-layers {
+  height: 1.5rem;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--lz-signal) 55%, transparent) 0,
+    color-mix(in srgb, var(--lz-signal) 55%, transparent) 1px,
+    transparent 1px,
+    transparent 6px
+  );
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  opacity: 0.5;
+}
+
+.lz-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-bottom: 1px solid var(--lz-hairline);
+}
+.lz-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image:
+    radial-gradient(42rem 26rem at 78% 6%, color-mix(in srgb, var(--lz-signal) 22%, transparent), transparent 66%),
+    radial-gradient(30rem 22rem at 12% 92%, color-mix(in srgb, var(--lz-accent) 9%, transparent), transparent 70%);
+}
+.lz-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.5;
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--lz-ink) 12%, transparent) 1px, transparent 0);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(70% 60% at 50% 40%, #000 20%, transparent 80%);
+  -webkit-mask-image: radial-gradient(70% 60% at 50% 40%, #000 20%, transparent 80%);
+  pointer-events: none;
+}
+
+.lz-stage {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--lz-hairline-strong);
+  border-radius: calc(var(--lz-radius) + 8px);
+  background-color: color-mix(in srgb, var(--lz-surface) 72%, black 28%);
+  background-image:
+    radial-gradient(60% 50% at 50% 42%, color-mix(in srgb, var(--lz-signal) 20%, transparent), transparent 70%),
+    linear-gradient(160deg, color-mix(in srgb, var(--lz-surface-2) 82%, transparent), transparent 62%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 34px 80px rgb(0 0 0 / 0.34);
+}
+.lz-stage-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.28;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--lz-ink) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--lz-ink) 12%, transparent) 1px, transparent 1px);
+  background-size: 30px 30px;
+  mask-image: radial-gradient(64% 58% at 50% 50%, #000, transparent 82%);
+  -webkit-mask-image: radial-gradient(64% 58% at 50% 50%, #000, transparent 82%);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Interaction, motion and reveal
+   ------------------------------------------------------------------------- */
+.lz-reveal {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition: opacity 620ms cubic-bezier(0.22, 0.8, 0.28, 1), transform 620ms cubic-bezier(0.22, 0.8, 0.28, 1);
+  transition-delay: var(--lz-delay, 0ms);
+  will-change: opacity, transform;
+}
+.lz-reveal.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+.store-shell[data-motion='false'] .lz-reveal,
+.store-shell[data-mobile-reduce='true'] .lz-reveal {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+.lz-marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.lz-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 2.5rem;
+  animation: lz-marquee-scroll 34s linear infinite;
+}
+.store-shell[data-motion='false'] .lz-marquee-track { animation: none; }
+@keyframes lz-marquee-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes lz-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, calc(var(--vi-motion-distance, 8px) * -0.9), 0); }
+}
+.store-shell[data-motion='true'] [data-vi-float] {
+  animation: lz-float var(--vi-float-duration, 5s) ease-in-out infinite;
+}
+.store-shell[data-motion='false'] [data-vi-float] { animation: none; }
+@media (max-width: 640px) {
+  .store-shell[data-mobile-reduce='true'] [data-vi-float] { animation: none; }
+  .store-shell[data-mobile-reduce='true'] .lz-marquee-track { animation: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Store chrome (header, navigation, footer, mobile dock)
+   ------------------------------------------------------------------------- */
+.store-utility-bar {
+  border-bottom: 1px solid var(--lz-hairline);
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--lz-signal) 14%, transparent),
+    transparent 45%,
+    color-mix(in srgb, var(--lz-accent) 7%, transparent)
+  );
+  color: var(--lz-muted);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 2rem;
+  text-transform: uppercase;
+}
+.store-header {
+  border-bottom: 1px solid var(--lz-hairline);
+  background-color: color-mix(in srgb, var(--vi-header, var(--lz-bg)) 84%, transparent);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.18);
+}
+.store-brand-mark {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--lz-signal) 55%, transparent);
+  border-radius: 0.85rem;
+  background-image: linear-gradient(145deg, color-mix(in srgb, var(--lz-signal) 88%, white 12%), color-mix(in srgb, var(--lz-signal) 74%, black 26%));
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--lz-signal) 24%, transparent);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+.store-brand:hover .store-brand-mark { transform: translateY(-2px) rotate(-3deg); }
+.store-nav-link {
+  position: relative;
+  padding: 0.55rem 0;
+  color: var(--lz-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color 180ms ease;
+}
+.store-nav-link::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0.1rem;
+  left: 0;
+  height: 2px;
+  transform: scaleX(0);
+  transform-origin: right;
+  border-radius: 999px;
+  background: var(--lz-signal);
+  transition: transform 220ms ease;
+}
+.store-nav-link:hover,
+.store-nav-link-active { color: var(--lz-ink); }
+.store-nav-link:hover::after,
+.store-nav-link-active::after { transform: scaleX(1); transform-origin: left; }
+.store-icon-button {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  color: var(--lz-muted);
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+.store-icon-button:hover {
+  border-color: var(--lz-hairline-strong);
+  background-color: color-mix(in srgb, var(--lz-ink) 6%, transparent);
+  color: var(--lz-ink);
+  transform: translateY(-1px);
+}
+.store-cart-count {
+  position: absolute;
+  right: -0.1rem;
+  top: -0.1rem;
+  display: flex;
+  min-height: 1.15rem;
+  min-width: 1.15rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--lz-signal);
+  padding: 0 0.28rem;
+  color: var(--vi-button-text, #fff);
+  font-size: 0.625rem;
+  font-weight: 800;
+  box-shadow: 0 0 0 3px var(--lz-bg);
+}
+
+.store-mobile-nav {
+  border-top: 1px solid var(--lz-hairline);
+  background-color: color-mix(in srgb, var(--vi-footer, #09090b) 96%, transparent);
+  animation: lz-slide-down 220ms ease both;
+}
+@keyframes lz-slide-down {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.store-dock {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 45;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--lz-hairline);
+  background-color: color-mix(in srgb, var(--vi-header, var(--lz-bg)) 92%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  box-shadow: 0 -12px 30px rgb(0 0 0 / 0.22);
+}
+.store-dock-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.55rem 0.25rem 0.5rem;
+  color: var(--lz-muted);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: color 160ms ease;
+}
+.store-dock-link[aria-current='page'] { color: var(--lz-signal); }
+.store-dock-link:active { transform: scale(0.97); }
+
+.store-footer { border-top: 1px solid var(--lz-hairline); }
+.footer-heading {
+  color: var(--lz-ink);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.footer-link {
+  color: var(--lz-muted);
+  font-size: 0.8125rem;
+  transition: color 160ms ease, transform 160ms ease;
+}
+.footer-link:hover { color: var(--lz-ink); transform: translateX(2px); }
+.footer-social {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--lz-hairline-strong);
+  border-radius: 0.75rem;
+  background-color: color-mix(in srgb, var(--lz-ink) 4%, transparent);
+  color: var(--lz-muted);
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+.footer-social:hover {
+  border-color: transparent;
+  background-color: var(--lz-signal);
+  color: var(--vi-button-text, #fff);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 1023px) {
+  .store-shell footer { padding-bottom: 5.25rem; }
+}
+
+/* ---------------------------------------------------------------------------
+   Admin shell refinements
+   ------------------------------------------------------------------------- */
+.admin-shell main {
+  background-image:
+    radial-gradient(52rem 30rem at 8% -8%, rgb(227 38 54 / 0.07), transparent 60%),
+    radial-gradient(40rem 26rem at 100% 0%, rgb(59 130 246 / 0.05), transparent 65%);
+  background-repeat: no-repeat;
+}
+.admin-shell .admin-card {
+  position: relative;
+  border-color: rgb(255 255 255 / 0.075);
+  background-image: linear-gradient(145deg, rgb(255 255 255 / 0.025), transparent 52%);
+  background-color: rgb(28 30 36 / 0.92);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 0.14);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.admin-shell .admin-card:hover {
+  border-color: rgb(255 255 255 / 0.13);
+  box-shadow: 0 16px 38px rgb(0 0 0 / 0.2);
+}
+
+/* ---------------------------------------------------------------------------
+   Accessibility: never let decoration block the reduced-motion contract.
+   ------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .store-shell *,
+  .store-shell *::before,
+  .store-shell *::after,
+  .admin-shell *,
+  .admin-shell *::before,
+  .admin-shell *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .lz-reveal { opacity: 1 !important; transform: none !important; }
+}

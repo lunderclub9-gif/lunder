@@ -16,9 +16,13 @@ export type VisualIdentity = {
   content: {
     heroTitle: string; heroHighlight: string; heroDescription: string
     primaryButton: string; secondaryButton: string; featuredTitle: string
+    categoriesTitle: string; processTitle: string
     customTitle: string; latestTitle: string; ctaTitle: string; ctaDescription: string
   }
-  sections: { benefits: boolean; featured: boolean; custom: boolean; latest: boolean; finalCta: boolean }
+  sections: {
+    benefits: boolean; featured: boolean; categories: boolean; process: boolean
+    custom: boolean; latest: boolean; finalCta: boolean
+  }
 }
 
 export const DEFAULT_VISUAL_IDENTITY: VisualIdentity = {
@@ -38,11 +42,16 @@ export const DEFAULT_VISUAL_IDENTITY: VisualIdentity = {
     heroTitle: 'Vos idées prennent', heroHighlight: 'forme en 3D.',
     heroDescription: 'Des créations uniques, des pièces utiles et des projets fabriqués sur mesure. Imaginez, choisissez, commandez — nous donnons vie à votre idée.',
     primaryButton: 'Explorer la boutique', secondaryButton: 'Créer mon projet',
-    featuredTitle: 'Nos coups de cœur', customTitle: 'Vous ne trouvez pas exactement ce que vous cherchez ?',
+    featuredTitle: 'Nos coups de cœur', categoriesTitle: 'Explorer par catégorie',
+    processTitle: 'De l’idée à la pièce, en trois étapes',
+    customTitle: 'Vous ne trouvez pas exactement ce que vous cherchez ?',
     latestTitle: 'Les nouveautés', ctaTitle: 'Votre prochaine idée commence ici.',
     ctaDescription: 'Parcourez les créations ou lancez un projet personnalisé.',
   },
-  sections: { benefits: true, featured: true, custom: true, latest: true, finalCta: true },
+  sections: {
+    benefits: true, featured: true, categories: true, process: true,
+    custom: true, latest: true, finalCta: true,
+  },
 }
 
 export const VISUAL_PRESETS: { id: string; name: string; description: string; colors: VisualIdentity['colors'] }[] = [
@@ -89,6 +98,7 @@ export function visualIdentityCssVars(config: VisualIdentity): CSSProperties {
     '--vi-shadow': String(config.shape.shadow),
     '--vi-body-font': '"' + config.typography.bodyFont + '", system-ui, sans-serif',
     '--vi-heading-font': '"' + config.typography.headingFont + '", system-ui, sans-serif',
+    '--vi-heading-weight': String(config.typography.headingWeight),
     '--vi-base-size': String(config.typography.baseSize) + 'px',
     '--vi-line-height': String(config.typography.lineHeight),
     '--vi-motion-duration': String(Math.max(0.12, 0.55 / Math.max(0.4, config.motion.speed))) + 's',

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowUpRight, CheckCircle2, Package, ShoppingBag } from 'lucide-react'
+import { ArrowUpRight, Box, CheckCircle2, Clock3, PackageX } from 'lucide-react'
 import type { Product } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 import posthog, { isPostHogEnabled } from '@/lib/posthog'
@@ -10,7 +10,20 @@ type Props = {
 }
 
 export default function ProductCard({ product, imageUrl }: Props) {
-  const available = product.made_to_order || product.stock_quantity > 0
+  const inStock = product.stock_quantity > 0
+  const available = product.made_to_order || inStock
+
+  const availability = product.made_to_order
+    ? { label: 'Sur commande', tone: 'text-amber-300', icon: Clock3 }
+    : inStock
+      ? { label: 'En stock', tone: 'text-emerald-300', icon: CheckCircle2 }
+      : { label: 'Épuisé', tone: 'text-red-300', icon: PackageX }
+  const AvailabilityIcon = availability.icon
+
+  const meta = [
+    product.material,
+    product.production_lead_days != null ? `${product.production_lead_days} j de fabrication` : null,
+  ].filter(Boolean).join(' · ')
 
   return (
     <Link
@@ -25,56 +38,63 @@ export default function ProductCard({ product, imageUrl }: Props) {
         }
       }}
       aria-label={`Voir ${product.name}, ${formatDzd(product.price_dzd)}`}
-      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-charcoal-400/15 bg-charcoal-800/55 transition duration-300 hover:-translate-y-1 hover:border-brand-red/40 hover:bg-charcoal-800 hover:shadow-xl hover:shadow-black/20"
+      className="lz-card group flex h-full flex-col overflow-hidden"
     >
-      <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-charcoal-700 to-charcoal-900">
+      <div className="relative aspect-[4/5] overflow-hidden bg-charcoal-900">
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={product.name}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Package className="h-12 w-12 text-charcoal-600" />
+          <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_38%,rgba(227,38,54,.16),transparent_62%)]">
+            <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.09)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.09)_1px,transparent_1px)] [background-size:24px_24px]" />
+            <Box className="relative h-14 w-14 text-charcoal-400" strokeWidth={1.1} />
           </div>
         )}
-        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          {product.category && (
-            <span className="max-w-[10rem] truncate rounded-full border border-white/10 bg-charcoal-950/80 px-3 py-1 text-[10px] font-semibold text-charcoal-100 backdrop-blur">
-              {product.category.name}
-            </span>
+
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-charcoal-950/85 via-charcoal-950/5 to-transparent opacity-90" />
+
+        <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
+          {product.category ? (
+            <span className="lz-badge max-w-[9rem] truncate">{product.category.name}</span>
+          ) : (
+            <span />
           )}
+          <span className="flex h-8 w-8 translate-y-1 items-center justify-center rounded-full border border-white/15 bg-charcoal-950/70 text-white opacity-0 shadow-lg backdrop-blur transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+            <ArrowUpRight className="h-4 w-4" />
+          </span>
         </div>
-        <span className={`absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold backdrop-blur ${available ? 'bg-charcoal-950/85 text-green-300' : 'bg-charcoal-950/85 text-red-300'}`}>
-          {available ? <CheckCircle2 className="h-3 w-3" /> : null}
-          {product.made_to_order ? 'Fabriqué sur commande' : product.stock_quantity > 0 ? 'Disponible' : 'Indisponible'}
-        </span>
-        <span className="absolute right-3 top-3 flex h-9 w-9 translate-y-1 items-center justify-center rounded-full border border-white/10 bg-charcoal-950/80 text-white opacity-0 shadow-lg transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-          <ArrowUpRight className="h-4 w-4" />
-        </span>
+
+        <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2">
+          <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] ${availability.tone}`}>
+            <AvailabilityIcon className="h-3.5 w-3.5" />
+            {availability.label}
+          </span>
+          {product.is_featured && <span className="lz-badge lz-badge-signal">Sélection</span>}
+        </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
-        <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-offwhite transition-colors group-hover:text-brand-red-light">
+      <div className="flex flex-1 flex-col p-4 sm:p-[1.1rem]">
+        <h3 className="line-clamp-2 text-[0.9375rem] font-semibold leading-[1.35] text-offwhite transition-colors duration-200 group-hover:text-brand-red-light">
           {product.name}
         </h3>
-        {product.description ? (
-          <p className="mt-2 line-clamp-2 min-h-9 text-xs leading-5 text-charcoal-400">{product.description}</p>
-        ) : (
-          <p className="mt-2 min-h-9 text-xs text-charcoal-500">Une création LUNDER'S 3D STUDIO.</p>
-        )}
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-charcoal-400/10 pt-4">
-          <div className="min-w-0">
-            <span className="block text-[10px] font-medium text-charcoal-400">Prix</span>
-            <span className="mt-0.5 block text-lg font-extrabold tracking-tight text-offwhite">{formatDzd(product.price_dzd)}</span>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-red/10 px-3 py-2 text-xs font-semibold text-brand-red-light transition group-hover:bg-brand-red group-hover:text-white">
-            <ShoppingBag className="h-3.5 w-3.5" /> Voir
+        <p className="mt-1.5 line-clamp-1 text-[11px] text-charcoal-400">
+          {meta || (product.description ? product.description : 'Création LUNDER’S 3D STUDIO')}
+        </p>
+
+        <div className="mt-auto flex items-end justify-between gap-3 border-t border-charcoal-400/10 pt-3.5">
+          <span className="text-[1.05rem] font-extrabold tracking-tight text-offwhite">{formatDzd(product.price_dzd)}</span>
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-charcoal-400 transition group-hover:text-brand-red-light">
+            Découvrir
+            <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </span>
         </div>
       </div>
+      {!available && <span className="sr-only">Produit indisponible</span>}
     </Link>
   )
 }

@@ -114,7 +114,7 @@ export default function OrderConfirmationPage() {
       </div>
 
       <div className="space-y-4">
-        <div className="admin-card">
+        <div className="lz-card">
           <h2 className="mb-3 text-lg font-semibold text-offwhite">Articles</h2>
           <ul className="space-y-2 text-sm">
             {order.items.map((item, index) => (
@@ -143,7 +143,7 @@ export default function OrderConfirmationPage() {
           </div>
         </div>
 
-        <div className="admin-card">
+        <div className="lz-card">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-offwhite">
             <MapPin className="h-4 w-4 text-brand-red" />
             Livraison

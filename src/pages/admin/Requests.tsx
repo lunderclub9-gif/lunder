@@ -734,8 +734,8 @@ export default function AdminRequests() {
                                 {!quote.order_id && ['sent', 'accepted'].includes(quote.status) && (
                                   <p className="mt-2 text-[11px] text-charcoal-500">
                                     {quote.status === 'sent'
-                                      ? 'Le devis est envoyé. Le propriétaire peut approuver la demande sans attendre une acceptation du client.'
-                                      : 'Le client a accepté le devis ; l’approbation du propriétaire reste la décision finale.'}
+                                      ? 'En attente de la décision du client. Le propriétaire ne peut approuver qu’après acceptation de cette version du devis.'
+                                      : 'Le client a accepté cette version du devis ; l’approbation du propriétaire reste nécessaire avant la création de la commande.'}
                                   </p>
                                 )}
                                 {canOwnerApproveCustomQuote({

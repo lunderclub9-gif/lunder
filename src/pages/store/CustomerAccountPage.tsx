@@ -15,7 +15,12 @@ type AccountOrder = {
   status: string
   total_dzd: number
   created_at: string
-  items: { product_name: string; quantity: number }[] | null
+  delivery_method: string
+  delivery_eta_min: number | null
+  delivery_eta_max: number | null
+  wilaya_name: string
+  commune_name: string
+  items: { product_name: string; variant_label: string | null; quantity: number; unit_price_dzd: number; line_total_dzd: number }[] | null
 }
 
 type AccountQuote = {
@@ -45,7 +50,11 @@ const requestStatusLabels: Record<string, string> = {
   approved: 'Approuvée', rejected: 'Refusée', closed: 'Clôturée',
 }
 const quoteStatusLabels: Record<string, string> = {
-  sent: 'À consulter', approved: 'Accepté', rejected: 'Refusé', expired: 'Expiré',
+  sent: 'À consulter', accepted: 'Accepté — en attente du studio',
+  approved: 'Approuvé — commande créée', rejected: 'Refusé', expired: 'Expiré',
+}
+const deliveryMethodLabels: Record<string, string> = {
+  domicile: 'Livraison à domicile', stopdesk: 'Point relais / Stop Desk',
 }
 const formatAccountDate = (value: string) => new Intl.DateTimeFormat('fr-DZ', {
   dateStyle: 'medium',
@@ -69,6 +78,7 @@ export default function CustomerAccountPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [resetEmailSent, setResetEmailSent] = useState(false)
   const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([])
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
   const [accountRequests, setAccountRequests] = useState<AccountRequest[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
   const [activityError, setActivityError] = useState<string | null>(null)
@@ -92,7 +102,7 @@ export default function CustomerAccountPage() {
       const [ordersResult, requestsResult, quotesResult] = await Promise.all([
         supabase
           .from('customer_account_orders')
-          .select('id, order_number, status, total_dzd, created_at, items')
+          .select('id, order_number, status, total_dzd, created_at, delivery_method, delivery_eta_min, delivery_eta_max, wilaya_name, commune_name, items')
           .order('created_at', { ascending: false })
           .limit(20),
         supabase
@@ -347,7 +357,37 @@ export default function CustomerAccountPage() {
                           <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-charcoal-200">{orderStatusLabels[order.status] ?? order.status}</span>
                         </div>
                         <p className="mt-3 text-xs text-charcoal-300">{(order.items ?? []).reduce((sum, item) => sum + item.quantity, 0)} article(s) · {formatAccountPrice(order.total_dzd)}</p>
-                        <Link to="/boutique/suivi" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-red-light hover:text-white">Détails et suivi <ArrowRight className="h-3.5 w-3.5" /></Link>
+                        <button type="button" aria-expanded={expandedOrderId === order.id} onClick={() => setExpandedOrderId((current) => current === order.id ? null : order.id)} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-red-light hover:text-white">
+                          {expandedOrderId === order.id ? 'Masquer les détails' : 'Voir les détails'} <ArrowRight className={`h-3.5 w-3.5 transition-transform ${expandedOrderId === order.id ? 'rotate-90' : ''}`} />
+                        </button>
+                        {expandedOrderId === order.id && (
+                          <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <span className="text-charcoal-400">Mode de livraison</span>
+                              <strong className="text-charcoal-100">{deliveryMethodLabels[order.delivery_method] ?? order.delivery_method}</strong>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <span className="text-charcoal-400">Destination</span>
+                              <strong className="text-right text-charcoal-100">{[order.commune_name, order.wilaya_name].filter(Boolean).join(', ') || 'Non renseignée'}</strong>
+                            </div>
+                            {(order.delivery_eta_min != null || order.delivery_eta_max != null) && (
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <span className="text-charcoal-400">Délai estimé</span>
+                                <strong className="text-charcoal-100">{order.delivery_eta_min ?? '—'}–{order.delivery_eta_max ?? '—'} jours</strong>
+                              </div>
+                            )}
+                            <div className="space-y-2 border-t border-white/10 pt-3">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-charcoal-400">Articles commandés</p>
+                              {(order.items ?? []).map((item, index) => (
+                                <div key={`${order.id}-${index}`} className="flex items-start justify-between gap-3 text-xs">
+                                  <div className="min-w-0"><p className="font-medium text-charcoal-100">{item.product_name}</p>{item.variant_label && <p className="mt-0.5 text-charcoal-500">{item.variant_label}</p>}<p className="mt-0.5 text-charcoal-400">Quantité : {item.quantity} · {formatAccountPrice(item.unit_price_dzd)} / unité</p></div>
+                                  <strong className="shrink-0 text-charcoal-100">{formatAccountPrice(item.line_total_dzd)}</strong>
+                                </div>
+                              ))}
+                            </div>
+                            <Link to="/boutique/suivi" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-red-light hover:text-white">Accéder au suivi sécurisé <ArrowRight className="h-3.5 w-3.5" /></Link>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>

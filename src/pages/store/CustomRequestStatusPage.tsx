@@ -10,6 +10,8 @@ type Quote = {
   version: number
   public_token: string
   price_dzd: number
+  currency_code: string
+  delivery_price_dzd: number | null
   production_lead_days: number | null
   valid_until: string
   terms: string | null
@@ -25,6 +27,17 @@ type Quote = {
 }
 
 type RequestView = {
+  product_specs?: {
+    id: string
+    file_name: string
+    mode: string
+    original_dimensions_mm: { length: number; width: number; height: number }
+    target_dimensions_mm: { length: number; width: number; height: number }
+    quantity: number
+    material_name: string
+    color: string | null
+    instructions?: string | null
+  }[]
   request_number: string
   status: string
   title: string
@@ -154,10 +167,34 @@ export default function CustomRequestStatusPage() {
           {request.material_preference ? ` · ${request.material_preference}` : ''}
           {request.color_preference ? ` · ${request.color_preference}` : ''}
         </p>
+        {(request.product_specs ?? []).length > 0 && (
+          <div className="mt-3 space-y-2 rounded-lg border border-charcoal-400/15 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-charcoal-400">Produits et tailles demandées</p>
+            {(request.product_specs ?? []).map((product, index) => (
+              <div key={product.id || product.file_name} className="rounded-md bg-charcoal-900/60 p-2 text-xs">
+                <p className="font-semibold text-offwhite">{index + 1}. {product.file_name}</p>
+                <p className="mt-1 text-charcoal-400">{({ reference: "Modèle de référence", exact: "Dimensions exactes du fichier", modify: "Modification demandée", inspiration: "Inspiration pour une création" } as Record<string, string>)[product.mode] ?? "Modèle transmis"}</p>
+                <p className="mt-1">{product.target_dimensions_mm.length} × {product.target_dimensions_mm.width} × {product.target_dimensions_mm.height} mm · {product.quantity} pièce(s)</p>
+                <p className="text-charcoal-400">{product.material_name}{product.color ? ` · ${product.color}` : ''}</p>
+                {product.instructions && <p className="mt-1 whitespace-pre-line text-charcoal-300">Détails : {product.instructions}</p>}
+              </div>
+            ))}
+          </div>
+        )}
         {request.files.length > 0 && (
-          <p className="text-xs text-charcoal-400">
-            {request.files.length} fichier(s) transmis — conservés en privé.
-          </p>
+          <div className="rounded-lg border border-charcoal-400/15 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-charcoal-400">
+              Fichiers reçus ({request.files.length}) — conservés en privé
+            </p>
+            <ul className="space-y-1">
+              {request.files.map((file, index) => (
+                <li key={index} className="flex items-center justify-between gap-3 text-xs">
+                  <span className="min-w-0 truncate text-charcoal-200">{file.original_name}</span>
+                  <span className="shrink-0 text-charcoal-500">{file.kind === "model" ? "Modèle 3D" : "Image / référence"}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         {request.estimate_price_dzd != null && (
           <p className="text-xs text-charcoal-400">
@@ -218,6 +255,26 @@ export default function CustomRequestStatusPage() {
                   : ''}
                 {quote.source === 'automatic' ? ' · estimation automatique' : ' · devis manuel'}
               </p>
+              {quote.delivery_price_dzd != null ? (
+                <div className="mt-2 rounded-lg border border-charcoal-700 bg-charcoal-900/60 px-3 py-2 text-xs">
+                  <div className="flex justify-between gap-3 text-charcoal-300">
+                    <span>Fabrication</span>
+                    <span>{formatDzd(quote.price_dzd)}</span>
+                  </div>
+                  <div className="mt-1 flex justify-between gap-3 text-charcoal-300">
+                    <span>Livraison</span>
+                    <span>{formatDzd(quote.delivery_price_dzd)}</span>
+                  </div>
+                  <div className="mt-2 flex justify-between gap-3 border-t border-charcoal-700 pt-2 font-semibold text-offwhite">
+                    <span>Total à payer à la livraison</span>
+                    <span>{formatDzd(quote.price_dzd + quote.delivery_price_dzd)}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-amber-300">
+                  Les frais de livraison de cette ancienne version ne sont pas figés. Contactez le studio pour recevoir un devis actualisé.
+                </p>
+              )}
               {quote.breakdown?.lines && quote.breakdown.lines.length > 0 && (
                 <ul className="mt-2 space-y-0.5 text-xs text-charcoal-300">
                   {quote.breakdown.lines.map((line, index) => (
@@ -253,7 +310,7 @@ export default function CustomRequestStatusPage() {
                   Ce devis a expiré. Contactez le studio pour demander une nouvelle version.
                 </p>
               )}
-              {canCustomerDecideCustomQuote({ quoteStatus: quote.status, validUntil: quote.valid_until, today }) && (
+              {quote.delivery_price_dzd != null && canCustomerDecideCustomQuote({ quoteStatus: quote.status, validUntil: quote.valid_until, today }) && (
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <button
                     type="button"

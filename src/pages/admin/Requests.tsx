@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
-import { ChevronDown, FileText, Loader2, Trash2, Upload } from 'lucide-react'
+import { Calculator, ChevronDown, FileText, Filter, Loader2, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
@@ -8,10 +8,27 @@ import { orderErrorMessage } from '@/lib/checkout'
 import { canOwnerApproveCustomQuote } from '@/lib/custom-workflow'
 
 type RequestFile = { id: string; kind: string; storage_path: string; original_name: string }
+type RequestProductSpec = {
+  id: string
+  file_path: string
+  file_name: string
+  mode: string
+  original_dimensions_mm: { length: number; width: number; height: number }
+  target_dimensions_mm: { length: number; width: number; height: number }
+  quantity: number
+  material_name: string
+  color: string | null
+  instructions?: string | null
+  geometry?: { format?: string; mesh_volume_cm3?: number | null; bounding_box_volume_cm3?: number; triangle_count?: number; vertex_count?: number; component_count?: number | null; warnings?: string[] }
+}
 type Quote = {
   id: string
   version: number
   price_dzd: number
+  currency_code: string
+  delivery_price_dzd: number | null
+  accepted_at: string | null
+  accepted_snapshot_hash: string | null
   production_lead_days: number | null
   valid_until: string
   terms: string | null
@@ -29,6 +46,8 @@ type Quote = {
     discountDzd?: number
     rushFeeDzd?: number
     totalDzd?: number
+    products?: { name: string; quantity: number; dimensionsMm: { length: number; width: number; height: number }; material: string; gramsPerPiece: number; hoursPerPiece: number; totalDzd: number; method: string }[]
+    estimates?: { grams?: number; printHours?: number; method?: string }
   } | null
 }
 type RequestRow = {
@@ -66,6 +85,7 @@ type RequestRow = {
   rush: boolean
   deletion_started_at: string | null
   custom_request_files: RequestFile[]
+  product_specs?: RequestProductSpec[]
   custom_quotes: Quote[]
 }
 
@@ -93,6 +113,8 @@ export default function AdminRequests() {
   const confirmAction = useAdminConfirm()
   const [searchParams] = useSearchParams()
   const [view, setView] = useState<'active' | 'approved'>(() => searchParams.get('view') === 'approved' ? 'approved' : 'active')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [requests, setRequests] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -125,29 +147,81 @@ export default function AdminRequests() {
   const load = useCallback(async () => {
     const sequence = ++requestLoadSequence.current
     setLoading(true)
-    let requestQuery = supabase.from('custom_requests').select(REQUEST_SELECT)
-    requestQuery = view === 'approved'
-      ? requestQuery.eq('status', 'approved')
-      : requestQuery.neq('status', 'approved')
-    const [{ data, error: queryError }, { data: mats }] = await Promise.all([
-      requestQuery.order('created_at', { ascending: false }).limit(100),
-      supabase.from('manufacturing_materials').select('name').eq('is_available', true).order('name'),
-    ])
+    const pageSize = 100
+    const allRequests: RequestRow[] = []
+    let offset = 0
+    let queryError: Error | null = null
+    let materialError: Error | null = null
+    let mats: { name: string }[] | null = null
+
+    while (true) {
+      let requestQuery = supabase.from('custom_requests').select(REQUEST_SELECT)
+      requestQuery = view === 'approved'
+        ? requestQuery.eq('status', 'approved')
+        : requestQuery.neq('status', 'approved')
+      const query = requestQuery
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+
+      const [requestResult, materialResult] = offset === 0
+        ? await Promise.all([
+            query,
+            supabase.from('manufacturing_materials').select('name').eq('is_available', true).order('name'),
+          ])
+        : [await query, null]
+
+      if (sequence !== requestLoadSequence.current) return
+      if (requestResult.error) {
+        queryError = requestResult.error
+        break
+      }
+      if (materialResult?.error) materialError = materialResult.error
+      if (materialResult) mats = (materialResult.data as { name: string }[]) ?? []
+      const batch = (requestResult.data as RequestRow[]) ?? []
+      allRequests.push(...batch)
+      if (batch.length < pageSize) break
+      offset += pageSize
+    }
+
     if (sequence !== requestLoadSequence.current) return
     if (queryError) {
-      setError('Impossible de charger les demandes.')
+      setError('Impossible de charger toutes les demandes.')
       setRequests([])
     } else {
-      setError(null)
-      setRequests((data as RequestRow[]) ?? [])
+      setError(materialError ? 'Les demandes sont chargées, mais la liste des matières est indisponible.' : null)
+      setRequests(allRequests)
     }
-    setMaterials((mats as { name: string }[]) ?? [])
+    if (mats) setMaterials(mats)
+    else if (materialError) setMaterials([])
     setLoading(false)
   }, [view])
 
   useEffect(() => {
     load()
   }, [load])
+
+  const filteredRequests = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase('fr')
+    return requests.filter((request) => {
+      const matchesSearch = !term || [
+        request.request_number,
+        request.customer_name,
+        request.title,
+        request.phone,
+        request.email ?? '',
+      ].some((value) => value.toLocaleLowerCase('fr').includes(term))
+      const matchesStatus = statusFilter === 'all' || request.status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+  }, [requests, search, statusFilter])
+
+  const requestCounts = useMemo(() => ({
+    total: requests.length,
+    new: requests.filter((request) => request.status === 'new').length,
+    reviewing: requests.filter((request) => request.status === 'reviewing').length,
+    quoted: requests.filter((request) => request.status === 'quoted' || request.custom_quotes.some((quote) => quote.status === 'sent')).length,
+  }), [requests])
 
   const requestedRequestId = searchParams.get('request')
   useEffect(() => {
@@ -282,6 +356,11 @@ export default function AdminRequests() {
       setError('Aucune estimation disponible pour cette demande.')
       return
     }
+    if ((request.product_specs?.length ?? 0) > 0 && !(await confirmAction({
+      title: 'Vérifier l’estimation des modèles 3D',
+      description: 'Les dimensions et le volume sont transmis par l’analyse exécutée dans le navigateur du client et ne sont pas recalculés côté serveur. Le poids et le temps ne viennent pas d’un trancheur G-code. Pour un devis ferme, ouvrez le modèle dans votre trancheur, vérifiez les dimensions, le poids réel et le temps, puis utilisez le devis manuel. Confirmez ici uniquement si vous acceptez un devis indicatif.',
+      confirmLabel: 'Créer le devis indicatif',
+    }))) return
     setBusy(true)
     const { error: rpcError } = await supabase.rpc('create_custom_quote_from_estimate', {
       p_request_id: request.id,
@@ -390,21 +469,58 @@ export default function AdminRequests() {
   }
 
   return (
-    <div className="animate-fade-in">
-      <h1 className="mb-2 text-2xl font-bold text-offwhite">Demandes sur mesure</h1>
-      <p className="mb-6 text-sm text-charcoal-400">
-        Vérifiez la demande et les fichiers, créez ou ajustez le devis, puis approuvez explicitement
-        la fabrication pour créer une commande. L’acceptation du devis par le client est informative
-        et n’est pas requise pour l’approbation propriétaire. Un nouveau devis expire la version précédente.
-      </p>
+    <div className="animate-fade-in space-y-5">
+      <header className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#20232b] via-[#171a21] to-[#171318] p-5 md:p-7">
+        <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full bg-brand-red/10 blur-3xl" />
+        <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="admin-eyebrow">Atelier · Relation client</p>
+            <h1 className="text-2xl font-black text-white md:text-3xl">Demandes sur mesure</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-charcoal-300">
+              Centralisez les demandes, contrôlez les fichiers et spécifications, calculez un devis versionné et suivez son acceptation avant toute création de commande.
+            </p>
+          </div>
+          <button type="button" onClick={() => void load()} disabled={loading} className="btn-secondary shrink-0">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Actualiser
+          </button>
+        </div>
+      </header>
 
-      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filtrer les demandes">
-        <button type="button" aria-pressed={view === 'active'} onClick={() => setView('active')} className={view === 'active' ? 'btn-primary' : 'btn-secondary'}>
-          Demandes actives
-        </button>
-        <button type="button" aria-pressed={view === 'approved'} onClick={() => setView('approved')} className={view === 'approved' ? 'btn-primary' : 'btn-secondary'}>
-          Approuvées — historique
-        </button>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          { label: 'Demandes chargées', value: requestCounts.total, tone: 'text-white' },
+          { label: 'Nouvelles', value: requestCounts.new, tone: 'text-sky-300' },
+          { label: 'En étude', value: requestCounts.reviewing, tone: 'text-amber-300' },
+          { label: 'Devis envoyés', value: requestCounts.quoted, tone: 'text-violet-300' },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border border-white/[0.07] bg-charcoal-900/75 p-4">
+            <p className="text-[11px] text-charcoal-400">{item.label}</p>
+            <p className={`mt-1 text-2xl font-black tabular-nums ${item.tone}`}>{loading ? '—' : item.value.toLocaleString('fr-DZ')}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-charcoal-900/70 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Type de demandes">
+            <button type="button" aria-pressed={view === 'active'} onClick={() => { setView('active'); setStatusFilter('all') }} className={view === 'active' ? 'btn-primary' : 'btn-secondary'}>Demandes actives</button>
+            <button type="button" aria-pressed={view === 'approved'} onClick={() => { setView('approved'); setStatusFilter('all') }} className={view === 'approved' ? 'btn-primary' : 'btn-secondary'}>Historique approuvé</button>
+          </div>
+          <span className="text-xs text-charcoal-500">{filteredRequests.length} résultat(s) · maximum 100 demandes chargées</span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-500" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher par numéro, client, téléphone, projet…" className="input-field pl-10" aria-label="Rechercher une demande" />
+          </label>
+          <label className="relative block">
+            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-500" />
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input-field pl-10" aria-label="Filtrer par statut">
+              <option value="all">Tous les statuts</option>
+              {Object.entries(STATUS_LABELS).filter(([status]) => view === 'approved' ? status === 'approved' : status !== 'approved').map(([status, label]) => <option key={status} value={status}>{label}</option>)}
+            </select>
+          </label>
+        </div>
       </div>
 
       {error && (
@@ -422,14 +538,14 @@ export default function AdminRequests() {
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand-red" />
         </div>
-      ) : requests.length === 0 ? (
+      ) : filteredRequests.length === 0 ? (
         <div className="admin-card py-16 text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-charcoal-500" />
-          <p className="text-charcoal-400">{view === 'approved' ? 'Aucune demande approuvée dans l’historique.' : 'Aucune demande active pour le moment.'}</p>
+          <p className="text-charcoal-400">{search || statusFilter !== 'all' ? 'Aucun résultat pour ces filtres. Essayez une autre recherche.' : view === 'approved' ? 'Aucune demande approuvée dans l’historique.' : 'Aucune demande active pour le moment.'}</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {requests.map((request) => {
+          {filteredRequests.map((request) => {
             const open = expanded === request.id
             const latestQuote = [...request.custom_quotes].sort((a, b) => b.version - a.version)[0]
             return (
@@ -473,6 +589,31 @@ export default function AdminRequests() {
                       {request.color_preference ? ` · ${request.color_preference}` : ''}
                       {request.rush ? ' · urgent' : ''}
                     </p>
+
+                    {(request.product_specs ?? []).length > 0 && (
+                      <div className="rounded-lg border border-charcoal-400/15 p-3 text-xs text-charcoal-300">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-charcoal-400">Analyse des produits ({request.product_specs?.length})</p>
+                        <div className="space-y-3">
+                          {(request.product_specs ?? []).map((product, index) => (
+                            <div key={product.id || product.file_path} className="rounded-lg bg-charcoal-900/60 p-3">
+                              <p className="font-semibold text-offwhite">{index + 1}. {product.file_name}</p>
+                              <p className="mt-1">Mode : {({ reference: 'Modèle de référence', exact: 'Dimensions exactes du fichier', modify: 'Modification demandée', inspiration: 'Inspiration' } as Record<string, string>)[product.mode] ?? product.mode}</p>
+                              <p>Dimensions originales : {product.original_dimensions_mm?.length} × {product.original_dimensions_mm?.width} × {product.original_dimensions_mm?.height} mm</p>
+                              <p className="text-brand-red-light">Dimensions souhaitées : {product.target_dimensions_mm?.length} × {product.target_dimensions_mm?.width} × {product.target_dimensions_mm?.height} mm</p>
+                              <p>Quantité : {product.quantity} · Matière : {product.material_name}{product.color ? ` · Couleur : ${product.color}` : ''}</p>
+                              {product.instructions && <p className="mt-1 whitespace-pre-line text-offwhite">Demandes propres à ce produit : {product.instructions}</p>}
+                              <p>Maillage : {product.geometry?.format?.toUpperCase() ?? '3D'} · {product.geometry?.triangle_count?.toLocaleString('fr-FR') ?? '—'} triangles · {product.geometry?.component_count ?? '—'} élément(s) · Volume : {product.geometry?.mesh_volume_cm3 ?? 'non calculé'} cm³</p>
+                              {product.geometry?.warnings?.length ? <ul className="mt-1 list-disc pl-4 text-amber-300">{product.geometry.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
+                              <button type="button" onClick={() => {
+                                const file = request.custom_request_files.find((item) => item.storage_path === product.file_path)
+                                if (file) void openFile(file)
+                              }} className="mt-2 text-brand-red-light underline-offset-4 hover:underline">Ouvrir le fichier 3D</button>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-charcoal-500">Les dimensions et le volume affichés sont fournis par l’analyse du navigateur client et ne sont pas vérifiés côté serveur. Le poids et le temps restent estimatifs jusqu’à validation du fichier dans un trancheur G-code. Vérifiez le modèle avant tout devis ferme.</p>
+                      </div>
+                    )}
 
                     <div className="rounded-lg border border-charcoal-400/15 p-3 text-xs text-charcoal-300">
                       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-charcoal-400">
@@ -520,6 +661,22 @@ export default function AdminRequests() {
                                 </li>
                               ))}
                             </ul>
+                          )}
+                          {request.estimate_breakdown?.products && (
+                            <div className="mt-3 border-t border-charcoal-400/15 pt-2">
+                              <p className="mb-1 font-semibold text-charcoal-300">Calcul par produit</p>
+                              <ul className="space-y-2">
+                                {request.estimate_breakdown.products.map((product, index) => (
+                                  <li key={`${product.name}-${index}`} className="rounded bg-charcoal-900/60 p-2">
+                                    <p className="font-semibold text-offwhite">{product.name} · {product.quantity} pièce(s)</p>
+                                    <p>{product.dimensionsMm.length} × {product.dimensionsMm.width} × {product.dimensionsMm.height} mm · {product.material}</p>
+                                    <p>{product.gramsPerPiece} g/pièce · {product.hoursPerPiece} h/pièce · {product.method === 'mesh_volume_heuristic' ? 'volume du maillage' : 'boîte englobante'}</p>
+                                    <p className="mt-1 text-right font-semibold text-offwhite">{formatDzd(product.totalDzd)}</p>
+                                  </li>
+                                ))}
+                              </ul>
+                              {request.estimate_breakdown.estimates && <p className="mt-2 text-charcoal-500">Total estimé : {request.estimate_breakdown.estimates.grams ?? '—'} g · {request.estimate_breakdown.estimates.printHours ?? '—'} h</p>}
+                            </div>
                           )}
                         </>
                       ) : (
@@ -607,8 +764,8 @@ export default function AdminRequests() {
                                 {!quote.order_id && ['sent', 'accepted'].includes(quote.status) && (
                                   <p className="mt-2 text-[11px] text-charcoal-500">
                                     {quote.status === 'sent'
-                                      ? 'Le devis est envoyé. Le propriétaire peut approuver la demande sans attendre une acceptation du client.'
-                                      : 'Le client a accepté le devis ; l’approbation du propriétaire reste la décision finale.'}
+                                      ? 'En attente de la décision du client. Le propriétaire ne peut approuver qu’après acceptation de cette version du devis.'
+                                      : 'Le client a accepté cette version du devis ; l’approbation du propriétaire reste nécessaire avant la création de la commande.'}
                                   </p>
                                 )}
                                 {canOwnerApproveCustomQuote({
@@ -794,6 +951,12 @@ export default function AdminRequests() {
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
+                        {!['rejected', 'closed'].includes(request.status) && (
+                          <Link to={`/admin/calcul-devis?request=${encodeURIComponent(request.id)}`} className="btn-secondary">
+                            <Calculator className="h-4 w-4" />Calcul détaillé des coûts
+                          </Link>
+                        )}
+                        {(request.product_specs?.length ?? 0) > 1 && <p className="w-full text-xs text-charcoal-400">Cette demande contient plusieurs modèles : utilisez « Créer le devis depuis l’estimation », qui additionne les calculs de chaque produit. Le devis technique manuel ne prend en charge qu’un seul produit.</p>}
                         <button
                           type="button"
                           disabled={busy || !request.estimate_price_dzd}
@@ -803,7 +966,7 @@ export default function AdminRequests() {
                           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                           Créer le devis depuis l'estimation
                         </button>
-                        <button type="button" onClick={() => openAutoQuote(request)} className="btn-secondary">
+                        <button type="button" disabled={busy || (request.product_specs?.length ?? 0) > 1} onClick={() => openAutoQuote(request)} className="btn-secondary">
                           Devis technique (poids / heures)
                         </button>
                         <button type="button" onClick={() => openNewQuote(request)} className="btn-secondary">

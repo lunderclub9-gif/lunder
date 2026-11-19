@@ -51,6 +51,7 @@ const RPC_MESSAGES: Record<string, string> = {
   VARIANTE_INDISPONIBLE: "La variante choisie n'est plus disponible.",
   COMMANDE_INTROUVABLE: 'Aucune commande ne correspond à ces informations.',
   TROP_DE_TENTATIVES: 'Trop de tentatives. Réessayez dans quelques minutes.',
+  TROP_DEMANDES: 'Trop de demandes. Réessayez dans quelques minutes.',
   TRANSITION_INVALIDE: 'Cette modification de statut est impossible.',
   ACCES_REFUSE: 'Accès refusé.',
   CLE_IDEMPOTENCE_MANQUANTE: 'Erreur technique. Rechargez la page et réessayez.',

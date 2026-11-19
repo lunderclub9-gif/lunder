@@ -11,7 +11,7 @@ export function canOwnerApproveCustomQuote(input: {
   return (
     input.orderId === null &&
     !terminalRequestStatuses.has(input.requestStatus) &&
-    (input.quoteStatus === 'sent' || input.quoteStatus === 'accepted') &&
+    input.quoteStatus === 'accepted' &&
     input.validUntil >= input.today
   )
 }

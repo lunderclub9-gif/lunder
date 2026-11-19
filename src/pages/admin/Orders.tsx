@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
-import { ChevronDown, Loader2, Package, Printer, Search, Trash2 } from 'lucide-react'
+import { ArchiveRestore, ChevronDown, Loader2, Package, Printer, Search, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
@@ -38,6 +38,8 @@ type OrderRow = {
   order_items: { id: string; product_name: string; variant_label: string | null; quantity: number; unit_price_dzd: number; line_total_dzd: number }[]
 }
 
+const ORDER_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+
 const NEXT_ACTIONS: Record<string, { status: string; label: string; danger?: boolean }[]> = {
   pending: [
     { status: 'confirmed', label: 'Confirmer' },
@@ -56,11 +58,12 @@ export default function AdminOrders() {
   const confirmAction = useAdminConfirm()
   const { profile } = useAuth()
   const [searchParams] = useSearchParams()
+  const requestedStatus = searchParams.get('status') ?? ''
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useState(() => ORDER_STATUSES.includes(requestedStatus) ? requestedStatus : '')
   const [searchText, setSearchText] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -75,23 +78,45 @@ export default function AdminOrders() {
     setPrintPreferences(readAdminPreferences(profile?.id ?? null))
   }, [profile?.id])
 
+  useEffect(() => {
+    setFilter(ORDER_STATUSES.includes(requestedStatus) ? requestedStatus : '')
+  }, [requestedStatus])
+
   const load = useCallback(async (term: string) => {
     const sequence = ++requestSequence.current
     setLoading(true)
-    let query = supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .order('created_at', { ascending: false })
-      .limit(200)
-    const expression = buildOrderSearchExpression(term)
-    if (expression) query = query.or(expression)
-    const { data, error: queryError } = await query
+    const pageSize = 500
+    const allOrders: OrderRow[] = []
+    let offset = 0
+    let queryError: Error | null = null
+
+    while (true) {
+      let query = supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+      const expression = buildOrderSearchExpression(term)
+      if (expression) query = query.or(expression)
+      const { data, error } = await query
+      if (sequence !== requestSequence.current) return
+      if (error) {
+        queryError = error
+        break
+      }
+      const batch = (data as OrderRow[]) ?? []
+      allOrders.push(...batch)
+      if (batch.length < pageSize) break
+      offset += pageSize
+    }
+
     if (sequence !== requestSequence.current) return
     if (queryError) {
-      setError('Impossible de charger les commandes.')
+      setError('Impossible de charger toutes les commandes.')
     } else {
       setError(null)
-      setOrders((data as OrderRow[]) ?? [])
+      setOrders(allOrders)
     }
     setLoading(false)
   }, [])
@@ -160,6 +185,27 @@ export default function AdminOrders() {
     await load(searchText)
   }
 
+  const restoreOrder = async (order: OrderRow) => {
+    setDeleteError(null)
+    if (!(await confirmAction({
+      title: 'Restaurer cette commande ?',
+      description: order.status === 'cancelled'
+        ? `La commande ${order.order_number} sera retirée des archives. Le stock ne sera pas réservé car elle est annulée.`
+        : `La commande ${order.order_number} sera restaurée et son stock sera réservé à nouveau. La restauration échouera si le stock disponible est insuffisant.`,
+      confirmLabel: 'Restaurer',
+    }))) return
+    setDeletingId(order.id)
+    const { error: rpcError } = await supabase.rpc('restore_archived_order', {
+      p_order_id: order.id,
+    })
+    setDeletingId(null)
+    if (rpcError) {
+      setDeleteError(orderErrorMessage(rpcError.message, 'Impossible de restaurer cette commande.'))
+      return
+    }
+    await load(searchText)
+  }
+
   const hardDelete = async (order: OrderRow) => {
     setDeleteError(null)
     if (!(await confirmAction({ title: 'Supprimer définitivement cette commande ?', description: `La commande ${order.order_number}, ses articles, son historique et ses fichiers seront supprimés. Cette action est irréversible ; seule une trace d’audit sera conservée.`, confirmLabel: 'Supprimer définitivement', tone: 'danger' }))) {
@@ -183,6 +229,12 @@ export default function AdminOrders() {
   const visible = (filter ? orders.filter((order) => order.status === filter) : orders).filter(
     (order) => showArchived || !order.archived_at
   )
+  const activeOrders = orders.filter((order) => !order.archived_at)
+  const statusCounts = ORDER_STATUSES.reduce<Record<string, number>>((counts, status) => {
+    counts[status] = activeOrders.filter((order) => order.status === status).length
+    return counts
+  }, {})
+  const archivedCount = orders.filter((order) => Boolean(order.archived_at)).length
 
   return (
     <div className="animate-fade-in">
@@ -206,6 +258,20 @@ export default function AdminOrders() {
           <option value="cancelled">Annulées</option>
         </select>
       </div>
+
+      <section aria-label="Résumé des commandes" className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <button type="button" onClick={() => setFilter('')} aria-pressed={!filter} className={`rounded-xl border p-4 text-left transition ${!filter ? 'border-brand-red/40 bg-brand-red/10' : 'border-white/[.07] bg-charcoal-800/70 hover:border-white/15'}`}>
+          <span className="block text-[11px] font-medium text-charcoal-400">Commandes actives</span>
+          <strong className="mt-2 block text-2xl font-black tabular-nums text-white">{activeOrders.length}</strong>
+        </button>
+        {ORDER_STATUSES.slice(0, 4).map((status) => (
+          <button key={status} type="button" onClick={() => setFilter(filter === status ? '' : status)} aria-pressed={filter === status} className={`rounded-xl border p-4 text-left transition ${filter === status ? 'border-brand-red/40 bg-brand-red/10' : 'border-white/[.07] bg-charcoal-800/70 hover:border-white/15'}`}>
+            <span className="block text-[11px] font-medium text-charcoal-400">{orderStatusLabel(status)}</span>
+            <strong className="mt-2 block text-2xl font-black tabular-nums text-white">{statusCounts[status] ?? 0}</strong>
+          </button>
+        ))}
+      </section>
+      {showArchived && <p className="mb-4 text-xs text-charcoal-400">{archivedCount} commande(s) archivée(s) dans le résultat chargé.</p>}
 
       <label className="relative mb-6 block max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
@@ -326,7 +392,23 @@ export default function AdminOrders() {
                       {order.note && <p className="mt-1 text-charcoal-400">Note : {order.note}</p>}
                     </div>
 
-                    {(NEXT_ACTIONS[order.status] ?? []).length > 0 && (
+                    {order.archived_at && (
+                      <button
+                        type="button"
+                        disabled={deletingId === order.id}
+                        onClick={() => restoreOrder(order)}
+                        className="btn-primary"
+                      >
+                        {deletingId === order.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArchiveRestore className="h-4 w-4" />
+                        )}
+                        Restaurer la commande
+                      </button>
+                    )}
+
+                    {!order.archived_at && (NEXT_ACTIONS[order.status] ?? []).length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {(NEXT_ACTIONS[order.status] ?? []).map((action) => (
                           <button

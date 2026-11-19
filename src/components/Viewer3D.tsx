@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType, type Ref } from 'react'
 import { RotateCcw, Maximize, Minimize, Package, Loader2 } from 'lucide-react'
+import { ensureModelViewer } from '@/lib/model-viewer'
 
 type Props = {
   src: string
@@ -67,7 +68,7 @@ export default function Viewer3D({ src, poster, alt }: Props) {
   useEffect(() => {
     if (!inView || elementReady) return
     let cancelled = false
-    import('@google/model-viewer')
+    ensureModelViewer()
       .then(() => {
         if (!cancelled) setElementReady(true)
       })
@@ -158,7 +159,7 @@ export default function Viewer3D({ src, poster, alt }: Props) {
           camera-controls
           touch-action="pan-y"
           shadow-intensity="1"
-          loading="eager"
+          loading="lazy"
           reveal="auto"
           style={{ width: '100%', height: fullscreen ? '100vh' : '400px', background: '#1a1a1d' }}
         />

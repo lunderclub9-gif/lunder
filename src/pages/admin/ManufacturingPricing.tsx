@@ -75,10 +75,16 @@ export default function ManufacturingPricingPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: mats }, { data: rules }] = await Promise.all([
+    setError(null)
+    const [{ data: mats, error: materialsError }, { data: rules, error: pricingError }] = await Promise.all([
       supabase.from('manufacturing_materials').select('*').order('sort_order').order('name'),
       supabase.from('manufacturing_pricing').select('*').eq('id', true).maybeSingle(),
     ])
+    if (materialsError || pricingError) {
+      setError('Impossible de charger les matières ou les règles de tarification. Vérifiez les droits propriétaire et la connexion Supabase.')
+      setLoading(false)
+      return
+    }
     setMaterials((mats as MfgMaterial[]) ?? [])
     if (rules) {
       const row = rules as Record<string, unknown>
@@ -117,14 +123,41 @@ export default function ManufacturingPricingPage() {
     setSaved(false)
     let discounts: { minQuantity: number; percent: number }[]
     try {
-      const parsed = JSON.parse(discountsText)
+      const parsed: unknown = JSON.parse(discountsText)
       if (!Array.isArray(parsed)) throw new Error('not an array')
-      discounts = parsed.map((tier) => ({
-        minQuantity: Number(tier.minQuantity) || 0,
-        percent: Number(tier.percent) || 0,
-      }))
+      discounts = parsed.map((tier: unknown) => {
+        if (!tier || typeof tier !== 'object') throw new Error('invalid tier')
+        const values = tier as Record<string, unknown>
+        const minQuantity = Number(values.minQuantity)
+        const percent = Number(values.percent)
+        if (!Number.isInteger(minQuantity) || minQuantity < 2 || minQuantity > 10000 ||
+          !Number.isFinite(percent) || percent <= 0 || percent > 90) {
+          throw new Error('invalid tier values')
+        }
+        return { minQuantity, percent }
+      })
+      const sorted = [...discounts].sort((a, b) => a.minQuantity - b.minQuantity)
+      if (new Set(sorted.map((tier) => tier.minQuantity)).size !== sorted.length ||
+        sorted.some((tier, index) => index > 0 && tier.percent < sorted[index - 1].percent)) {
+        throw new Error('discount tiers must be unique and progressive')
+      }
+      discounts = sorted
     } catch {
-      setError('Les remises quantité doivent être un tableau JSON valide.')
+      setError('Remises invalides : utilisez des quantités entières uniques (à partir de 2) et des remises progressives entre 1 et 90 %.')
+      return
+    }
+
+    const numericEntries = Object.entries(pricing).filter(([key]) => key !== 'quantity_discounts')
+    if (numericEntries.some(([, value]) => !Number.isFinite(value) || Number(value) < 0)) {
+      setError('Tous les paramètres numériques doivent être des nombres positifs ou nuls.')
+      return
+    }
+    if (pricing.margin_percent > 90 || pricing.waste_percent > 100 ||
+      pricing.rush_fee_percent > 200 ||
+      pricing.effective_volume_percent <= 0 || pricing.effective_volume_percent > 100 ||
+      !Number.isInteger(pricing.validity_days) || pricing.validity_days < 1 || pricing.validity_days > 365 ||
+      pricing.print_speed_g_per_hour <= 0) {
+      setError('Vérifiez les limites : marge ≤ 90 %, perte ≤ 100 %, urgence ≤ 200 %, volume utile entre 1 et 100 %, validité de 1 à 365 jours et vitesse strictement positive.')
       return
     }
     setSaving(true)
@@ -154,6 +187,10 @@ export default function ManufacturingPricingPage() {
       return
     }
     const multiplier = Number(newMaterialMultiplier)
+    if (!Number.isFinite(multiplier) || multiplier <= 0) {
+      setError('Le multiplicateur doit être strictement positif.')
+      return
+    }
     const colors = newMaterialColors
       .split(',')
       .map((c) => c.trim())
@@ -178,6 +215,21 @@ export default function ManufacturingPricingPage() {
   }
 
   const updateMaterial = async (material: MfgMaterial, patch: Partial<MfgMaterial>) => {
+    if (patch.price_per_gram_dzd !== undefined &&
+      (!Number.isFinite(patch.price_per_gram_dzd) || patch.price_per_gram_dzd < 0)) {
+      setError('Le prix par gramme doit être un nombre positif ou nul.')
+      return
+    }
+    if (patch.density_g_cm3 !== undefined &&
+      (!Number.isFinite(patch.density_g_cm3) || patch.density_g_cm3 <= 0)) {
+      setError('La densité doit être strictement positive.')
+      return
+    }
+    if (patch.multiplier !== undefined &&
+      (!Number.isFinite(patch.multiplier) || patch.multiplier <= 0)) {
+      setError('Le multiplicateur doit être strictement positif.')
+      return
+    }
     const { error: updateError } = await supabase
       .from('manufacturing_materials')
       .update(patch)

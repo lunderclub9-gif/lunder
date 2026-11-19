@@ -5,14 +5,19 @@ catalog with 3D previews, guest cash-on-delivery checkout, Algerian delivery rat
 manufacturing requests with versioned quotes, and an owner-only admin area at `/admin`.
 
 **Stack:** React 18 + TypeScript + Vite 7 + Tailwind 3 · Supabase (Postgres, Auth, Storage) ·
-`@google/model-viewer` (lazy-loaded). No server process: all trust lives in Postgres policies and
+`@google/model-viewer` (loaded only when a customer opens a GLB/GLTF preview). No server process: all trust lives in Postgres policies and
 `SECURITY DEFINER` functions.
 
 ## Status
 
-The repository contains the storefront, owner back office, custom-manufacturing workflow and unit
-tests. The Supabase migrations have **not** been applied or verified against a live project; see the
-remaining validation limits at the bottom before any deployment.
+The `tayeb` branch contains the storefront, owner back office, custom-manufacturing workflow, finance MVP,
+customer account area, visual identity studio, security hardening, unit tests and seven SQL regression suites.
+Its 31 ordered migration files were replayed from a clean baseline in an isolated local Supabase CI job, and
+all seven SQL suites passed on the baseline commit `f1953917a038ef88db119b732a0c460c9447069f`. This validates
+the repository migration chain on a disposable database; it does **not** prove that either connected hosted
+Supabase project has the same schema or migration history. The connected projects have different migration
+histories. Do not run `supabase db push` against either live project until its identity, baseline and schema
+diff are reconciled and the production migration plan is explicitly approved.
 
 ## Architecture and trust boundaries
 
@@ -39,25 +44,27 @@ Every write that carries money, stock, privacy or status is only reachable throu
 | `create_custom_request(payload)` | `SECURITY DEFINER` | anon | Validates phone, dimensions, delivery and acceptance, computes the estimate server-side, verifies each uploaded path really exists in the private bucket before recording it |
 | `create_custom_quote(...)` | `SECURITY DEFINER` | owner | Computes the next version server-side and expires the previous `sent` quote, so only one version is ever approvable |
 | `create_custom_quote_from_estimate(request)` | `SECURITY DEFINER` | owner | Issues the next quote version directly from the stored automatic estimate, keeping the immutable snapshot |
-| `owner_approve_custom_request(quote, note)` | `SECURITY DEFINER` | owner | The only path from a valid `sent` or `accepted` quote to an order: locks quote and request, re-quotes delivery, creates exactly one order derived from the quote id, and is idempotent |
+| `owner_approve_custom_request(quote, note)` | `SECURITY DEFINER` | owner | The only path from the latest, unexpired customer-accepted quote with a valid immutable snapshot to an order; locks quote/request and is idempotent |
 | `owner_reject_custom_request(request, reason)` | `SECURITY DEFINER` | owner | Refuses the request and any open quote with an optional reason, without creating an order |
 | `delete_delivered_order(id, reason)` | `SECURITY DEFINER` | owner | Hard-deletes a `delivered` order only, after inserting an audit entry; related items/history are removed by cascade |
 | `get_order_by_token(token)` | `SECURITY DEFINER` | anon | Returns a full order only for a 128-bit token; there is no table access for guests |
-| `track_order(number, phone)` | `SECURITY DEFINER` | anon | Order number + phone, minimal fields only, capped at 8 attempts per order per 15 minutes |
+| `track_order(number, phone)` | `SECURITY DEFINER` | anon | Order number + phone, minimal fields only, capped at 8 attempts per order and 20 attempts per client IP per 15 minutes |
 | `get_custom_request_by_token(token)` | `SECURITY DEFINER` | anon | Guest view of their own request and quotes; also expires stale quotes |
 | `quote_delivery(wilaya, commune, method)` | `SECURITY DEFINER` | anon | The only source of a delivery price; raises `LIVRAISON_INDISPONIBLE` instead of returning 0 |
 | `set_order_status(id, status)` | `SECURITY DEFINER` | owner | Validates the transition map and restores stock exactly once on cancellation |
 | `set_custom_request_status(id, status)` | `SECURITY DEFINER` | owner | Refuses `quoted`/`approved`, which may only result from a quote |
 | `product_cost_estimate(product)` | `SECURITY DEFINER` | owner | Computes cost from configured inputs, separating margin from markup |
-| `is_owner()` | `SECURITY DEFINER STABLE` | anon | Single source of truth for owner checks used by RLS and functions |
+| `is_owner()` | `SECURITY DEFINER STABLE` | authenticated | Single source of truth for owner checks; not executable by anonymous callers |
 | `log_owner_event(action)` | `SECURITY DEFINER` | owner | Append-only auth event, restricted to two action names |
 | `audit_row()` | `SECURITY DEFINER` trigger | nobody | Writes the audit entry with before/after diff; clients cannot insert logs |
 | `handle_new_user()` | `SECURITY DEFINER` trigger | nobody | Creates the profile with `role = 'customer'` on signup |
 | `prevent_role_change()` | trigger | nobody | Rejects any role change coming from `authenticated` |
 
-With the sole exception of the sequence helper `next_order_number()`, each of these pins an explicit
-`search_path` (`public` for legacy functions; `pg_catalog, public` for new 012 functions) and has
-`EXECUTE` revoked from `PUBLIC`, granted only to the roles listed.
+Migration 016 pins the `search_path` of privileged functions and blocks client roles from creating
+objects in `public`; migration 019 narrows RPC execution grants and changes the public materials view
+to `security_invoker`. Owner-only functions remain callable by `authenticated` because the database
+checks `is_owner()` inside them; guest token/checkout/estimate endpoints are explicitly granted to
+`anon` and `authenticated`.
 
 ### Which boundary enforces what
 
@@ -93,19 +100,22 @@ With the sole exception of the sequence helper `next_order_number()`, each of th
 2. The customer may accept or refuse a valid `sent` quote, but acceptance is only a communication
    status and never creates an order. A refusal invalidates the quote but does not reject the request;
    only the owner can make the final request decision.
-3. The owner may approve an eligible, unexpired `sent` or `accepted` quote without waiting for the
-   customer's acceptance. Older quote versions expire when a new one is issued.
-4. Approval locks the quote and request rows, validates delivery and final DZD totals, and uses a
+3. The customer must accept the latest valid `sent` quote version. A quote that has not been accepted
+   cannot be approved by the owner; older versions expire when a new quote is issued.
+4. Owner approval then locks the quote and request rows, verifies the immutable accepted snapshot, validates delivery and final DZD totals, and uses a
    unique quote-linked idempotency key; retries return the existing order.
 
 ### Limits of this model
 
-- Guests must upload without an account, so the intake bucket accepts anonymous `INSERT`. Size and MIME
-  are capped, but there is no rate limit and abandoned uploads are not collected.
+- Guests must upload without an account, so the private intake bucket accepts anonymous `INSERT`. The
+  Storage trigger caps each request folder at 10 files / 100 MiB and the bucket caps each file at 25 MiB;
+  guest order/request RPCs, manufacturing estimates, repeated product-spec saves and tracking are rate-limited; rate-limit keys store a one-way hash of the client IP, not the raw address. There is still no global per-IP quota for direct
+  Storage uploads, and abandoned/orphaned uploads need a scheduled cleanup or server-issued upload ticket.
 - Owner sign-in/out is logged by the app calling `log_owner_event`; an API login that bypasses the app
   is not recorded. Real auth-event logging needs a server-side hook.
-- `next_order_number()` is executable by any role and can only consume sequence values — it reveals
-  nothing and merely creates gaps in the numbering.
+- Internal helpers and trigger functions (`next_order_number`, audit hooks, status guards and cost
+  calculators) are not executable by `anon` or `authenticated`; triggers and trusted functions invoke
+  them as their database owner. The guest RPC surface is explicitly allow-listed.
 - Authorisation is only as good as the policies: any new table needs RLS enabled and an owner policy,
   which is why every migration here does both explicitly.
 
@@ -140,8 +150,10 @@ secrets in that provider's secret store.
 
 ## Migrations — apply in this order
 
-Run these against the Supabase project (SQL editor or `supabase db push`), **in filename order**.
-Later files depend on `public.is_owner()` and on the tables created earlier.
+These files are a **single ordered migration chain**. Apply them to a clean disposable database first,
+then reconcile an existing database against the actual schema before applying anything. Do not replay
+this chain against either connected project until its untracked schema changes and migration history
+have been reconciled. Later files depend on `public.is_owner()` and earlier tables/functions.
 
 | File | Creates | Depends on |
 |---|---|---|
@@ -156,10 +168,32 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261113150000_009_order_archive_source_and_security.sql` | order archive columns, source, soft-delete, owner-only quote generation | 008 |
 | `20261113160000_010_pricing_security_and_public_estimate.sql` | revoke public pricing access, safe materials view, public estimate RPC | 009 |
 | `20261113170000_011_custom_workflow_and_delivered_deletion.sql` | dimension estimate, client decision history, owner approval, delivered-order deletion | 010 |
-| `20261113180000_012_owner_approval_and_safe_request_deletion.sql` | remove legacy public order-creation RPC, allow owner approval of `sent` quotes, two-phase deletion of eligible unlinked requests | 011 |
+| `20261113180000_012_owner_approval_and_safe_request_deletion.sql` | remove legacy public order-creation RPC, add the intermediate owner-approval rule (superseded by immutable acceptance in 024), two-phase deletion of eligible unlinked requests | 011 |
+| `20261114224500_013_owner_notifications.sql` | durable owner notification records and insert triggers | 012 |
+| `20261116100000_014_multi_model_custom_requests.sql` | multi-file / multi-model product specs, geometry-aware estimation and exact-dimension server validation | 013 |
+| `20261116120000_015_profit_analytics.sql` | delivered timestamps, immutable order-item cost snapshots, business expenses and owner-only finance data | 014 |
+| `20261116140000_016_security_financial_accuracy_hardening.sql` | pinned privileged-function search paths, role-change guard correction, public-schema and default-execute hardening | 015 |
+| `20261116150000_017_variant_combination_integrity.sql` | database-enforced unique complete option combinations per product variant | 016 |
+| `20261116160000_018_guest_api_rate_limits.sql` | IP/user rate limits for guest order creation, custom request creation and order tracking | 017 |
+| `20261116170000_019_public_view_and_function_privileges.sql` | invoker-secured public materials view, owner-only RPC grants and trigger-function revocations | 018 |
+| `20261116180000_020_custom_upload_storage_limits.sql` | server-side custom-upload folder path, file-count and aggregate-size limits | 019 |
+| `20261116190000_021_rls_performance_and_fk_indexes.sql` | consolidate overlapping read policies, cache auth identity in RLS, and index uncovered foreign keys | 020 |
+| `20261116200000_022_guest_estimate_rate_limits.sql` | IP/user throttling for public manufacturing estimates and repeated model-spec saves; only rate-limited estimate wrappers remain public | 021 |
+| `20261117230000_023_customer_quote_breakdown_allowlist.sql` | customer-safe allowlist for quote cost breakdowns | 022 |
+| `20261118000656_revoke_anon_access_to_private_tables.sql` | revoke anonymous direct access to private business tables | 023 |
+| `20261118090000_024_immutable_custom_quotations.sql` | immutable accepted quote snapshots, latest-version owner approval and safe quote-to-order creation | 023 |
+| `20261118100000_025_inventory_movement_ledger.sql` | auditable stock reservation/release/consumption ledger and safe archive/restore transitions | 024 |
+| `20261118110000_026_storage_atomic_quotas.sql` | atomic per-request upload count and size quotas | 025 |
+| `20261118120000_027_tracking_attempt_serialization.sql` | serialized tracking attempt limits to prevent concurrent rate-limit bypass | 026 |
+| `20261118130000_028_manufacturing_cost_engine.sql` | configurable material/labour/machine costing, margin/tax calculation and immutable costing snapshots | 027 |
+| `20261118140000_029_visual_identity_studio.sql` | owner-only visual identity publishing, version history and restoration | 028 |
+| `20261118150000_030_customer_account_ownership.sql` | authenticated customer ownership links and safe account-history views; committed on `tayeb`, not confirmed applied to production | 029 |
 
-Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
-seed rows use `ON CONFLICT DO NOTHING`.
+A post-migration privilege regression script is provided at `supabase/tests/security_regression.sql`.
+
+Treat migrations as **apply-once, in timestamp order**. Some operations are idempotent, but the chain
+as a whole is not advertised as safe to replay manually. Never mark a migration applied or skip one
+without comparing the live schema and its migration history.
 
 The geography dataset is the 69-wilaya structure of Loi 26-06 (4 April 2026), sourced from
 `el-amin-dev/algeria-wilayas-communes` and retrieved 12 Nov 2026. Wilayas 59–69 are legally in force
@@ -239,7 +273,7 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
    détail interne, l'acceptation éventuelle du client et l'historique des devis. Il peut créer un
    devis depuis l'estimation, saisir un devis manuel ou un devis technique, puis l'envoyer.
 5. L'acceptation client ne crée aucune commande et n'est pas requise. Le propriétaire peut approuver
-   un devis valide `sent` ou `accepted` via `owner_approve_custom_request`; ce RPC vérifie la livraison,
+   un devis valide, accepté par le client et toujours à jour via `owner_approve_custom_request`; ce RPC vérifie la livraison,
    le montant, l'éligibilité de la demande et l'idempotence. La commande suit ensuite le système
    existant de suivi et de livraison.
 6. Une commande `delivered` affiche un bouton de suppression directement sur sa carte. La
@@ -248,7 +282,8 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
 
 Les migrations sont strictement progressives : `011` ajoute des colonnes et redéfinit des fonctions;
 `012` corrige les règles d'approbation, retire les anciens RPC qui pouvaient créer une commande et
-ajoute une suppression en deux phases pour les demandes sans devis, décision historique ou commande.
+ajoute une suppression en deux phases; `013–020` ajoutent notifications, multi-modèles, finance,
+hardening de sécurité, intégrité des variantes, limitation des RPC et garde-fous Storage.
 La suppression des fichiers passe par Supabase Storage API; le RPC final vérifie ensuite qu'aucun objet
 correspondant ne subsiste avant de supprimer les métadonnées. Un journal d'audit conserve une référence
 et l'instantané des événements métier avant suppression. Les demandes avec devis ou commande ne sont
@@ -256,25 +291,29 @@ pas supprimables par cette action.
 
 ## Known open items
 
-- **Database validation is pending.** Migrations have not been applied to a local/test or production
-  database in this task. The sandbox has no local PostgreSQL/Supabase CLI environment; migration 012
-  therefore still needs isolated-database validation before deployment. Do not apply it to production
-  without separate approval.
-- **Automated coverage is partial.** `npm test` runs the Vitest unit suite; it does not exercise RLS,
-  Postgres RPC transactions, Storage permissions, end-to-end customer flows or mobile layouts.
-- **Admin notifications remain incomplete.** The dashboard now uses real counters through an owner-only
-  RPC, but there is no durable read/unread notification center or event-driven notification delivery.
+- **Hosted database rollout is pending.** The complete repository migration chain has passed clean-baseline
+  replay and seven SQL regression suites on an isolated local Supabase CI database. The connected hosted
+  projects still have different migration histories, and the production target has not been conclusively
+  reconciled. Migration 030 is branch-only until an approved production migration plan is executed.
+  Do not apply migrations to either live project without a schema/history diff and explicit approval.
+- **Automated coverage is partial.** `npm test` runs Vitest and CI replays all migrations plus seven SQL
+  regression suites; it still does not replace end-to-end browser tests, real-device checks or physical
+  printer verification.
+- **Notifications are in-app only.** The owner notification center supports durable read/unread state and
+  realtime refresh, but it does not send transactional email or SMS.
 - **Storage deletion race is not fully closed.** The final RPC checks that the known request objects are
   absent, but anonymous bucket inserts are not serialized against that check. Do not deploy request
   deletion until uploads are bound to server-issued sessions or an equivalent reconciliation/cleanup
   mechanism prevents a concurrent re-upload from becoming orphaned.
 - **Production stage is not tracked separately.** Orders support pending/confirmed/shipped/delivered;
   there is no distinct manufacturing-in-progress status, so the dashboard does not invent one.
-- **No transactional email or SMS.** No order confirmation, quote notification or password reset is
-  sent; guests must keep their tracking link. Password recovery is therefore hidden.
+- **No transactional order/quote email or SMS.** Guests must keep their tracking link. Customer password
+  recovery is implemented through Supabase Auth and depends on the hosted project's email delivery setup.
 - **Uploads:** the private custom-request bucket accepts anonymous inserts (guests must upload without
-  an account). Storage caps individual size and declared MIME, but there is no quota/rate limit or
-  server-side geometry parser; abandoned/partially uploaded files require cleanup.
+  an account). Migrations 018–020 add RPC throttling and server-side per-folder caps, but direct Storage
+  uploads do not yet have a global per-IP quota. Abandoned/partially uploaded objects still need a
+  scheduled cleanup or server-issued upload session. Geometry parsing runs in the browser and rejects
+  malformed/oversized inputs; final manufacturing feasibility still requires slicer/operator validation.
 - No license file is present; redistribution rights are unresolved.
 
 ## Migrations de fabrication sur mesure (008–012)
@@ -301,6 +340,16 @@ Ordre d'exécution complet, du plus ancien au plus récent :
 10. `20261113160000_010_pricing_security_and_public_estimate.sql`
 11. `20261113170000_011_custom_workflow_and_delivered_deletion.sql`
 12. `20261113180000_012_owner_approval_and_safe_request_deletion.sql`
+13. `20261114224500_013_owner_notifications.sql`
+14. `20261116100000_014_multi_model_custom_requests.sql`
+15. `20261116120000_015_profit_analytics.sql`
+16. `20261116140000_016_security_financial_accuracy_hardening.sql`
+17. `20261116150000_017_variant_combination_integrity.sql`
+18. `20261116160000_018_guest_api_rate_limits.sql`
+19. `20261116170000_019_public_view_and_function_privileges.sql`
+20. `20261116180000_020_custom_upload_storage_limits.sql`
+21. `20261116190000_021_rls_performance_and_fk_indexes.sql`
+22. `20261116200000_022_guest_estimate_rate_limits.sql`
 
 Après application, renseigner au moins une matière et les tarifs : la ligne
 unique de `manufacturing_pricing` est initialisée à zéro, un devis rendrait donc

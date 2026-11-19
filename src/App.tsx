@@ -1,12 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { CartProvider } from '@/lib/cart'
+import { WishlistProvider } from '@/lib/wishlist'
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Loader2, Settings2 } from 'lucide-react'
 import { isSupabaseConfigured, missingConfigKeys } from '@/lib/supabase'
 
 const StoreLayout = lazy(() => import('@/layouts/StoreLayout'))
 const HomePage = lazy(() => import('@/pages/store/HomePage'))
+const IntentLandingPage = lazy(() => import('@/pages/store/IntentLandingPage'))
 const ProductsPage = lazy(() => import('@/pages/store/ProductsPage'))
 const ProductDetailPage = lazy(() => import('@/pages/store/ProductDetailPage'))
 const CartPage = lazy(() => import('@/pages/store/CartPage'))
@@ -16,6 +18,8 @@ const TrackOrderPage = lazy(() => import('@/pages/store/TrackOrderPage'))
 const CustomRequestPage = lazy(() => import('@/pages/store/CustomRequestPage'))
 const CustomRequestStatusPage = lazy(() => import('@/pages/store/CustomRequestStatusPage'))
 const InfoPage = lazy(() => import('@/pages/store/InfoPage'))
+const CustomerAccountPage = lazy(() => import('@/pages/store/CustomerAccountPage'))
+const WishlistPage = lazy(() => import('@/pages/store/WishlistPage'))
 const AdminLogin = lazy(() => import('@/pages/admin/AdminLogin'))
 const AdminLayout = lazy(() => import('@/layouts/AdminLayout'))
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'))
@@ -23,12 +27,17 @@ const AdminProducts = lazy(() => import('@/pages/admin/Products'))
 const AdminProductEdit = lazy(() => import('@/pages/admin/ProductEdit'))
 const AdminCategories = lazy(() => import('@/pages/admin/Categories'))
 const AdminOrders = lazy(() => import('@/pages/admin/Orders'))
+const AdminCustomers = lazy(() => import('@/pages/admin/Customers'))
 const AdminDelivery = lazy(() => import('@/pages/admin/Delivery'))
 const AdminRequests = lazy(() => import('@/pages/admin/Requests'))
 const AdminManufacturingPricing = lazy(() => import('@/pages/admin/ManufacturingPricing'))
 const AdminProductCostMaterials = lazy(() => import('@/pages/admin/ProductCostMaterials'))
+const AdminSmartFileAnalyzer = lazy(() => import('@/pages/admin/SmartFileAnalyzer'))
+const AdminCustomCosting = lazy(() => import('@/pages/admin/CustomCosting'))
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'))
+const AdminVisualIdentity = lazy(() => import('@/pages/admin/VisualIdentityStudio'))
 const AdminHistory = lazy(() => import('@/pages/admin/History'))
+const AdminFinancialDashboard = lazy(() => import('@/pages/admin/FinancialDashboard'))
 
 function FullPageLoader() {
   return (
@@ -83,6 +92,7 @@ export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
+        <WishlistProvider>
         <BrowserRouter>
           <Suspense fallback={<FullPageLoader />}>
             <Routes>
@@ -96,26 +106,34 @@ export default function App() {
                 }
               >
                 <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="finances" element={<AdminFinancialDashboard />} />
                 <Route path="produits" element={<AdminProducts />} />
                 <Route path="produits/nouveau" element={<AdminProductEdit />} />
                 <Route path="produits/:id" element={<AdminProductEdit />} />
                 <Route path="categories" element={<AdminCategories />} />
                 <Route path="commandes" element={<AdminOrders />} />
+                <Route path="clients" element={<AdminCustomers />} />
                 <Route path="livraison" element={<AdminDelivery />} />
                 <Route path="demandes" element={<AdminRequests />} />
                 <Route path="tarification" element={<AdminManufacturingPricing />} />
                 <Route path="couts-produits" element={<AdminProductCostMaterials />} />
+                <Route path="analyse-fichiers" element={<AdminSmartFileAnalyzer />} />
+                <Route path="calcul-devis" element={<AdminCustomCosting />} />
                 <Route path="parametres" element={<AdminSettings />} />
+                <Route path="visual-identity" element={<AdminVisualIdentity />} />
                 <Route path="historique" element={<AdminHistory />} />
               </Route>
               <Route path="/boutique" element={<StoreLayout />}>
                 <Route index element={<HomePage />} />
+                <Route path="decouvrir/:intent" element={<IntentLandingPage />} />
                 <Route path="produits" element={<ProductsPage />} />
+                <Route path="favoris" element={<WishlistPage />} />
                 <Route path="produits/:slug" element={<ProductDetailPage />} />
                 <Route path="panier" element={<CartPage />} />
                 <Route path="commande" element={<CheckoutPage />} />
                 <Route path="commande/confirmation" element={<OrderConfirmationPage />} />
                 <Route path="suivi" element={<TrackOrderPage />} />
+                <Route path="compte" element={<CustomerAccountPage />} />
                 <Route path="sur-mesure" element={<CustomRequestPage />} />
                 <Route path="sur-mesure/suivi" element={<CustomRequestStatusPage />} />
                 <Route path="informations" element={<InfoPage />} />
@@ -125,6 +143,7 @@ export default function App() {
             </Routes>
           </Suspense>
         </BrowserRouter>
+        </WishlistProvider>
       </CartProvider>
     </AuthProvider>
   )

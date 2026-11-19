@@ -43,19 +43,46 @@ const CartContext = createContext<CartContextValue>({
   clear: () => {},
 })
 
+export function normalizeStoredCart(value: unknown): CartItem[] {
+  if (!Array.isArray(value)) return []
+
+  return value.flatMap((entry): CartItem[] => {
+    if (!entry || typeof entry !== 'object') return []
+    const item = entry as Partial<CartItem>
+    if (
+      typeof item.productId !== 'string' || !item.productId ||
+      typeof item.slug !== 'string' || !item.slug ||
+      typeof item.name !== 'string' || !item.name ||
+      typeof item.quantity !== 'number' || !Number.isFinite(item.quantity) ||
+      typeof item.unitPriceDzd !== 'number' || !Number.isFinite(item.unitPriceDzd) ||
+      item.unitPriceDzd < 0
+    ) return []
+
+    const variantId = typeof item.variantId === 'string' ? item.variantId : null
+    const quantity = Math.min(MAX_QUANTITY, Math.max(1, Math.floor(item.quantity)))
+    const imageUrl = typeof item.imageUrl === 'string' && /^https?:\/\//i.test(item.imageUrl)
+      ? item.imageUrl
+      : null
+
+    return [{
+      key: `${item.productId}::${variantId ?? 'base'}`,
+      productId: item.productId,
+      variantId,
+      slug: item.slug,
+      name: item.name.slice(0, 200),
+      variantLabel: typeof item.variantLabel === 'string' ? item.variantLabel.slice(0, 120) : null,
+      unitPriceDzd: item.unitPriceDzd,
+      quantity,
+      imageUrl,
+    }]
+  })
+}
+
 function readStoredCart(): CartItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(
-      (item): item is CartItem =>
-        !!item &&
-        typeof item === 'object' &&
-        typeof (item as CartItem).productId === 'string' &&
-        typeof (item as CartItem).quantity === 'number'
-    )
+    return normalizeStoredCart(JSON.parse(raw) as unknown)
   } catch {
     /* stockage local indisponible (mode privé) : panier vide */
     return []
@@ -80,7 +107,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (existing) {
         return current.map((line) =>
           line.key === key
-            ? { ...line, quantity: Math.min(MAX_QUANTITY, line.quantity + quantity) }
+            ? {
+                ...line,
+                ...item,
+                key,
+                quantity: Math.min(MAX_QUANTITY, line.quantity + quantity),
+              }
             : line
         )
       }

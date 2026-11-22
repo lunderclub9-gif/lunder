@@ -143,8 +143,6 @@ export default function ProductsPage() {
 
       {categories.length > 0 && <nav aria-label="Pages des catégories" className="mb-6 flex flex-wrap gap-x-4 gap-y-2 text-xs text-charcoal-400">{categories.map((category) => <Link key={category.id} to={`/boutique/categories/${category.slug}`} className="underline-offset-4 hover:text-brand-red hover:underline">{category.name}</Link>)}</nav>}
 
-      {categories.length > 0 && <nav aria-label="Pages des catégories" className="mb-6 flex flex-wrap gap-x-4 gap-y-2 text-xs text-charcoal-400">{categories.map((category) => <Link key={category.id} to={`/boutique/categories/${category.slug}`} className="underline-offset-4 hover:text-brand-red hover:underline">{category.name}</Link>)}</nav>}
-
       {loading ? (
         <div className="flex items-center justify-center py-16" aria-busy="true">
           <Package className="h-8 w-8 animate-pulse text-charcoal-500" />

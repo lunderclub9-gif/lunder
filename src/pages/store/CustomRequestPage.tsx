@@ -94,7 +94,6 @@ export default function CustomRequestPage() {
           colors: (m.colors as string[]) ?? [],
         }))
         setMaterials(mats)
-        if (mats.length > 0) setMaterial((current) => current || mats[0].name)
       })
     supabase
       .from('wilayas')
@@ -469,9 +468,9 @@ export default function CustomRequestPage() {
           <div className="grid gap-4 sm:grid-cols-3">
             {(
               [
-                ['Longueur (mm) *', lengthMm, setLengthMm],
-                ['Largeur (mm) *', widthMm, setWidthMm],
-                ['Hauteur (mm) *', heightMm, setHeightMm],
+                ['Longueur (mm)', lengthMm, setLengthMm],
+                ['Largeur (mm)', widthMm, setWidthMm],
+                ['Hauteur (mm)', heightMm, setHeightMm],
               ] as const
             ).map(([label, value, setter]) => (
               <label key={label} className="block">

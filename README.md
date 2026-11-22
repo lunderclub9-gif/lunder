@@ -164,6 +164,7 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261122124000_016_flexible_custom_requests.sql` | allows manual custom requests without dimensions, material or an accepted estimate | 012 |
 | `20261122130000_017_order_level_manufacturing_pricing.sql` | applies setup fees and minimum order adjustment once per order | 008 |
 | `20261123100000_018_marketing_attribution.sql` | stores privacy-minimal first-touch UTM attribution for guest orders and custom requests; owner-only read and validated RPC write | 005, 016 |
+| `20261123110000_019_marketing_campaign_spend.sql` | owner-only daily campaign spend records with RLS and DZD amount validation | 002, 018 |
 
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
 seed rows use `ON CONFLICT DO NOTHING`.
@@ -178,7 +179,7 @@ but administered by their mother wilayas until 31 Dec 2026; each can be disabled
 
 ### Marketing attribution (018)
 
-Store and custom-request forms capture first-touch `utm_source`, `utm_medium`, `utm_campaign`, `utm_content` and `utm_term` values from the landing URL. Values are kept in the browser tab session and submitted only after a guest order/request succeeds. Attribution is linked by the existing idempotency key; no customer name, phone, email, payment detail or cookie is added. Referrer is reduced to its hostname. The owner-only Analytics page reports attributed leads, orders and delivered revenue. Add UTM parameters to campaign links, for example `?utm_source=facebook&utm_medium=paid_social&utm_campaign=summer_launch`. Ad spend is not collected, so the report does not claim ROI or ROAS. Apply migration 018 before using the new Analytics section; it is not applied automatically.
+Store and custom-request forms capture first-touch `utm_source`, `utm_medium`, `utm_campaign`, `utm_content` and `utm_term` values from the landing URL. Values are kept in the browser tab session and submitted only after a guest order/request succeeds. Attribution is linked by the existing idempotency key; no customer name, phone, email, payment detail or cookie is added. Referrer is reduced to its hostname. The owner-only Analytics page reports attributed leads, orders and delivered revenue. Add UTM parameters to campaign links, for example `?utm_source=facebook&utm_medium=paid_social&utm_campaign=summer_launch`. In the same page, record daily ad spend using the exact same source, medium and campaign values; the dashboard calculates ROAS as attributed delivered revenue divided by recorded spend. ROAS is not net profit and excludes unrecorded fees, refunds and overhead. Apply migrations 018 and 019 before using campaign attribution and spend reporting. Apply migration 018 before using the new Analytics section; it is not applied automatically.
 
 ## First owner account
 

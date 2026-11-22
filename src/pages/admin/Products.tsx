@@ -43,8 +43,20 @@ export default function AdminProducts() {
       return
     }
     setProducts((current) => current.filter((item) => item.id !== product.id))
-    const imagePaths = (imageFiles ?? []).map((file) => `${product.id}/${file.name}`)
-    const modelPaths = (modelFiles ?? []).map((file) => `${product.id}/${file.name}`)
+    const imagePaths: string[] = []
+    for (const file of imageFiles ?? []) {
+      const objectPath = `${product.id}/${file.name}`
+      const publicUrl = supabase.storage.from('product-images').getPublicUrl(objectPath).data.publicUrl
+      const { data: references, error: referenceError } = await supabase.from('product_images').select('id').eq('image_url', publicUrl).limit(1)
+      if (!referenceError && !references?.length) imagePaths.push(objectPath)
+    }
+    const modelPaths: string[] = []
+    for (const file of modelFiles ?? []) {
+      const objectPath = `${product.id}/${file.name}`
+      const publicUrl = supabase.storage.from('product-models').getPublicUrl(objectPath).data.publicUrl
+      const { data: references, error: referenceError } = await supabase.from('products').select('id').eq('model_url', publicUrl).limit(1)
+      if (!referenceError && !references?.length) modelPaths.push(objectPath)
+    }
     const [imageCleanup, modelCleanup] = await Promise.all([
       imagePaths.length ? supabase.storage.from('product-images').remove(imagePaths) : Promise.resolve({ error: null }),
       modelPaths.length ? supabase.storage.from('product-models').remove(modelPaths) : Promise.resolve({ error: null }),

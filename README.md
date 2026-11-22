@@ -156,7 +156,7 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261113150000_009_order_archive_source_and_security.sql` | order archive columns, source, soft-delete, owner-only quote generation | 008 |
 | `20261113160000_010_pricing_security_and_public_estimate.sql` | revoke public pricing access, safe materials view, public estimate RPC | 009 |
 | `20261113170000_011_custom_workflow_and_delivered_deletion.sql` | dimension estimate, client decision history, owner approval, delivered-order deletion | 010 |
-| `20261113180000_012_owner_approval_and_safe_request_deletion.sql` | remove legacy public order-creation RPC, allow owner approval of `sent` quotes, two-phase deletion of eligible unlinked requests | 011 |
+| `20261113180000_012_owner_approval_and_safe_request_deletion.sql` | remove legacy public order-creation RPC, allow owner approval of `sent` quotes, two-phase deletion of eligible unlinked requests | 011 |\n| `20261114224500_013_owner_notifications.sql` | owner notification counters and notification RPC | 012 |\n| `20261122120000_014_product_seo_keywords.sql` | product SEO keyword array | 001 |\n| `20261122123000_015_category_seo_metadata.sql` | category SEO title, description and keyword fields | 001 |
 
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
 seed rows use `ON CONFLICT DO NOTHING`.

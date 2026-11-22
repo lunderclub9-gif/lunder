@@ -47,13 +47,17 @@ export default function AdminCategories() {
     setSaving(true)
     const categorySlug = slugify(slug.trim() || name)
     const seoPayload = { seo_title: seoTitle.trim() || null, seo_description: seoDescription.trim() || null, seo_keywords: seoKeywords.split(',').map((keyword) => keyword.trim()).filter(Boolean) }
+    const { error: seoColumnError } = await supabase.from('categories').select('seo_title,seo_description,seo_keywords').limit(1)
+    const basePayload = { name: name.trim(), slug: categorySlug, description: description || null }
+    const savePayload = seoColumnError ? basePayload : { ...basePayload, ...seoPayload }
     if (editingId) {
-      const { error } = await supabase.from('categories').update({ name: name.trim(), slug: categorySlug, description: description || null, ...seoPayload }).eq('id', editingId)
+      const { error } = await supabase.from('categories').update(savePayload).eq('id', editingId)
       if (!error && isPostHogEnabled) posthog.capture('category_updated', { category_id: editingId })
     } else {
-      const { error } = await supabase.from('categories').insert({ name: name.trim(), slug: categorySlug, description: description || null, sort_order: categories.length, ...seoPayload })
+      const { error } = await supabase.from('categories').insert({ ...savePayload, sort_order: categories.length })
       if (!error && isPostHogEnabled) posthog.capture('category_created')
     }
+    if (seoColumnError && (seoTitle.trim() || seoDescription.trim() || seoKeywords.trim())) window.alert('Catégorie enregistrée. Les champs SEO avancés seront sauvegardés après application de la migration 015.')
     resetForm()
     await loadCategories()
     setSaving(false)

@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Printer, LayoutDashboard, Package, Tag, LogOut, Menu, X,
-  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins, PanelLeftClose, PanelLeftOpen, ChartNoAxesCombined,
+  ShoppingBag, Truck, ClipboardList, Settings, History, Calculator, Coins, PanelLeftClose, PanelLeftOpen, BarChart3,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -13,7 +13,7 @@ import { AdminConfirmProvider } from '@/components/admin/AdminConfirmProvider'
 const navGroups = [
   { label: 'Vue d’ensemble', items: [
     { to: '/admin/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-    { to: '/admin/analytics', label: 'Analytics & Growth', icon: ChartNoAxesCombined },
+    { to: '/admin/analytics', label: 'Analytics & Growth', icon: BarChart3 },
   ] },
   { label: 'Ventes et opérations', items: [
     { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },

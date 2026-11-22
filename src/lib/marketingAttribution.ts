@@ -13,7 +13,13 @@ export type MarketingAttribution = {
 
 function clean(value: string | null, max = 120): string | null {
   if (!value) return null
-  const normalized = value.trim().replace(/[\u0000-\u001f\u007f]/g, '').slice(0, max)
+  const normalized = Array.from(value.trim())
+    .filter((character) => {
+      const code = character.charCodeAt(0)
+      return code >= 32 && code !== 127
+    })
+    .join('')
+    .slice(0, max)
   return normalized || null
 }
 

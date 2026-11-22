@@ -215,12 +215,12 @@ export function calculateManufacturingQuote(
     {
       label: 'Matière',
       amountDzd: materialCost * quantity,
-      detail: `${material.name} · `${round(gramsWithWaste)} g × `${round(material.pricePerGramDzd)} DA/g par pièce (perte `${Math.max(0, rules.wastePercent)} %)`,
+      detail: `${material.name} · ${round(gramsWithWaste)} g × ${round(material.pricePerGramDzd)} DA/g par pièce (perte ${Math.max(0, rules.wastePercent)} %)`,
     },
     {
       label: 'Impression',
       amountDzd: printingCost * quantity,
-      detail: `${formatHours(input.printHours)} h × `${round(hourlyCost)} DA/h par pièce`,
+      detail: `${formatHours(input.printHours)} h × ${round(hourlyCost)} DA/h par pièce`,
     },
     ...laborLines.map((line) => ({ ...line, amountDzd: line.amountDzd * quantity })),
   ]

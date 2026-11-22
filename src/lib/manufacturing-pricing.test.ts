@@ -43,10 +43,12 @@ describe('calculateManufacturingQuote', () => {
     expect(quote.lines[0].amountDzd).toBe(440)
     // impression : 2 h × 170 DA/h = 340
     expect(quote.lines[1].amountDzd).toBe(340)
-    // production : 440 + 340 + 200 (finition) + 50 = 1030, marge 40 % = 412
-    expect(quote.unitProductionCostDzd).toBe(1030)
-    expect(quote.unitPriceDzd).toBe(1442)
-    expect(quote.totalDzd).toBe(1442)
+    // production par pièce : 440 + 340 + 200 = 980, marge 40 % = 392
+    // préparation de commande : 50 DA, comptée une seule fois.
+    expect(quote.unitProductionCostDzd).toBe(980)
+    expect(quote.unitPriceDzd).toBe(1372)
+    expect(quote.totalDzd).toBe(1422)
+    expect(quote.lines.reduce((sum, line) => sum + line.amountDzd, 0)).toBe(quote.totalDzd)
   })
 
   it('applique le multiplicateur de matière', () => {
@@ -63,7 +65,8 @@ describe('calculateManufacturingQuote', () => {
       quantity: 1,
     })
     expect(quote.lines[1].amountDzd).toBe(100)
-    expect(quote.totalDzd).toBeGreaterThanOrEqual(rules.minimumOrderDzd)
+    expect(quote.totalDzd).toBe(rules.minimumOrderDzd)
+    expect(quote.lines.reduce((sum, line) => sum + line.amountDzd, 0)).toBe(quote.totalDzd)
   })
 
   it('applique la remise quantité, puis le supplément urgence', () => {
@@ -74,11 +77,12 @@ describe('calculateManufacturingQuote', () => {
       options: { finishing: true },
     })
     expect(quote.discountPercent).toBe(15)
-    expect(quote.subtotalDzd).toBe(1442 * 10)
-    expect(quote.discountDzd).toBe(Math.round(14420 * 0.15))
-    const afterDiscount = 14420 - quote.discountDzd
+    expect(quote.subtotalDzd).toBe(1372 * 10 + 50)
+    expect(quote.discountDzd).toBe(Math.round(13770 * 0.15))
+    const afterDiscount = 13770 - quote.discountDzd
     expect(quote.rushFeeDzd).toBe(Math.round(afterDiscount * 0.25))
     expect(quote.totalDzd).toBe(afterDiscount + quote.rushFeeDzd)
+    expect(quote.lines.reduce((sum, line) => sum + line.amountDzd, 0)).toBe(quote.totalDzd)
   })
 
   it('refuse une matière indisponible ou inconnue', () => {

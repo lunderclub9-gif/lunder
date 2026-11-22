@@ -1,0 +1,24 @@
+.analytics-line {
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: lunder-chart-draw 1.4s cubic-bezier(.22,.8,.25,1) forwards;
+}
+.analytics-area {
+  opacity: 0;
+  animation: lunder-chart-fade .9s ease-out .35s forwards;
+}
+.analytics-bar {
+  transform-origin: left center;
+  animation: lunder-bar-grow .85s cubic-bezier(.2,.8,.2,1) both;
+  transition: width .7s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes lunder-chart-draw { to { stroke-dashoffset: 0; } }
+@keyframes lunder-chart-fade { to { opacity: 1; } }
+@keyframes lunder-bar-grow { from { transform: scaleX(.02); opacity: .55; } to { transform: scaleX(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .analytics-line, .analytics-area, .analytics-bar {
+    animation: none !important;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}

@@ -36,7 +36,7 @@ Every write that carries money, stock, privacy or status is only reachable throu
 | `create_guest_order(payload)` | `SECURITY DEFINER` | anon | Re-reads every price and total from tables, locks product rows `FOR UPDATE`, validates commune↔wilaya and an active delivery rate, reserves stock once, one order per idempotency key (advisory lock + unique key) |
 | `estimate_manufacturing_dimensions(l, w, h, material, qty, options, rush)` | `SECURITY DEFINER` | anon | Derives estimated grams and print hours from the bounding-box volume, the configured fill ratio and material density, then runs the same pricing engine and returns a customer-safe breakdown |
 | `decide_custom_quote(token, decision)` | `SECURITY DEFINER` | anon | Accepts or refuses a sent quote; customer acceptance never creates an order |
-| `create_custom_request(payload)` | `SECURITY DEFINER` | anon | Validates phone, dimensions, delivery and acceptance, computes the estimate server-side, verifies each uploaded path really exists in the private bucket before recording it |
+| `create_custom_request(payload)` | `SECURITY DEFINER` | anon | Validates contact and delivery details; dimensions, material, files and estimate acceptance are optional; computes an estimate server-side when enough inputs exist and verifies each uploaded path before recording it |
 | `create_custom_quote(...)` | `SECURITY DEFINER` | owner | Computes the next version server-side and expires the previous `sent` quote, so only one version is ever approvable |
 | `create_custom_quote_from_estimate(request)` | `SECURITY DEFINER` | owner | Issues the next quote version directly from the stored automatic estimate, keeping the immutable snapshot |
 | `owner_approve_custom_request(quote, note)` | `SECURITY DEFINER` | owner | The only path from a valid `sent` or `accepted` quote to an order: locks quote and request, re-quotes delivery, creates exactly one order derived from the quote id, and is idempotent |
@@ -161,7 +161,7 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261114224500_013_owner_notifications.sql` | owner notification counters and notification RPC | 012 |
 | `20261122120000_014_product_seo_keywords.sql` | product SEO keyword array | 001 |
 | `20261122123000_015_category_seo_metadata.sql` | category SEO title, description and keyword fields | 001 |
-| `20261122120000_016_flexible_custom_requests.sql` | allows manual custom requests without dimensions, material or an accepted estimate | 012 |
+| `20261122124000_016_flexible_custom_requests.sql` | allows manual custom requests without dimensions, material or an accepted estimate | 012 |
 | `20261122130000_017_order_level_manufacturing_pricing.sql` | applies setup fees and minimum order adjustment once per order | 008 |
 
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
@@ -232,7 +232,7 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
 | `LIVRAISON_REQUISE` | owner approval attempted on a request without complete delivery information |
 | `COMMANDE_NON_LIVREE` | hard delete attempted on an order that is not `delivered` |
 
-## Workflow fabrication sur mesure (011)
+## Workflow fabrication sur mesure (011–016)
 
 1. Le client décrit son projet et peut joindre une photo ou un fichier de référence. Les dimensions,
    la matière et les options techniques sont facultatives ; le client ne saisit jamais de poids ni
@@ -310,6 +310,11 @@ Ordre d'exécution complet, du plus ancien au plus récent :
 10. `20261113160000_010_pricing_security_and_public_estimate.sql`
 11. `20261113170000_011_custom_workflow_and_delivered_deletion.sql`
 12. `20261113180000_012_owner_approval_and_safe_request_deletion.sql`
+13. `20261114224500_013_owner_notifications.sql`
+14. `20261122120000_014_product_seo_keywords.sql`
+15. `20261122123000_015_category_seo_metadata.sql`
+16. `20261122124000_016_flexible_custom_requests.sql`
+17. `20261122130000_017_order_level_manufacturing_pricing.sql`
 
 Après application, renseigner au moins une matière et les tarifs : la ligne
 unique de `manufacturing_pricing` est initialisée à zéro, un devis rendrait donc

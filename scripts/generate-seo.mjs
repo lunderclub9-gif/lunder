@@ -83,7 +83,17 @@ fs.writeFileSync(path.join(dist, 'index.html'), pageHtml({
   schema: { '@context': 'https://schema.org', '@type': 'Store', name: "LUNDER'S 3D STUDIO", url: `${siteUrl}/boutique`, description: globalDescription, areaServed: { '@type': 'Country', name: 'Algeria' } },
 }))
 
-const staticPages = [\n  { path: 'sur-mesure', title: 'Fabrication sur mesure | LUNDER’S 3D STUDIO', description: 'Décrivez votre projet et demandez une fabrication 3D sur mesure en Algérie.' },\n  { path: 'informations', title: 'Informations et politiques | LUNDER’S 3D STUDIO', description: 'Retrouvez les informations, conditions et politiques de LUNDER’S 3D STUDIO.' },\n]\nfor (const page of staticPages) {\n  const filename = path.join(dist, 'boutique', `${page.path}.html`)\n  fs.mkdirSync(path.dirname(filename), { recursive: true })\n  fs.writeFileSync(filename, pageHtml({ title: page.title, description: page.description, canonical: `${siteUrl}/boutique/${page.path}`, schema: { '@context': 'https://schema.org', '@type': 'WebPage', name: page.title, description: page.description, url: `${siteUrl}/boutique/${page.path}` } }))\n}\n\nconst urls = [
+const staticPages = [
+  { path: 'sur-mesure', title: 'Fabrication sur mesure | LUNDER’S 3D STUDIO', description: 'Décrivez votre projet et demandez une fabrication 3D sur mesure en Algérie.' },
+  { path: 'informations', title: 'Informations et politiques | LUNDER’S 3D STUDIO', description: 'Retrouvez les informations, conditions et politiques de LUNDER’S 3D STUDIO.' },
+]
+for (const page of staticPages) {
+  const filename = path.join(dist, 'boutique', `${page.path}.html`)
+  fs.mkdirSync(path.dirname(filename), { recursive: true })
+  fs.writeFileSync(filename, pageHtml({ title: page.title, description: page.description, canonical: `${siteUrl}/boutique/${page.path}`, schema: { '@context': 'https://schema.org', '@type': 'WebPage', name: page.title, description: page.description, url: `${siteUrl}/boutique/${page.path}` } }))
+}
+
+const urls = [
   { loc: `${siteUrl}/boutique`, changefreq: 'weekly', priority: '1.0' },
   { loc: `${siteUrl}/boutique/produits`, changefreq: 'daily', priority: '0.9' },
   { loc: `${siteUrl}/boutique/sur-mesure`, changefreq: 'monthly', priority: '0.7' },

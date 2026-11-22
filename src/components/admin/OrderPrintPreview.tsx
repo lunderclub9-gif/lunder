@@ -13,7 +13,7 @@ import {
   type PageOrientation,
   type PaperSize,
 } from '@/lib/print-layout'
-import { calculatePrintScale, getThermalPageHeightMm } from '@/lib/print-fit'
+import { calculatePrintScale, getGuardedPrintableArea, getThermalPageHeightMm } from '@/lib/print-fit'
 import { supabase } from '@/lib/supabase'
 import './delivery-note-print.css'
 
@@ -199,11 +199,11 @@ export default function OrderPrintPreview({
     if (!sheet || !frame || !content) return
 
     const pixelsPerMillimeter = 96 / 25.4
-    const availableWidthMm = Math.max(1, dimensions.widthMm - marginMm * 2)
-    const availableHeightMm = dimensions.heightMm === null
-      ? null
-      : Math.max(1, dimensions.heightMm - marginMm * 2)
-    const availableWidthPx = availableWidthMm * pixelsPerMillimeter
+    const usable = getGuardedPrintableArea(
+      Math.max(1, dimensions.widthMm - marginMm * 2),
+      dimensions.heightMm === null ? null : Math.max(1, dimensions.heightMm - marginMm * 2),
+    )
+    const availableWidthPx = usable.widthMm * pixelsPerMillimeter
 
     // Measure natural layout at the selected printable width, never the preview zoom.
     content.style.zoom = '1'
@@ -217,7 +217,7 @@ export default function OrderPrintPreview({
     frame.style.height = 'auto'
     const contentWidthPx = Math.max(content.scrollWidth, content.getBoundingClientRect().width)
     const contentHeightPx = Math.max(content.scrollHeight, content.getBoundingClientRect().height)
-    const printScale = calculatePrintScale(contentWidthPx, contentHeightPx, availableWidthMm, availableHeightMm)
+    const printScale = calculatePrintScale(contentWidthPx, contentHeightPx, usable.widthMm, usable.heightMm)
 
     content.style.transformOrigin = 'top left'
     content.style.transform = `scale(${printScale})`

@@ -51,9 +51,11 @@ type ProductCost = {
 type Material = { id: string; cost_per_kg_dzd: number }
 type Wilaya = { code: number; name_fr: string }
 type AttributionRow = { lead_type: 'order' | 'custom_request'; idempotency_key: string; utm_source: string | null; utm_medium: string | null; utm_campaign: string | null; utm_content: string | null; utm_term: string | null; referrer: string | null; landing_path: string | null; created_at: string }
+type CampaignSpend = { id: string; spend_date: string; source: string; medium: string; campaign: string; spend_dzd: number; notes: string | null }
 type AnalyticsData = {
   orders: Order[]
   attributions: AttributionRow[]
+  spend: CampaignSpend[]
   products: Product[]
   costs: ProductCost[]
   materials: Material[]
@@ -117,19 +119,21 @@ async function loadOrders(): Promise<Order[]> {
 }
 
 async function loadAnalytics(): Promise<AnalyticsData> {
-  const [orders, productsResult, costsResult, materialsResult, wilayasResult, attributionResult] = await Promise.all([
+  const [orders, productsResult, costsResult, materialsResult, wilayasResult, attributionResult, spendResult] = await Promise.all([
     loadOrders(),
     supabase.from('products').select('id, name, price_dzd, status, stock_quantity'),
     supabase.from('product_costs').select('product_id, material_id, print_grams, print_hours, machine_hour_rate_dzd, labor_minutes, labor_hour_rate_dzd, packaging_dzd, failure_rate_pct, return_reserve_dzd'),
     supabase.from('materials').select('id, cost_per_kg_dzd'),
     supabase.from('wilayas').select('code, name_fr').eq('is_active', true).order('code'),
     supabase.from('marketing_attributions').select('lead_type, idempotency_key, utm_source, utm_medium, utm_campaign, utm_content, utm_term, referrer, landing_path, created_at').order('created_at', { ascending: false }),
+    supabase.from('marketing_campaign_spend').select('id, spend_date, source, medium, campaign, spend_dzd, notes').order('spend_date', { ascending: false }),
   ])
-  const failed = [productsResult.error, costsResult.error, materialsResult.error, wilayasResult.error, attributionResult.error].find(Boolean)
+  const failed = [productsResult.error, costsResult.error, materialsResult.error, wilayasResult.error, attributionResult.error, spendResult.error].find(Boolean)
   if (failed) throw failed
   return {
     orders,
     attributions: (attributionResult.data as AttributionRow[]) ?? [],
+    spend: (spendResult.data as CampaignSpend[]) ?? [],
     products: (productsResult.data as Product[]) ?? [],
     costs: (costsResult.data as ProductCost[]) ?? [],
     materials: (materialsResult.data as Material[]) ?? [],
@@ -275,6 +279,14 @@ export default function AdminAnalytics() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [wilayaSearch, setWilayaSearch] = useState('')
+  const [spendDate, setSpendDate] = useState(() => { const date = new Date(); return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0') })
+  const [spendSource, setSpendSource] = useState('facebook')
+  const [spendMedium, setSpendMedium] = useState('paid_social')
+  const [spendCampaign, setSpendCampaign] = useState('')
+  const [spendAmount, setSpendAmount] = useState('')
+  const [spendNotes, setSpendNotes] = useState('')
+  const [savingSpend, setSavingSpend] = useState(false)
+  const [spendError, setSpendError] = useState('')
 
   const refresh = useCallback(async (quiet = false) => {
     if (quiet) setRefreshing(true)
@@ -378,7 +390,7 @@ export default function AdminAnalytics() {
     }))
 
     const orderByKey = new Map(currentOrders.map((order) => [order.idempotency_key, order] as const))
-    const campaignMap = new Map<string, { name: string; source: string; medium: string; leads: number; orders: number; delivered: number; revenue: number }>()
+    const campaignMap = new Map<string, { name: string; source: string; medium: string; leads: number; orders: number; delivered: number; revenue: number; spendDzd: number }>()
     const currentAttributions = data.attributions.filter((row) => {
       const date = new Date(row.created_at)
       return (!start || date >= start) && date <= now
@@ -387,7 +399,7 @@ export default function AdminAnalytics() {
       const source = row.utm_source || row.referrer || 'Direct / non attribué'
       const name = row.utm_campaign || source
       const key = [source, row.utm_medium || '', name].join('::')
-      const current = campaignMap.get(key) ?? { name, source, medium: row.utm_medium || '—', leads: 0, orders: 0, delivered: 0, revenue: 0 }
+      const current = campaignMap.get(key) ?? { name, source, medium: row.utm_medium || '—', leads: 0, orders: 0, delivered: 0, revenue: 0, spendDzd: 0 }
       current.leads += 1
       if (row.lead_type === 'order') {
         const order = orderByKey.get(row.idempotency_key)
@@ -398,9 +410,19 @@ export default function AdminAnalytics() {
       }
       campaignMap.set(key, current)
     }
-    const campaigns = [...campaignMap.values()].sort((a, b) => b.revenue - a.revenue || b.leads - a.leads)
+    for (const row of data.spend) {
+      const date = new Date(row.spend_date + 'T00:00:00')
+      if ((start && date < start) || date > now) continue
+      const key = [row.source, row.medium, row.campaign].join('::')
+      const current = campaignMap.get(key) ?? { name: row.campaign, source: row.source, medium: row.medium, leads: 0, orders: 0, delivered: 0, revenue: 0, spendDzd: 0 }
+      current.spendDzd += Number(row.spend_dzd || 0)
+      campaignMap.set(key, current)
+    }
+    const campaigns = [...campaignMap.values()].sort((a, b) => b.revenue - a.revenue || b.spendDzd - a.spendDzd || b.leads - a.leads)
     const attributedOrders = campaigns.reduce((sum, campaign) => sum + campaign.orders, 0)
     const attributedRevenue = campaigns.reduce((sum, campaign) => sum + campaign.revenue, 0)
+    const totalAdSpend = campaigns.reduce((sum, campaign) => sum + campaign.spendDzd, 0)
+    const overallRoas = totalAdSpend > 0 ? attributedRevenue / totalAdSpend : null
     const customRequestLeads = currentAttributions.filter((row) => row.lead_type === 'custom_request').length
 
     const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 13 : 12
@@ -467,7 +489,7 @@ export default function AdminAnalytics() {
 
     return {
       currentOrders, validOrders, delivered, revenue, deliveryRevenue, pipeline, cancelled, storeOrders, customOrders,
-      campaigns, attributedOrders, attributedRevenue, customRequestLeads,
+      campaigns, attributedOrders, attributedRevenue, customRequestLeads, totalAdSpend, overallRoas,
       uniqueCustomers, repeatCustomers, repeatRate, products, mostProfitable, estimatedProfit,
       marginCoverage, wilayas, statusStats, trend, revenueTrend,
       conversion: currentOrders.length ? (delivered.length / currentOrders.length) * 100 : 0,
@@ -482,6 +504,24 @@ export default function AdminAnalytics() {
     const term = wilayaSearch.trim().toLowerCase()
     return analysis.wilayas.filter((wilaya) => !term || wilaya.name.toLowerCase().includes(term) || String(wilaya.code).includes(term))
   }, [analysis, wilayaSearch])
+
+  const handleAddSpend = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSpendError('')
+    const amount = Number(spendAmount)
+    if (!spendCampaign.trim() || !Number.isInteger(amount) || amount <= 0) {
+      setSpendError('Renseignez une campagne et un montant positif en DA.')
+      return
+    }
+    setSavingSpend(true)
+    const { error: insertError } = await supabase.from('marketing_campaign_spend').insert({
+      spend_date: spendDate, source: spendSource.trim(), medium: spendMedium.trim(),
+      campaign: spendCampaign.trim(), spend_dzd: amount, notes: spendNotes.trim() || null,
+    })
+    if (insertError) setSpendError(insertError.message)
+    else { setSpendCampaign(''); setSpendAmount(''); setSpendNotes(''); await refresh(true) }
+    setSavingSpend(false)
+  }
 
   const exportCsv = () => {
     if (!analysis) return
@@ -600,9 +640,19 @@ export default function AdminAnalytics() {
           </Card>
 
           <Card>
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Acquisition & marketing</p><h2 className="mt-1 text-lg font-bold text-white">Quelles campagnes apportent des clients ?</h2><p className="mt-1 text-xs text-neutral-500">Attribution première visite · paramètres UTM</p></div><div className="flex gap-4 text-xs"><div><p className="text-neutral-500">Commandes attribuées</p><strong className="text-white">{number(analysis.attributedOrders)}</strong></div><div><p className="text-neutral-500">CA livré attribué</p><strong className="text-emerald-400">{money(analysis.attributedRevenue)}</strong></div><div><p className="text-neutral-500">Demandes sur mesure</p><strong className="text-white">{number(analysis.customRequestLeads)}</strong></div></div></div>
-            {analysis.campaigns.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead><tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-neutral-500"><th className="pb-3 pr-3">Campagne / source</th><th className="pb-3 pr-3">Support</th><th className="pb-3 pr-3">Leads</th><th className="pb-3 pr-3">Commandes</th><th className="pb-3 pr-3">Livrées</th><th className="pb-3">CA livré</th></tr></thead><tbody>{analysis.campaigns.slice(0, 10).map((item, index) => <tr key={item.name + item.source + index} className="border-b border-white/[0.05] last:border-0"><td className="py-3 pr-3"><strong className="text-neutral-200">{item.name}</strong><p className="mt-1 text-[10px] text-neutral-500">{item.source}</p></td><td className="py-3 pr-3 text-neutral-400">{item.medium}</td><td className="py-3 pr-3 text-neutral-300">{number(item.leads)}</td><td className="py-3 pr-3 text-neutral-300">{number(item.orders)}</td><td className="py-3 pr-3 text-neutral-300">{number(item.delivered)}</td><td className="py-3 font-semibold text-emerald-400">{money(item.revenue)}</td></tr>)}</tbody></table></div> : <EmptyState text="Aucune campagne attribuée sur cette période. Ajoutez des paramètres UTM à vos liens publicitaires pour mesurer les résultats." />}
-            <p className="mt-4 text-[10px] leading-5 text-neutral-600">Les ventes sont reliées aux commandes livrées. Les dépenses publicitaires ne sont pas encore saisies : ce tableau ne calcule donc pas le ROI.</p>
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Acquisition & marketing</p><h2 className="mt-1 text-lg font-bold text-white">Quelles campagnes apportent des clients ?</h2><p className="mt-1 text-xs text-neutral-500">Attribution première visite · paramètres UTM</p></div><div className="flex flex-wrap gap-4 text-xs"><div><p className="text-neutral-500">Commandes attribuées</p><strong className="text-white">{number(analysis.attributedOrders)}</strong></div><div><p className="text-neutral-500">CA livré attribué</p><strong className="text-emerald-400">{money(analysis.attributedRevenue)}</strong></div><div><p className="text-neutral-500">Dépenses pub.</p><strong className="text-white">{money(analysis.totalAdSpend)}</strong></div><div><p className="text-neutral-500">ROAS global</p><strong className="text-white">{analysis.overallRoas === null ? '—' : analysis.overallRoas.toFixed(2) + 'x'}</strong></div><div><p className="text-neutral-500">Demandes sur mesure</p><strong className="text-white">{number(analysis.customRequestLeads)}</strong></div></div></div>
+            <form onSubmit={handleAddSpend} className="mb-5 grid gap-2 rounded-xl border border-white/[0.07] bg-neutral-900/70 p-3 sm:grid-cols-2 xl:grid-cols-6">
+              <label className="text-[10px] text-neutral-500">Date<input required type="date" value={spendDate} onChange={(event) => setSpendDate(event.target.value)} className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
+              <label className="text-[10px] text-neutral-500">Source<input required value={spendSource} onChange={(event) => setSpendSource(event.target.value)} maxLength={120} placeholder="facebook" className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
+              <label className="text-[10px] text-neutral-500">Support<input required value={spendMedium} onChange={(event) => setSpendMedium(event.target.value)} maxLength={120} placeholder="paid_social" className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
+              <label className="text-[10px] text-neutral-500 sm:col-span-2">Nom exact de la campagne<input required value={spendCampaign} onChange={(event) => setSpendCampaign(event.target.value)} maxLength={120} placeholder="summer_launch" className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
+              <label className="text-[10px] text-neutral-500">Dépenses (DA)<input required type="number" min="1" step="1" value={spendAmount} onChange={(event) => setSpendAmount(event.target.value)} placeholder="2500" className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
+              <label className="text-[10px] text-neutral-500 sm:col-span-2 xl:col-span-4">Note (facultative)<input value={spendNotes} onChange={(event) => setSpendNotes(event.target.value)} maxLength={500} placeholder="Période, audience ou référence interne" className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
+              <div className="flex items-end"><button disabled={savingSpend} className="min-h-9 w-full rounded-lg bg-red-600 px-3 text-xs font-bold text-white disabled:opacity-50">{savingSpend ? 'Enregistrement…' : 'Ajouter dépense'}</button></div>
+              {spendError && <p role="alert" className="text-xs text-red-300 sm:col-span-2 xl:col-span-6">{spendError}</p>}
+            </form>
+            {analysis.campaigns.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead><tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-neutral-500"><th className="pb-3 pr-3">Campagne / source</th><th className="pb-3 pr-3">Support</th><th className="pb-3 pr-3">Leads</th><th className="pb-3 pr-3">Commandes</th><th className="pb-3 pr-3">Livrées</th><th className="pb-3 pr-3">Dépenses</th><th className="pb-3 pr-3">CA livré</th><th className="pb-3">ROAS</th></tr></thead><tbody>{analysis.campaigns.slice(0, 10).map((item, index) => <tr key={item.name + item.source + index} className="border-b border-white/[0.05] last:border-0"><td className="py-3 pr-3"><strong className="text-neutral-200">{item.name}</strong><p className="mt-1 text-[10px] text-neutral-500">{item.source}</p></td><td className="py-3 pr-3 text-neutral-400">{item.medium}</td><td className="py-3 pr-3 text-neutral-300">{number(item.leads)}</td><td className="py-3 pr-3 text-neutral-300">{number(item.orders)}</td><td className="py-3 pr-3 text-neutral-300">{number(item.delivered)}</td><td className="py-3 pr-3 text-neutral-300">{money(item.spendDzd)}</td><td className="py-3 pr-3 font-semibold text-emerald-400">{money(item.revenue)}</td><td className="py-3 font-semibold text-white">{item.spendDzd > 0 ? (item.revenue / item.spendDzd).toFixed(2) + 'x' : '—'}</td></tr>)}</tbody></table></div> : <EmptyState text="Aucune campagne attribuée sur cette période. Ajoutez des paramètres UTM à vos liens publicitaires pour mesurer les résultats." />}
+            <p className="mt-4 text-[10px] leading-5 text-neutral-600">Les ventes sont reliées aux commandes livrées. Les dépenses sont saisies manuellement par campagne et par date. Le ROAS compare le chiffre d'affaires livré attribué aux dépenses enregistrées ; il ne représente pas un bénéfice net.</p>
           </Card>
 
           <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">

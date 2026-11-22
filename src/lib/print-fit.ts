@@ -1,4 +1,5 @@
 const CSS_PIXELS_PER_MM = 96 / 25.4
+const PRINT_EDGE_GUARD_MM = 1.5
 
 /** Return a proportional downscale that fits the rendered content in the printable area. */
 export function calculatePrintScale(
@@ -17,7 +18,19 @@ export function calculatePrintScale(
   return Math.min(1, widthRatio, heightRatio)
 }
 
-/** Size a variable-length thermal page for the scaled content and its margins. */
+/** Leave a small physical safety inset to absorb browser/PDF pagination rounding. */
+export function getGuardedPrintableArea(
+  widthMm: number,
+  heightMm: number | null,
+): { widthMm: number; heightMm: number | null } {
+  return {
+    widthMm: Math.max(1, widthMm - PRINT_EDGE_GUARD_MM),
+    heightMm: heightMm === null ? null : Math.max(1, heightMm - PRINT_EDGE_GUARD_MM),
+  }
+}
+
+/** Size a variable-length thermal page for scaled content, margins, and PDF rounding. */
 export function getThermalPageHeightMm(contentHeightPx: number, scale: number, marginMm: number): number {
-  return Math.max(60, (contentHeightPx / CSS_PIXELS_PER_MM) * scale + marginMm * 2)
+  const measuredHeightMm = (contentHeightPx / CSS_PIXELS_PER_MM) * scale + marginMm * 2
+  return Math.max(60, Math.ceil(measuredHeightMm + PRINT_EDGE_GUARD_MM))
 }

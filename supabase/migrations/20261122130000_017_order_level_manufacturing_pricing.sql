@@ -106,6 +106,7 @@ BEGIN
   WHERE (tier->>'minQuantity')::integer <= v_quantity
     AND (tier->>'percent')::integer > 0;
 
+  v_discount_pct := least(90, greatest(0, v_discount_pct));
   v_discount := round(v_subtotal * v_discount_pct::numeric / 100);
   IF coalesce(p_rush, false) THEN
     v_rush := round((v_subtotal - v_discount) * v_rules.rush_fee_percent::numeric / 100);
@@ -121,9 +122,9 @@ BEGIN
       'detail', round(p_print_hours * 10) / 10 || ' h × ' || v_hourly || ' DA/h par pièce')
   ) || (
     SELECT coalesce(jsonb_agg(
-      jsonb_set(line, '{amountDzd}', to_jsonb((line->>'amountDzd')::integer * v_quantity))
+      jsonb_set(labor.line, '{amountDzd}', to_jsonb((labor.line->>'amountDzd')::integer * v_quantity))
     ), '[]'::jsonb)
-    FROM jsonb_array_elements(v_lines) AS line
+    FROM jsonb_array_elements(v_lines) AS labor(line)
   );
 
   IF v_complexity > 0 THEN

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, BarChart3, CalendarDays,
+  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, CalendarDays,
   CheckCircle2, ChevronDown, CircleDollarSign, Download, Filter, MapPin,
   Package, RefreshCw, ShoppingBag, Sparkles, Target, TrendingUp, Users,
   Wallet, AlertTriangle, Boxes, Truck,
@@ -364,7 +364,6 @@ export default function AdminAnalytics() {
       wilayaStats.set(order.wilaya_code, current)
     }
     const wilayas = [...wilayaStats.values()].sort((a, b) => b.orders - a.orders || b.revenue - a.revenue)
-    const customers = [...customerOrders.values()]
     const statusStats = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].map((key) => ({
       key, count: currentOrders.filter((order) => order.status === key).length,
     }))

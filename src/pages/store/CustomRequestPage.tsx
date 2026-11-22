@@ -74,7 +74,12 @@ export default function CustomRequestPage() {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`
   )
   const uploadLock = useRef(false)
-  const idempotencyKey = useRef<string>(crypto.randomUUID())
+  const estimateRequestId = useRef(0)
+  const idempotencyKey = useRef<string>(
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  )
 
   useEffect(() => {
     let active = true
@@ -125,6 +130,7 @@ export default function CustomRequestPage() {
   }, [wilayaCode])
 
   const runEstimate = useCallback(async () => {
+    const requestId = ++estimateRequestId.current
     const l = Number(lengthMm)
     const w = Number(widthMm)
     const h = Number(heightMm)
@@ -132,36 +138,45 @@ export default function CustomRequestPage() {
     if (!material || !Number.isFinite(l) || l <= 0 || !Number.isFinite(w) || w <= 0 || !Number.isFinite(h) || h <= 0) {
       setEstimate(null)
       setEstimateError(null)
+      setEstimateLoading(false)
       return
     }
     setEstimateLoading(true)
     setEstimateError(null)
-    const { data, error: rpcError } = await supabase.rpc('estimate_manufacturing_dimensions', {
-      p_length_mm: l,
-      p_width_mm: w,
-      p_height_mm: h,
-      p_material_name: material,
-      p_quantity: qty,
-      p_options: options,
-      p_rush: rush,
-    })
-    setEstimateLoading(false)
-    if (rpcError || !data) {
+    try {
+      const { data, error: rpcError } = await supabase.rpc('estimate_manufacturing_dimensions', {
+        p_length_mm: l,
+        p_width_mm: w,
+        p_height_mm: h,
+        p_material_name: material,
+        p_quantity: qty,
+        p_options: options,
+        p_rush: rush,
+      })
+      if (requestId !== estimateRequestId.current) return
+      if (rpcError || !data) {
+        setEstimate(null)
+        setEstimateError(orderErrorMessage(rpcError?.message, 'Estimation impossible pour ces dimensions.'))
+        return
+      }
+      const d = data as Record<string, unknown>
+      setEstimate({
+        lines: (d.lines as Estimate['lines']) ?? [],
+        totalDzd: Number(d.totalDzd ?? 0),
+        quantity: Number(d.quantity ?? qty),
+        discountPercent: Number(d.discountPercent ?? 0),
+        discountDzd: Number(d.discountDzd ?? 0),
+        rushFeeDzd: Number(d.rushFeeDzd ?? 0),
+        assumptions: (d.assumptions as string[]) ?? [],
+        estimates: d.estimates as Estimate['estimates'],
+      })
+    } catch {
+      if (requestId !== estimateRequestId.current) return
       setEstimate(null)
-      setEstimateError(orderErrorMessage(rpcError?.message, 'Estimation impossible pour ces dimensions.'))
-      return
+      setEstimateError('Connexion impossible pendant le calcul. Vous pouvez réessayer ou envoyer une demande de devis manuel.')
+    } finally {
+      if (requestId === estimateRequestId.current) setEstimateLoading(false)
     }
-    const d = data as Record<string, unknown>
-    setEstimate({
-      lines: (d.lines as Estimate['lines']) ?? [],
-      totalDzd: Number(d.totalDzd ?? 0),
-      quantity: Number(d.quantity ?? qty),
-      discountPercent: Number(d.discountPercent ?? 0),
-      discountDzd: Number(d.discountDzd ?? 0),
-      rushFeeDzd: Number(d.rushFeeDzd ?? 0),
-      assumptions: (d.assumptions as string[]) ?? [],
-      estimates: d.estimates as Estimate['estimates'],
-    })
   }, [lengthMm, widthMm, heightMm, material, quantity, options, rush])
 
   useEffect(() => {
@@ -401,6 +416,7 @@ export default function CustomRequestPage() {
               <input
                 type="text"
                 required
+                minLength={3}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 className="input-field"

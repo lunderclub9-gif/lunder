@@ -9,6 +9,7 @@ const StoreLayout = lazy(() => import('@/layouts/StoreLayout'))
 const HomePage = lazy(() => import('@/pages/store/HomePage'))
 const ProductsPage = lazy(() => import('@/pages/store/ProductsPage'))
 const ProductDetailPage = lazy(() => import('@/pages/store/ProductDetailPage'))
+const CategoryPage = lazy(() => import('@/pages/store/CategoryPage'))
 const CartPage = lazy(() => import('@/pages/store/CartPage'))
 const CheckoutPage = lazy(() => import('@/pages/store/CheckoutPage'))
 const OrderConfirmationPage = lazy(() => import('@/pages/store/OrderConfirmationPage'))
@@ -112,6 +113,7 @@ export default function App() {
                 <Route index element={<HomePage />} />
                 <Route path="produits" element={<ProductsPage />} />
                 <Route path="produits/:slug" element={<ProductDetailPage />} />
+                <Route path="categories/:slug" element={<CategoryPage />} />
                 <Route path="panier" element={<CartPage />} />
                 <Route path="commande" element={<CheckoutPage />} />
                 <Route path="commande/confirmation" element={<OrderConfirmationPage />} />

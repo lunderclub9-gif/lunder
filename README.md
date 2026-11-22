@@ -121,7 +121,7 @@ npm run dev             # http://localhost:5173 (Vite default)
 npm run typecheck       # tsc --noEmit
 npm run lint            # eslint
 npm test                # Vitest unit tests
-npm run build           # production bundle in dist/
+npm run build           # production bundle + SEO HTML, sitemap.xml and robots.txt
 ```
 
 Without the two environment variables the app renders a French "Configuration requise" screen
@@ -133,6 +133,7 @@ instead of failing on a blank page.
 |---|---|---|
 | `VITE_SUPABASE_URL` | yes | Project URL, e.g. `https://xxxx.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | yes | Public anon key |
+| `VITE_SITE_URL` | recommended | Public HTTPS origin, e.g. `https://your-domain.example`; used to generate canonical URLs, sitemap.xml and robots.txt |
 
 Both are **public** — they ship to the browser. Never put a `service_role` key, a database password
 or any API secret in `.env`, in `store_settings`, or in client code. On a hosting provider, set
@@ -157,9 +158,14 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261113160000_010_pricing_security_and_public_estimate.sql` | revoke public pricing access, safe materials view, public estimate RPC | 009 |
 | `20261113170000_011_custom_workflow_and_delivered_deletion.sql` | dimension estimate, client decision history, owner approval, delivered-order deletion | 010 |
 | `20261113180000_012_owner_approval_and_safe_request_deletion.sql` | remove legacy public order-creation RPC, allow owner approval of `sent` quotes, two-phase deletion of eligible unlinked requests | 011 |
+| `20261114224500_013_owner_notifications.sql` | owner notification counters and notification RPC | 012 |
+| `20261122120000_014_product_seo_keywords.sql` | product SEO keyword array | 001 |
+| `20261122123000_015_category_seo_metadata.sql` | category SEO title, description and keyword fields | 001 |
 
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
 seed rows use `ON CONFLICT DO NOTHING`.
+
+The SEO build reads published products, product images, active categories and public SEO settings through the Supabase anon key. Set `VITE_SITE_URL` (or the public `seo_site_url` setting) so the build can emit canonical URLs, per-product/per-category HTML metadata, Product/CollectionPage JSON-LD, `sitemap.xml` and `robots.txt`. If the URL is missing, the app build still succeeds but the static SEO output is skipped. Apply migrations 014 and 015 before using product/category SEO keyword fields in the admin.
 
 The geography dataset is the 69-wilaya structure of Loi 26-06 (4 April 2026), sourced from
 `el-amin-dev/algeria-wilayas-communes` and retrieved 12 Nov 2026. Wilayas 59–69 are legally in force

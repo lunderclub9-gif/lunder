@@ -36,6 +36,8 @@ const GROUPS: { title: string; keys: { key: string; label: string; type: 'text' 
     keys: [
       { key: 'seo_title', label: 'Titre SEO', type: 'text' },
       { key: 'seo_description', label: 'Description SEO', type: 'textarea' },
+      { key: 'seo_keywords', label: 'Mots-clés SEO (séparés par des virgules)', type: 'text' },
+      { key: 'seo_site_url', label: 'URL publique du site (https://...)', type: 'url', help: 'Utilisée pour les URL canoniques et le sitemap généré pendant le build; renseignez aussi VITE_SITE_URL dans les variables de déploiement.' },
     ],
   },
   {
@@ -143,7 +145,7 @@ export default function AdminSettings() {
     const invalid = GROUPS.flatMap((group) => group.keys).find((field) => {
       if (field.type !== 'url') return false
       const value = values[field.key]?.trim()
-      return value ? !/^https:\/\/[\w.-]+\.[a-z]{2,}\//i.test(value) : false
+      return value ? !/^https:\/\/[\w.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(value) : false
     })
     if (invalid) {
       setError(`Le lien ${invalid.label} doit être une URL complète en https://`)

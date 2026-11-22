@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Pencil, Search, Package } from 'lucide-react'
+import { Plus, Pencil, Search, Package, Trash2, Loader2 } from 'lucide-react'
+import { useAdminConfirm } from '@/components/admin/AdminConfirmProvider'
 import { supabase, type Product } from '@/lib/supabase'
 import { formatDzd } from '@/lib/format'
 
@@ -8,6 +9,8 @@ export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const confirmAction = useAdminConfirm()
 
   useEffect(() => {
     loadProducts()
@@ -21,6 +24,47 @@ export default function AdminProducts() {
       .order('created_at', { ascending: false })
     setProducts((data as Product[]) ?? [])
     setLoading(false)
+  }
+
+  const deleteProduct = async (product: Product) => {
+    if (!(await confirmAction({ title: `Supprimer « ${product.name} » ?`, description: 'Cette action supprime définitivement le produit et ses médias associés. Les lignes de commandes historiques conservent leur instantané.', confirmLabel: 'Supprimer le produit', tone: 'danger' }))) return
+    setDeletingId(product.id)
+    const { data: imageFiles, error: imageListError } = await supabase.storage.from('product-images').list(product.id, { limit: 1000 })
+    const { data: modelFiles, error: modelListError } = await supabase.storage.from('product-models').list(product.id, { limit: 1000 })
+    if (imageListError || modelListError) {
+      window.alert('Impossible de préparer la suppression des médias. Le produit n’a pas été supprimé.')
+      setDeletingId(null)
+      return
+    }
+    const { error: deleteError } = await supabase.from('products').delete().eq('id', product.id)
+    if (deleteError) {
+      window.alert('Impossible de supprimer le produit. Vérifiez les dépendances et les autorisations.')
+      setDeletingId(null)
+      return
+    }
+    setProducts((current) => current.filter((item) => item.id !== product.id))
+    const imagePaths: string[] = []
+    for (const file of imageFiles ?? []) {
+      const objectPath = `${product.id}/${file.name}`
+      const publicUrl = supabase.storage.from('product-images').getPublicUrl(objectPath).data.publicUrl
+      const { data: references, error: referenceError } = await supabase.from('product_images').select('id').eq('image_url', publicUrl).limit(1)
+      if (!referenceError && !references?.length) imagePaths.push(objectPath)
+    }
+    const modelPaths: string[] = []
+    for (const file of modelFiles ?? []) {
+      const objectPath = `${product.id}/${file.name}`
+      const publicUrl = supabase.storage.from('product-models').getPublicUrl(objectPath).data.publicUrl
+      const { data: references, error: referenceError } = await supabase.from('products').select('id').eq('model_url', publicUrl).limit(1)
+      if (!referenceError && !references?.length) modelPaths.push(objectPath)
+    }
+    const [imageCleanup, modelCleanup] = await Promise.all([
+      imagePaths.length ? supabase.storage.from('product-images').remove(imagePaths) : Promise.resolve({ error: null }),
+      modelPaths.length ? supabase.storage.from('product-models').remove(modelPaths) : Promise.resolve({ error: null }),
+    ])
+    if (imageCleanup.error || modelCleanup.error) {
+      window.alert('Le produit a été supprimé, mais certains fichiers de stockage n’ont pas pu être nettoyés. Un nettoyage manuel du dossier du produit est nécessaire.')
+    }
+    setDeletingId(null)
   }
 
   const filtered = products.filter(
@@ -110,6 +154,10 @@ export default function AdminProducts() {
                         <Pencil className="h-4 w-4" />
                         Modifier
                       </Link>
+                      <button type="button" onClick={() => void deleteProduct(p)} disabled={deletingId === p.id} className="ml-3 inline-flex items-center gap-1 text-brand-red-light transition-colors hover:text-red-300 disabled:opacity-50" aria-label={`Supprimer ${p.name}`}>
+                        {deletingId === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        Supprimer
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -138,6 +186,10 @@ export default function AdminProducts() {
                     <Pencil className="h-4 w-4" />
                     Modifier
                   </Link>
+                  <button type="button" onClick={() => void deleteProduct(p)} disabled={deletingId === p.id} className="inline-flex items-center gap-1 text-sm text-brand-red-light disabled:opacity-50" aria-label={`Supprimer ${p.name}`}>
+                    {deletingId === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    Supprimer
+                  </button>
                 </div>
               </div>
             ))}

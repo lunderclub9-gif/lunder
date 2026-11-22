@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Package, Loader2, ShoppingCart, Check } from 'lucide-react'
+import { ArrowLeft, Package, Loader2, ShoppingCart, Check, ChevronLeft, ChevronRight, Maximize2, X, Image as ImageIcon, Box } from 'lucide-react'
 import {
   supabase,
   type Product,
@@ -11,6 +11,7 @@ import {
 import { formatDzd } from '@/lib/format'
 import Viewer3D from '@/components/Viewer3D'
 import { useCart } from '@/lib/cart'
+import { setPageSeo } from '@/lib/seo'
 
 export default function ProductDetailPage() {
   const { slug } = useParams()
@@ -20,6 +21,8 @@ export default function ProductDetailPage() {
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [loading, setLoading] = useState(true)
   const [activeImage, setActiveImage] = useState<string | null>(null)
+  const [mediaMode, setMediaMode] = useState<'photos' | '3d'>('photos')
+  const [imageFullscreen, setImageFullscreen] = useState(false)
   const [selectedColor, setSelectedColor] = useState<string | null>(null)
   const [selection, setSelection] = useState<Record<string, string>>({})
   const [added, setAdded] = useState(false)
@@ -62,6 +65,7 @@ export default function ProductDetailPage() {
       setImages(imgList)
       const primary = imgList.find((i) => i.is_primary) ?? imgList[0]
       setActiveImage(primary?.image_url ?? null)
+      setMediaMode(imgList.length > 0 ? 'photos' : p.model_url ? '3d' : 'photos')
 
       const optionList = ((opts as ProductOption[]) ?? []).map((option) => ({
         ...option,
@@ -83,6 +87,20 @@ export default function ProductDetailPage() {
       setLoading(false)
     })()
   }, [slug])
+
+  useEffect(() => {
+    if (!product) return
+    const description = product.seo_description?.trim() || product.description?.trim() || `${product.name} — disponible chez LUNDER'S 3D STUDIO en Algérie.`
+    const image = images.find((item) => item.is_primary)?.image_url ?? images[0]?.image_url ?? undefined
+    setPageSeo({
+      title: product.seo_title?.trim() || `${product.name} | LUNDER'S 3D STUDIO`,
+      description,
+      keywords: product.seo_keywords ?? [],
+      canonicalUrl: `${window.location.origin}/boutique/produits/${encodeURIComponent(product.slug)}`,
+      imageUrl: image,
+      type: 'product',
+    })
+  }, [product, images])
 
   const selectableOptions = useMemo(
     () => options.filter((option) => (option.values ?? []).length > 0),
@@ -162,36 +180,51 @@ export default function ProductDetailPage() {
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="space-y-4">
-          {product.model_url ? (
+          {product.model_url && images.length > 0 && (
+            <div className="flex gap-2 rounded-xl border border-charcoal-400/15 bg-charcoal-800/60 p-1" role="group" aria-label="Mode d’affichage du produit">
+              <button type="button" onClick={() => setMediaMode('photos')} aria-pressed={mediaMode === 'photos'} className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${mediaMode === 'photos' ? 'bg-brand-red text-white' : 'text-charcoal-300 hover:text-white'}`}>
+                <ImageIcon className="h-4 w-4" /> Photos
+              </button>
+              <button type="button" onClick={() => setMediaMode('3d')} aria-pressed={mediaMode === '3d'} className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${mediaMode === '3d' ? 'bg-brand-red text-white' : 'text-charcoal-300 hover:text-white'}`}>
+                <Box className="h-4 w-4" /> Vue 3D
+              </button>
+            </div>
+          )}
+
+          {mediaMode === '3d' && product.model_url ? (
             <Viewer3D src={product.model_url} poster={activeImage ?? undefined} alt={product.name} />
           ) : activeImage ? (
-            <div className="aspect-square overflow-hidden rounded-xl border border-charcoal-400/15 bg-charcoal-800">
-              <img src={activeImage} alt={product.name} className="h-full w-full object-cover" />
+            <div className="group relative aspect-square overflow-hidden rounded-xl border border-charcoal-400/15 bg-charcoal-800">
+              <img src={activeImage} alt={product.name} className="h-full w-full object-contain" />
+              {images.length > 1 && (
+                <>
+                  <button type="button" onClick={() => { const index = images.findIndex((img) => img.image_url === activeImage); setActiveImage(images[(index - 1 + images.length) % images.length].image_url) }} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/65 p-2 text-white" aria-label="Photo précédente"><ChevronLeft className="h-5 w-5" /></button>
+                  <button type="button" onClick={() => { const index = images.findIndex((img) => img.image_url === activeImage); setActiveImage(images[(index + 1) % images.length].image_url) }} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/65 p-2 text-white" aria-label="Photo suivante"><ChevronRight className="h-5 w-5" /></button>
+                </>
+              )}
+              <button type="button" onClick={() => setImageFullscreen(true)} className="absolute bottom-3 right-3 rounded-lg bg-black/65 p-2 text-white" aria-label="Agrandir la photo"><Maximize2 className="h-4 w-4" /></button>
             </div>
+          ) : product.model_url ? (
+            <Viewer3D src={product.model_url} alt={product.name} />
           ) : (
             <div className="flex aspect-square items-center justify-center rounded-xl border border-charcoal-400/15 bg-charcoal-800">
               <Package className="h-12 w-12 text-charcoal-600" />
             </div>
           )}
 
-          {images.length > 1 && (
-            <div className="grid grid-cols-5 gap-2">
+          {images.length > 0 && mediaMode === 'photos' && (
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
               {images.map((img) => (
-                <button
-                  key={img.id}
-                  onClick={() => setActiveImage(img.image_url)}
-                  className={`aspect-square overflow-hidden rounded-lg border-2 transition-colors ${
-                    activeImage === img.image_url ? 'border-brand-red' : 'border-transparent hover:border-charcoal-400'
-                  }`}
-                >
-                  <img
-                    src={img.image_url}
-                    alt={img.alt_text ?? ''}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
+                <button key={img.id} type="button" onClick={() => setActiveImage(img.image_url)} aria-label={`Afficher ${img.alt_text || 'la photo'}`} aria-pressed={activeImage === img.image_url} className={`aspect-square overflow-hidden rounded-lg border-2 transition-colors ${activeImage === img.image_url ? 'border-brand-red' : 'border-transparent hover:border-charcoal-400'}`}>
+                  <img src={img.image_url} alt={img.alt_text ?? product.name} loading="lazy" className="h-full w-full object-cover" />
                 </button>
               ))}
+            </div>
+          )}
+          {imageFullscreen && activeImage && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4" role="dialog" aria-modal="true" aria-label="Aperçu de la photo" onClick={() => setImageFullscreen(false)}>
+              <button type="button" onClick={() => setImageFullscreen(false)} className="absolute right-4 top-4 rounded-full bg-charcoal-800 p-3 text-white" aria-label="Fermer l’aperçu"><X className="h-5 w-5" /></button>
+              <img src={activeImage} alt={product.name} className="max-h-full max-w-full object-contain" onClick={(event) => event.stopPropagation()} />
             </div>
           )}
         </div>

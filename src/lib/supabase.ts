@@ -56,6 +56,9 @@ export type Category = {
   name: string
   slug: string
   description: string | null
+  seo_title?: string | null
+  seo_description?: string | null
+  seo_keywords?: string[]
   sort_order: number
   is_active: boolean
   created_at: string
@@ -81,6 +84,7 @@ export type Product = {
   is_featured: boolean
   seo_title: string | null
   seo_description: string | null
+  seo_keywords?: string[]
   created_at: string
   updated_at: string
   category?: Category | null

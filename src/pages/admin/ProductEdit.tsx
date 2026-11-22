@@ -29,6 +29,7 @@ export default function AdminProductEdit() {
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [images, setImages] = useState<ProductImage[]>([])
+  const [originalModelUrl, setOriginalModelUrl] = useState('')
   const [colors, setColors] = useState<string[]>([])
   const [colorInput, setColorInput] = useState('')
 
@@ -42,6 +43,7 @@ export default function AdminProductEdit() {
 
   const [form, setForm] = useState({
     name: '',
+    slug: '',
     description: '',
     category_id: '',
     sku: '',
@@ -57,6 +59,7 @@ export default function AdminProductEdit() {
     is_featured: false,
     seo_title: '',
     seo_description: '',
+    seo_keywords: '',
   })
 
   useEffect(() => {
@@ -99,6 +102,7 @@ export default function AdminProductEdit() {
       const p = data as Product
       setForm({
         name: p.name,
+        slug: p.slug,
         description: p.description ?? '',
         category_id: p.category_id ?? '',
         sku: p.sku,
@@ -114,7 +118,9 @@ export default function AdminProductEdit() {
         is_featured: p.is_featured,
         seo_title: p.seo_title ?? '',
         seo_description: p.seo_description ?? '',
+        seo_keywords: ((p as Product & { seo_keywords?: string[] }).seo_keywords ?? []).join(', '),
       })
+      setOriginalModelUrl(p.model_url ?? '')
       setColors(p.available_colors ?? [])
     }
     const { data: imgs } = await supabase
@@ -190,8 +196,12 @@ export default function AdminProductEdit() {
       setForm((prev) => ({ ...prev, model_url: urlData.publicUrl }))
       if (isPostHogEnabled) posthog.capture('product_model_uploaded', { product_id: id })
 
-      if (previousPath) {
-        await supabase.storage.from('product-models').remove([previousPath])
+      if (previousPath && form.model_url !== originalModelUrl && previousPath.startsWith(`${id}/`)) {
+        const { data: references, error: referenceError } = await supabase.from('products').select('id').eq('model_url', form.model_url).neq('id', id).limit(1)
+        if (!referenceError && !references?.length) {
+          const { error: cleanupError } = await supabase.storage.from('product-models').remove([previousPath])
+          if (cleanupError) setError('Le nouveau modèle est chargé, mais un ancien fichier temporaire n’a pas pu être nettoyé.')
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'upload du modèle 3D.")
@@ -209,12 +219,54 @@ export default function AdminProductEdit() {
     if (isPostHogEnabled) posthog.capture('product_primary_image_set', { product_id: id, image_id: imageId })
   }
 
+  const storagePath = (url: string, bucket: 'product-images' | 'product-models') => {
+    try {
+      const parsed = new URL(url)
+      const marker = `/${bucket}/`
+      const index = parsed.pathname.indexOf(marker)
+      return index >= 0 ? decodeURIComponent(parsed.pathname.slice(index + marker.length)) : null
+    } catch { return null }
+  }
+
   const deleteImage = async (imageId: string, imageUrl: string) => {
-    const path = imageUrl.split('/product-images/')[1]
-    if (path) await supabase.storage.from('product-images').remove([path])
-    await supabase.from('product_images').delete().eq('id', imageId)
-    setImages((prev) => prev.filter((img) => img.id !== imageId))
+    if (!id || !(await confirmAction({ title: 'Supprimer cette photo ?', description: 'La photo sera retirée de la galerie du produit.', confirmLabel: 'Supprimer la photo', tone: 'danger' }))) return
+    const image = images.find((item) => item.id === imageId)
+    const { error: deleteError } = await supabase.from('product_images').delete().eq('id', imageId).eq('product_id', id)
+    if (deleteError) { setError('Impossible de supprimer cette photo. Réessayez.'); return }
+    const remaining = images.filter((item) => item.id !== imageId)
+    setImages(remaining)
+    if (image?.is_primary && remaining[0]) {
+      const { error: primaryError } = await supabase.from('product_images').update({ is_primary: true }).eq('id', remaining[0].id).eq('product_id', id)
+      if (!primaryError) setImages((current) => current.map((item) => ({ ...item, is_primary: item.id === remaining[0].id })))
+    }
+    const path = storagePath(imageUrl, 'product-images')
+    if (path && path.startsWith(`${id}/`)) {
+      const { data: references, error: referenceError } = await supabase.from('product_images').select('id').eq('image_url', imageUrl).limit(1)
+      if (referenceError) setError('La photo a été retirée du produit, mais la vérification des références du fichier a échoué; le fichier a été conservé par sécurité.')
+      else if (!references?.length) {
+        const { error: storageError } = await supabase.storage.from('product-images').remove([path])
+        if (storageError) setError('La photo a été retirée du produit, mais son fichier reste dans le stockage et devra être nettoyé.')
+      }
+    }
     if (isPostHogEnabled) posthog.capture('product_image_deleted', { product_id: id, image_id: imageId })
+  }
+
+  const deleteModel = async () => {
+    if (!id || !form.model_url || !(await confirmAction({ title: 'Supprimer le modèle 3D ?', description: 'Le modèle sera retiré du produit. Les photos resteront disponibles.', confirmLabel: 'Supprimer le modèle', tone: 'danger' }))) return
+    const previousUrl = form.model_url
+    const { error: updateError } = await supabase.from('products').update({ model_url: null }).eq('id', id)
+    if (updateError) { setError('Impossible de retirer le modèle 3D du produit.'); return }
+    setForm((current) => ({ ...current, model_url: '' }))
+    setOriginalModelUrl('')
+    const path = storagePath(previousUrl, 'product-models')
+    if (path && path.startsWith(`${id}/`)) {
+      const { data: references, error: referenceError } = await supabase.from('products').select('id').eq('model_url', previousUrl).neq('id', id).limit(1)
+      if (referenceError) setError('Le modèle a été retiré du produit, mais le contrôle des références a échoué; le fichier a été conservé par sécurité.')
+      else if (!references?.length) {
+        const { error: storageError } = await supabase.storage.from('product-models').remove([path])
+        if (storageError) setError('Le modèle a été retiré du produit, mais son fichier reste dans le stockage et devra être nettoyé.')
+      }
+    }
   }
 
   const addColor = () => {
@@ -394,7 +446,7 @@ export default function AdminProductEdit() {
     try {
       const category = categories.find((c) => c.id === form.category_id)
       const sku = form.sku.trim() || generateSku(category?.name ?? 'GEN', Math.floor(Math.random() * 9000) + 1000)
-      const slug = slugify(form.name)
+      const slug = slugify(form.slug.trim() || form.name)
       const payload = {
         name: form.name.trim(),
         slug,
@@ -415,22 +467,38 @@ export default function AdminProductEdit() {
         seo_title: form.seo_title || null,
         seo_description: form.seo_description || null,
       }
+      const { error: seoColumnError } = await supabase.from('products').select('seo_keywords').limit(1)
+      const savePayload = seoColumnError
+        ? payload
+        : { ...payload, seo_keywords: form.seo_keywords.split(',').map((keyword) => keyword.trim()).filter(Boolean) }
 
       if (isNew) {
-        const { data, error: insErr } = await supabase.from('products').insert(payload).select('*').single()
+        const { data, error: insErr } = await supabase.from('products').insert(savePayload).select('*').single()
         if (insErr) throw insErr
         if (isPostHogEnabled) {
           posthog.capture('product_created', { product_id: (data as Product).id, has_model: Boolean(payload.model_url) })
         }
         navigate(`/admin/produits/${(data as Product).id}`, { replace: true })
       } else if (id) {
-        const { error: upErr } = await supabase.from('products').update(payload).eq('id', id)
+        const { error: upErr } = await supabase.from('products').update(savePayload).eq('id', id)
         if (upErr) throw upErr
+        if (originalModelUrl && originalModelUrl !== payload.model_url) {
+          const previousPath = storagePath(originalModelUrl, 'product-models')
+          if (previousPath && previousPath.startsWith(`${id}/`)) {
+            const { data: references, error: referenceError } = await supabase.from('products').select('id').eq('model_url', originalModelUrl).neq('id', id).limit(1)
+            if (!referenceError && !references?.length) {
+              const { error: cleanupError } = await supabase.storage.from('product-models').remove([previousPath])
+              if (cleanupError) setError('Produit enregistré, mais l’ancien modèle reste à nettoyer dans le stockage.')
+            }
+          }
+        }
+        setOriginalModelUrl(payload.model_url ?? '')
         if (isPostHogEnabled) {
           posthog.capture('product_updated', { product_id: id, status: payload.status, has_model: Boolean(payload.model_url) })
         }
         // Le bandeau de visibilité doit refléter l'état réellement enregistré.
         setForm((prev) => ({ ...prev, status: payload.status }))
+        if (seoColumnError && form.seo_keywords.trim()) setError('Produit enregistré. Les mots-clés SEO seront sauvegardés après application de la migration 014.')
       }
     } catch {
       setError("Erreur lors de l'enregistrement. Vérifiez les champs.")
@@ -487,6 +555,10 @@ export default function AdminProductEdit() {
                   className="input-field"
                   placeholder="Ex: Support de téléphone adjustable"
                 />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="label-text">Slug URL (SEO)</label>
+                <input type="text" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} className="input-field" placeholder="genere-depuis-le-nom" />
               </div>
               <div className="sm:col-span-2">
                 <label className="label-text">Description</label>
@@ -855,8 +927,14 @@ export default function AdminProductEdit() {
                   onChange={(e) => setForm({ ...form, seo_description: e.target.value })}
                   rows={2}
                   className="input-field resize-none"
+                  maxLength={180}
                   placeholder="Description pour les moteurs de recherche"
                 />
+                <p className="mt-1 text-xs text-charcoal-500">Visez environ 150 à 160 caractères.</p>
+              </div>
+              <div>
+                <label className="label-text">Mots-clés SEO (séparés par des virgules)</label>
+                <input type="text" value={form.seo_keywords} onChange={(e) => setForm({ ...form, seo_keywords: e.target.value })} className="input-field" placeholder="impression 3D, accessoire, Algérie" />
               </div>
             </div>
           </div>
@@ -954,7 +1032,10 @@ export default function AdminProductEdit() {
                   GLB recommandé (25 Mo maximum). Un GLTF n'est accepté que si ses ressources sont intégrées.
                 </p>
                 {form.model_url && (
-                  <p className="mt-2 text-xs text-green-400">Modèle 3D téléversé</p>
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-charcoal-400/15 p-3">
+                    <p className="text-xs text-green-400">Modèle 3D téléversé</p>
+                    <button type="button" onClick={() => void deleteModel()} className="inline-flex items-center gap-1 rounded-md bg-charcoal-800 px-3 py-2 text-xs text-brand-red-light hover:bg-charcoal-700"><Trash2 className="h-4 w-4" /> Supprimer le modèle</button>
+                  </div>
                 )}
               </>
             )}

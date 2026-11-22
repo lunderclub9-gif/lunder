@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { AlertTriangle, Package, RefreshCw, Search } from 'lucide-react'
 import { supabase, type Product, type Category } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
 import { sanitizeSearchTerm } from '@/lib/format'
 import posthog, { isPostHogEnabled } from '@/lib/posthog'
+import { setPageSeo } from '@/lib/seo'
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -31,6 +32,10 @@ export default function ProductsPage() {
       }
       setCategories((cats as Category[]) ?? [])
     })()
+  }, [])
+
+  useEffect(() => {
+    setPageSeo({ title: 'Boutique | LUNDER’S 3D STUDIO', description: 'Découvrez notre catalogue de produits imprimés en 3D et de créations sur mesure en Algérie.', canonicalUrl: `${window.location.origin}/boutique/produits` })
   }, [])
 
   const urlQuery = searchParams.get('q') ?? ''
@@ -135,6 +140,8 @@ export default function ProductsPage() {
           ))}
         </div>
       )}
+
+      {categories.length > 0 && <nav aria-label="Pages des catégories" className="mb-6 flex flex-wrap gap-x-4 gap-y-2 text-xs text-charcoal-400">{categories.map((category) => <Link key={category.id} to={`/boutique/categories/${category.slug}`} className="underline-offset-4 hover:text-brand-red hover:underline">{category.name}</Link>)}</nav>}
 
       {loading ? (
         <div className="flex items-center justify-center py-16" aria-busy="true">

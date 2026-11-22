@@ -13,6 +13,10 @@ export default function AdminCategories() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [slug, setSlug] = useState('')
+  const [seoTitle, setSeoTitle] = useState('')
+  const [seoDescription, setSeoDescription] = useState('')
+  const [seoKeywords, setSeoKeywords] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -29,6 +33,10 @@ export default function AdminCategories() {
   const resetForm = () => {
     setName('')
     setDescription('')
+    setSlug('')
+    setSeoTitle('')
+    setSeoDescription('')
+    setSeoKeywords('')
     setEditingId(null)
     setShowForm(false)
   }
@@ -37,14 +45,19 @@ export default function AdminCategories() {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)
-    const slug = slugify(name)
+    const categorySlug = slugify(slug.trim() || name)
+    const seoPayload = { seo_title: seoTitle.trim() || null, seo_description: seoDescription.trim() || null, seo_keywords: seoKeywords.split(',').map((keyword) => keyword.trim()).filter(Boolean) }
+    const { error: seoColumnError } = await supabase.from('categories').select('seo_title,seo_description,seo_keywords').limit(1)
+    const basePayload = { name: name.trim(), slug: categorySlug, description: description || null }
+    const savePayload = seoColumnError ? basePayload : { ...basePayload, ...seoPayload }
     if (editingId) {
-      const { error } = await supabase.from('categories').update({ name: name.trim(), slug, description: description || null }).eq('id', editingId)
+      const { error } = await supabase.from('categories').update(savePayload).eq('id', editingId)
       if (!error && isPostHogEnabled) posthog.capture('category_updated', { category_id: editingId })
     } else {
-      const { error } = await supabase.from('categories').insert({ name: name.trim(), slug, description: description || null, sort_order: categories.length })
+      const { error } = await supabase.from('categories').insert({ ...savePayload, sort_order: categories.length })
       if (!error && isPostHogEnabled) posthog.capture('category_created')
     }
+    if (seoColumnError && (seoTitle.trim() || seoDescription.trim() || seoKeywords.trim())) window.alert('Catégorie enregistrée. Les champs SEO avancés seront sauvegardés après application de la migration 015.')
     resetForm()
     await loadCategories()
     setSaving(false)
@@ -54,6 +67,10 @@ export default function AdminCategories() {
     setEditingId(cat.id)
     setName(cat.name)
     setDescription(cat.description ?? '')
+    setSlug(cat.slug)
+    setSeoTitle(cat.seo_title ?? '')
+    setSeoDescription(cat.seo_description ?? '')
+    setSeoKeywords((cat.seo_keywords ?? []).join(', '))
     setShowForm(true)
   }
 
@@ -107,6 +124,12 @@ export default function AdminCategories() {
                 placeholder="Description courte"
               />
             </div>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="block"><span className="label-text">Slug URL</span><input value={slug} onChange={(e) => setSlug(e.target.value)} className="input-field" placeholder="genere-depuis-du-nom" /></label>
+            <label className="block"><span className="label-text">Titre SEO</span><input value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} className="input-field" maxLength={70} /></label>
+            <label className="block sm:col-span-2"><span className="label-text">Description SEO</span><textarea value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} className="input-field resize-none" rows={2} maxLength={180} /></label>
+            <label className="block sm:col-span-2"><span className="label-text">Mots-clés SEO (virgules)</span><input value={seoKeywords} onChange={(e) => setSeoKeywords(e.target.value)} className="input-field" /></label>
           </div>
           <div className="mt-4 flex gap-2">
             <button type="submit" disabled={saving} className="btn-primary">

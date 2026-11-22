@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.marketing_campaign_spend (
   campaign text NOT NULL CHECK (length(btrim(campaign)) BETWEEN 1 AND 120),
   spend_dzd integer NOT NULL CHECK (spend_dzd > 0 AND spend_dzd <= 1000000000),
   notes text,
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT auth.uid(),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT marketing_campaign_spend_notes_len CHECK (notes IS NULL OR length(notes) <= 500)

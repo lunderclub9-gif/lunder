@@ -7,6 +7,7 @@ import { validateCustomFile } from '@/lib/media'
 import { DELIVERY_METHOD_LABELS, normalizeAlgerianPhone, orderErrorMessage } from '@/lib/checkout'
 import { formatDzd } from '@/lib/format'
 import { downloadTicketImage } from '@/lib/ticketImage'
+import { getMarketingAttribution } from '@/lib/marketingAttribution'
 
 type UploadedFile = { path: string; name: string; mime: string; size: number; kind: 'image' | 'model' }
 type CreatedRequest = { request_number: string; tracking_token: string }
@@ -350,6 +351,13 @@ export default function CustomRequestPage() {
           )
         )
         return
+      }
+      try {
+        await supabase.rpc('record_marketing_attribution', {
+          p_payload: { ...getMarketingAttribution(), lead_type: 'custom_request', idempotency_key: idempotencyKey.current },
+        })
+      } catch {
+        // Attribution is best-effort and must never block a valid guest request.
       }
       setCreated(data as CreatedRequest)
     } catch {

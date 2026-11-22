@@ -65,9 +65,9 @@ BEGIN
   v_grams := p_grams * (1 + v_rules.waste_percent::numeric / 100);
   v_material_cost := round(v_grams * v_material.price_per_gram_dzd * v_material.multiplier);
 
-  v_hourly := v_rules.price_per_hour_dzd
-            + v_rules.machine_hourly_cost_dzd
-            + v_rules.electricity_per_hour_dzd;
+  v_hourly := greatest(0, v_rules.price_per_hour_dzd)
+            + greatest(0, v_rules.machine_hourly_cost_dzd)
+            + greatest(0, v_rules.electricity_per_hour_dzd);
   v_print_cost := greatest(round(p_print_hours * v_hourly), v_rules.minimum_print_charge_dzd);
 
   IF coalesce((p_options->>'design')::boolean, false) THEN
@@ -94,8 +94,8 @@ BEGIN
   -- Matière, impression et options sont des coûts par pièce.
   -- Le frais de préparation et le minimum sont appliqués une seule fois par commande.
   v_production := v_material_cost + v_print_cost + v_labor;
-  v_complexity := v_rules.complexity_fee_dzd;
-  v_margin := round((v_production + v_complexity) * v_rules.margin_percent::numeric / 100);
+  v_complexity := greatest(0, v_rules.complexity_fee_dzd);
+  v_margin := round((v_production + v_complexity) * greatest(0, least(200, v_rules.margin_percent))::numeric / 100);
   v_unit := v_production + v_complexity + v_margin;
   v_setup := greatest(0, v_rules.extra_production_dzd);
 

@@ -76,7 +76,7 @@ export default function StoreLayout() {
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-8 md:flex">
+          <nav className="hidden items-center gap-4 lg:flex xl:gap-7">
             <NavLink to="/boutique" end className={navLinkClass}>
               Accueil
             </NavLink>
@@ -117,7 +117,7 @@ export default function StoreLayout() {
               <Search className="h-5 w-5" />
             </button>
             <button
-              className="md:hidden"
+              className="lg:hidden"
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-label="Menu"
               type="button"
@@ -145,7 +145,7 @@ export default function StoreLayout() {
         )}
 
         {mobileOpen && (
-          <nav className="border-t border-charcoal-400/10 bg-charcoal-900 px-4 py-3 md:hidden">
+          <nav className="border-t border-charcoal-400/10 bg-charcoal-900 px-4 py-3 lg:hidden">
             <form onSubmit={submitSearch} className="mb-2" role="search">
               <input
                 type="search"

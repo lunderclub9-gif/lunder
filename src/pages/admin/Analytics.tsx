@@ -434,7 +434,7 @@ export default function AdminAnalytics() {
     return {
       currentOrders, validOrders, delivered, revenue, deliveryRevenue, pipeline, cancelled,
       uniqueCustomers, repeatCustomers, repeatRate, products, mostProfitable, estimatedProfit,
-      marginCoverage, wilayas, statusStats, trend, revenueTrend, orderTrend, customers,
+      marginCoverage, wilayas, statusStats, trend, revenueTrend,
       conversion: currentOrders.length ? (delivered.length / currentOrders.length) * 100 : 0,
       averageOrder: delivered.length ? revenue / delivered.length : 0,
       activeProducts: data.products.filter((product) => product.status === 'published').length,

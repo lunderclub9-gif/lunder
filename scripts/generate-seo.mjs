@@ -122,7 +122,7 @@ for (const category of categories) {
   const schema = { '@context': 'https://schema.org', '@type': 'CollectionPage', name: category.name, description, url: categoryUrl, mainEntity: { '@type': 'ItemList', itemListElement: categoryProducts.map((product, index) => ({ '@type': 'ListItem', position: index + 1, url: `${siteUrl}/boutique/produits/${encodeURIComponent(product.slug)}`, name: product.name })) } }
   const filename = path.join(dist, 'boutique', 'categories', `${category.slug}.html`)
   fs.mkdirSync(path.dirname(filename), { recursive: true })
-  fs.writeFileSync(filename, pageHtml({ title, description, keywords: category.seo_keywords || [], canonical: categoryUrl, keywords: seo.seo_keywords || [], schema }))
+  fs.writeFileSync(filename, pageHtml({ title, description, keywords: seo.seo_keywords || [], canonical: categoryUrl, schema }))
   urls.push({ loc: categoryUrl, changefreq: 'weekly', priority: '0.7' })
 }
 

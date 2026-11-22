@@ -909,8 +909,14 @@ export default function AdminProductEdit() {
                   onChange={(e) => setForm({ ...form, seo_description: e.target.value })}
                   rows={2}
                   className="input-field resize-none"
+                  maxLength={180}
                   placeholder="Description pour les moteurs de recherche"
                 />
+                <p className="mt-1 text-xs text-charcoal-500">Visez environ 150 à 160 caractères.</p>
+              </div>
+              <div>
+                <label className="label-text">Mots-clés SEO (séparés par des virgules)</label>
+                <input type="text" value={form.seo_keywords} onChange={(e) => setForm({ ...form, seo_keywords: e.target.value })} className="input-field" placeholder="impression 3D, accessoire, Algérie" />
               </div>
             </div>
           </div>

@@ -237,8 +237,23 @@ export default function CustomRequestPage() {
     event.preventDefault()
     setError(null)
 
-    if (!estimateAccepted || !estimate) {
-      setError('Acceptez d’abord l’estimation affichée pour continuer.')
+    if (estimateLoading) {
+      setError('Attendez la fin du calcul avant d’envoyer votre demande.')
+      return
+    }
+    if (estimate && !estimateAccepted) {
+      setError('Acceptez l’estimation affichée ou modifiez vos informations avant de continuer.')
+      return
+    }
+    const dimensionValues = [lengthMm.trim(), widthMm.trim(), heightMm.trim()]
+    const hasAnyDimension = dimensionValues.some(Boolean)
+    const hasAllDimensions = dimensionValues.every(Boolean)
+    if (hasAnyDimension && !hasAllDimensions) {
+      setError('Renseignez les trois dimensions ou laissez-les toutes vides pour demander un devis manuel.')
+      return
+    }
+    if (hasAllDimensions && !material) {
+      setError('Choisissez une matière ou laissez les dimensions vides pour que le studio vous conseille.')
       return
     }
     const normalized = normalizeAlgerianPhone(phone)
@@ -250,8 +265,12 @@ export default function CustomRequestPage() {
       setError('Le nom et prénom sont requis.')
       return
     }
-    if (description.trim().length < 20) {
-      setError('Décrivez votre projet en quelques phrases (20 caractères minimum).')
+    if (!description.trim()) {
+      setError('Ajoutez au moins un mot pour expliquer ce que vous souhaitez fabriquer.')
+      return
+    }
+    if (description.trim().length > 5000) {
+      setError('Le descriptif ne doit pas dépasser 5 000 caractères.')
       return
     }
     if (!wilayaCode || !communeId) {
@@ -277,17 +296,17 @@ export default function CustomRequestPage() {
         title: title.trim(),
         description: description.trim(),
         intended_use: intendedUse.trim() || null,
-        dimensions: `${lengthMm} x ${widthMm} x ${heightMm}`,
+        dimensions: hasAllDimensions ? `${lengthMm} x ${widthMm} x ${heightMm}` : null,
         dimension_unit: 'mm',
-        dim_length_mm: Number(lengthMm),
-        dim_width_mm: Number(widthMm),
-        dim_height_mm: Number(heightMm),
-        material_preference: material,
+        dim_length_mm: hasAllDimensions ? Number(lengthMm) : null,
+        dim_width_mm: hasAllDimensions ? Number(widthMm) : null,
+        dim_height_mm: hasAllDimensions ? Number(heightMm) : null,
+        material_preference: material || null,
         color_preference: color.trim() || null,
         quantity: Number(quantity) || 1,
         manufacturing_options: options,
         rush,
-        estimate_accepted: true,
+        estimate_accepted: Boolean(estimate && estimateAccepted),
         delivery: {
           wilaya_code: Number(wilayaCode),
           commune_id: communeId,
@@ -361,9 +380,9 @@ export default function CustomRequestPage() {
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <h1 className="text-3xl font-bold text-offwhite">Demande sur mesure</h1>
       <p className="mt-2 text-sm text-charcoal-400">
-        Décrivez la pièce, indiquez ses dimensions : le prix est estimé automatiquement. Vous
-        acceptez ensuite l’estimation, puis vous complétez vos coordonnées et votre livraison. Le
-        studio doit approuver la fabrication avant la création de la commande.
+        Envoyez un exemple en photo ou en fichier si vous en avez un, puis expliquez la forme,
+        les dimensions et les conditions souhaitées. Vous pouvez aussi envoyer votre demande sans
+        dimensions exactes : le studio l’étudiera et préparera un devis adapté avant fabrication.
       </p>
 
       {error && (
@@ -389,15 +408,19 @@ export default function CustomRequestPage() {
               />
             </label>
             <label className="block sm:col-span-2">
-              <span className="label-text">Description *</span>
+              <span className="label-text">Description de votre demande *</span>
               <textarea
                 required
-                rows={4}
+                rows={5}
+                maxLength={5000}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                className="input-field resize-none"
-                placeholder="Forme, fonction, contraintes, finition attendue..."
+                className="input-field resize-y"
+                placeholder="Expliquez librement ce que vous souhaitez fabriquer, même en quelques mots. Précisez les changements par rapport à la photo, les mesures et les détails importants..."
               />
+              <span className="mt-1 block text-right text-xs text-charcoal-500">
+                {description.length.toLocaleString('fr-FR')} / 5 000 caractères
+              </span>
             </label>
             <label className="block sm:col-span-2">
               <span className="label-text">Usage prévu</span>
@@ -413,11 +436,11 @@ export default function CustomRequestPage() {
         </div>
 
         <div className="admin-card">
-          <h2 className="mb-2 text-lg font-semibold text-offwhite">Dimensions et matière</h2>
+          <h2 className="mb-2 text-lg font-semibold text-offwhite">Dimensions et matière (facultatif)</h2>
           <p className="mb-4 text-xs text-charcoal-400">
-            Les trois dimensions sont nécessaires à l’estimation. Le poids et le temps sont déduits
-            automatiquement de la boîte englobante, de la matière et des hypothèses du studio : ce
-            sont des estimations, pas des mesures issues du fichier 3D.
+            Si vous connaissez les dimensions, renseignez les trois mesures pour obtenir une estimation.
+            Sinon, laissez-les vides : le studio étudiera votre exemple et vous proposera un devis.
+            Le poids et le temps affichés restent des estimations basées sur les dimensions et la matière.
           </p>
           <div className="grid gap-4 sm:grid-cols-3">
             {(
@@ -433,7 +456,6 @@ export default function CustomRequestPage() {
                   type="number"
                   min={1}
                   max={2000}
-                  required
                   value={value}
                   onChange={(event) => setter(event.target.value)}
                   className="input-field"
@@ -442,23 +464,19 @@ export default function CustomRequestPage() {
               </label>
             ))}
             <label className="block">
-              <span className="label-text">Matière *</span>
+              <span className="label-text">Matière souhaitée (facultatif)</span>
               <select
-                required
                 value={material}
                 onChange={(event) => setMaterial(event.target.value)}
                 className="input-field"
                 disabled={materials.length === 0}
               >
-                {materials.length === 0 ? (
-                  <option value="">Tarification non configurée</option>
-                ) : (
-                  materials.map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name}
-                    </option>
-                  ))
-                )}
+                <option value="">Je ne sais pas encore / conseillez-moi</option>
+                {materials.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="block">
@@ -580,16 +598,17 @@ export default function CustomRequestPage() {
             </div>
           ) : (
             <p className="text-xs text-charcoal-400">
-              Renseignez les trois dimensions, la matière et la quantité pour obtenir une estimation.
+              Renseignez les trois dimensions et la matière pour obtenir une estimation. Sinon, vous pouvez envoyer la demande sans estimation automatique.
             </p>
           )}
         </div>
 
         <div className="admin-card">
-          <h2 className="mb-2 text-lg font-semibold text-offwhite">Fichiers</h2>
+          <h2 className="mb-2 text-lg font-semibold text-offwhite">Exemples et fichiers (facultatif)</h2>
           <p className="mb-4 text-xs text-charcoal-400">
-            Photos et fichiers 3D sont stockés dans un espace privé, accessibles uniquement au
-            studio. Formats acceptés : JPG, PNG, WebP, AVIF (5 Mo), GLB, GLTF, STL, OBJ (25 Mo).
+            Ajoutez une ou plusieurs photos du produit de référence, ou un fichier 3D si vous en
+            possédez un. Ces pièces jointes sont facultatives et servent de référence au studio.
+            Elles sont stockées dans un espace privé, accessible uniquement au studio. Formats acceptés : JPG, PNG, WebP, AVIF (5 Mo), GLB, GLTF, STL, OBJ (25 Mo).
             Seul le GLB/GLTF peut être prévisualisé dans le navigateur ; STL et OBJ sont étudiés par
             le studio sans aperçu en ligne.
           </p>

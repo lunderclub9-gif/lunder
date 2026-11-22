@@ -102,7 +102,7 @@ export default function ProductDetailPage() {
     })
   }, [product, images])
 
-  const selectableOptions = useMemo((
+  const selectableOptions = useMemo(
     () => options.filter((option) => (option.values ?? []).length > 0),
     [options]
   )

@@ -227,7 +227,7 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
 | "Stock insuffisant" | quantity exceeds available stock (counted on variant, else product) |
 | "Trop de tentatives" | more than 8 tracking lookups for one order in 15 minutes |
 | "Devis expiré" | quote passed `valid_until`; issue a new version |
-| `DIMENSIONS_INVALIDES` | one of the three dimensions is missing, non-positive or above 2000 mm |
+| `DIMENSIONS_INCOMPLETES` | only one or two dimensions were supplied; provide all three or none for a manual quote |\n| `DIMENSIONS_INVALIDES` | one of the three dimensions is non-positive or above 2000 mm |\n| `MATIERE_REQUISE` | all dimensions were supplied without a material choice |
 | `ESTIMATION_INDISPONIBLE` | the customer accepted but no server-side estimate could be computed |
 | `LIVRAISON_REQUISE` | owner approval attempted on a request without complete delivery information |
 | `COMMANDE_NON_LIVREE` | hard delete attempted on an order that is not `delivered` |

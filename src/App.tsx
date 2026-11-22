@@ -20,6 +20,7 @@ const InfoPage = lazy(() => import('@/pages/store/InfoPage'))
 const AdminLogin = lazy(() => import('@/pages/admin/AdminLogin'))
 const AdminLayout = lazy(() => import('@/layouts/AdminLayout'))
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'))
+const AdminAnalytics = lazy(() => import('@/pages/admin/Analytics'))
 const AdminProducts = lazy(() => import('@/pages/admin/Products'))
 const AdminProductEdit = lazy(() => import('@/pages/admin/ProductEdit'))
 const AdminCategories = lazy(() => import('@/pages/admin/Categories'))
@@ -97,6 +98,7 @@ export default function App() {
                 }
               >
                 <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="produits" element={<AdminProducts />} />
                 <Route path="produits/nouveau" element={<AdminProductEdit />} />
                 <Route path="produits/:id" element={<AdminProductEdit />} />

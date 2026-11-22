@@ -315,7 +315,7 @@ export default function CustomRequestPage() {
           title: title.trim(),
           description: description.trim(),
           intended_use: intendedUse.trim() || null,
-          dimensions: hasAllDimensions ? `${lengthMm} x `${widthMm} x `${heightMm}` : null,
+          dimensions: hasAllDimensions ? [lengthMm, widthMm, heightMm].join(' x ') : null,
           dimension_unit: 'mm',
           dim_length_mm: hasAllDimensions ? Number(lengthMm) : null,
           dim_width_mm: hasAllDimensions ? Number(widthMm) : null,

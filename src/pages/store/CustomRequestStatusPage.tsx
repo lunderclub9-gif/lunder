@@ -231,7 +231,18 @@ export default function CustomRequestStatusPage() {
                       <span>{formatDzd(line.amountDzd)}</span>
                     </li>
                   ))}
-                  {/* Remise et urgence sont déjà incluses dans les lignes du devis. */}
+                  {quote.breakdown.discountPercent && !quote.breakdown.lines?.some((line) => line.label === 'Remise quantité') ? (
+                    <li className="flex justify-between gap-2 text-green-400">
+                      <span>Remise {quote.breakdown.discountPercent} %</span>
+                      <span>-{formatDzd(quote.breakdown.discountDzd ?? 0)}</span>
+                    </li>
+                  ) : null}
+                  {quote.breakdown.rushFeeDzd && !quote.breakdown.lines?.some((line) => line.label === 'Supplément urgence') ? (
+                    <li className="flex justify-between gap-2">
+                      <span>Supplément urgence</span>
+                      <span>{formatDzd(quote.breakdown.rushFeeDzd)}</span>
+                    </li>
+                  ) : null}
                 </ul>
               )}
               {quote.terms && (

@@ -50,8 +50,10 @@ const requestMetrics: Metric[] = [
   { label: 'Demandes reçues', key: 'requests_total', icon: FileText, to: '/admin/demandes' },
   { label: 'Nouvelles', key: 'requests_new', icon: FileText, to: '/admin/demandes' },
   { label: 'En étude', key: 'requests_reviewing', icon: Eye, to: '/admin/demandes' },
+  { label: 'Devis émis', key: 'quotes_issued', icon: FileText, to: '/admin/demandes' },
   { label: 'Devis en attente', key: 'quotes_pending', icon: FileText, to: '/admin/demandes' },
   { label: 'Demandes approuvées', key: 'requests_approved', icon: CheckCircle2, to: '/admin/demandes?view=approved' },
+  { label: 'Demandes refusées', key: 'requests_rejected', icon: Archive, to: '/admin/demandes' },
 ]
 
 const catalogMetrics: Metric[] = [

@@ -293,9 +293,8 @@ tarification automatique : `manufacturing_materials`, `manufacturing_pricing`,
 le snapshot de prix sur `custom_quotes`, puis `quote_custom_manufacturing`,
 `decide_custom_quote` et `delete_order`.
 
-La séquence complète est listée ci-dessus. Les migrations 011, 012, 016 et 017 doivent être validées
-sur une base isolée avant tout déploiement ; aucune migration n'est appliquée à la base de production
-par les changements de cette branche.
+La séquence complète est listée ci-dessus. Les migrations 011 et 012 ne doivent être validées que sur
+une base isolée avant tout déploiement.
 
 Ordre d'exécution complet, du plus ancien au plus récent :
 

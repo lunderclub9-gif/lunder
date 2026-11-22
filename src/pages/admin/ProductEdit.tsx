@@ -197,8 +197,11 @@ export default function AdminProductEdit() {
       if (isPostHogEnabled) posthog.capture('product_model_uploaded', { product_id: id })
 
       if (previousPath && form.model_url !== originalModelUrl && previousPath.startsWith(`${id}/`)) {
-        const { error: cleanupError } = await supabase.storage.from('product-models').remove([previousPath])
-        if (cleanupError) setError('Le nouveau modèle est chargé, mais un ancien fichier temporaire n’a pas pu être nettoyé.')
+        const { data: references, error: referenceError } = await supabase.from('products').select('id').eq('model_url', form.model_url).neq('id', id).limit(1)
+        if (!referenceError && !references?.length) {
+          const { error: cleanupError } = await supabase.storage.from('product-models').remove([previousPath])
+          if (cleanupError) setError('Le nouveau modèle est chargé, mais un ancien fichier temporaire n’a pas pu être nettoyé.')
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'upload du modèle 3D.")
@@ -238,8 +241,12 @@ export default function AdminProductEdit() {
     }
     const path = storagePath(imageUrl, 'product-images')
     if (path && path.startsWith(`${id}/`)) {
-      const { error: storageError } = await supabase.storage.from('product-images').remove([path])
-      if (storageError) setError('La photo a été retirée du produit, mais son fichier reste dans le stockage et devra être nettoyé.')
+      const { data: references, error: referenceError } = await supabase.from('product_images').select('id').eq('image_url', imageUrl).limit(1)
+      if (referenceError) setError('La photo a été retirée du produit, mais la vérification des références du fichier a échoué; le fichier a été conservé par sécurité.')
+      else if (!references?.length) {
+        const { error: storageError } = await supabase.storage.from('product-images').remove([path])
+        if (storageError) setError('La photo a été retirée du produit, mais son fichier reste dans le stockage et devra être nettoyé.')
+      }
     }
     if (isPostHogEnabled) posthog.capture('product_image_deleted', { product_id: id, image_id: imageId })
   }
@@ -253,8 +260,12 @@ export default function AdminProductEdit() {
     setOriginalModelUrl('')
     const path = storagePath(previousUrl, 'product-models')
     if (path && path.startsWith(`${id}/`)) {
-      const { error: storageError } = await supabase.storage.from('product-models').remove([path])
-      if (storageError) setError('Le modèle a été retiré du produit, mais son fichier reste dans le stockage et devra être nettoyé.')
+      const { data: references, error: referenceError } = await supabase.from('products').select('id').eq('model_url', previousUrl).neq('id', id).limit(1)
+      if (referenceError) setError('Le modèle a été retiré du produit, mais le contrôle des références a échoué; le fichier a été conservé par sécurité.')
+      else if (!references?.length) {
+        const { error: storageError } = await supabase.storage.from('product-models').remove([path])
+        if (storageError) setError('Le modèle a été retiré du produit, mais son fichier reste dans le stockage et devra être nettoyé.')
+      }
     }
   }
 
@@ -471,8 +482,11 @@ export default function AdminProductEdit() {
         if (originalModelUrl && originalModelUrl !== payload.model_url) {
           const previousPath = storagePath(originalModelUrl, 'product-models')
           if (previousPath && previousPath.startsWith(`${id}/`)) {
-            const { error: cleanupError } = await supabase.storage.from('product-models').remove([previousPath])
-            if (cleanupError) setError('Produit enregistré, mais l’ancien modèle reste à nettoyer dans le stockage.')
+            const { data: references, error: referenceError } = await supabase.from('products').select('id').eq('model_url', originalModelUrl).neq('id', id).limit(1)
+            if (!referenceError && !references?.length) {
+              const { error: cleanupError } = await supabase.storage.from('product-models').remove([previousPath])
+              if (cleanupError) setError('Produit enregistré, mais l’ancien modèle reste à nettoyer dans le stockage.')
+            }
           }
         }
         setOriginalModelUrl(payload.model_url ?? '')

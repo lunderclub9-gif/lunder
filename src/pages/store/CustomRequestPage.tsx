@@ -183,7 +183,10 @@ export default function CustomRequestPage() {
     const timer = setTimeout(() => {
       void runEstimate()
     }, 450)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      estimateRequestId.current += 1
+    }
   }, [runEstimate])
 
   // Toute modification des paramètres invalide l'acceptation précédente : le
@@ -302,54 +305,59 @@ export default function CustomRequestPage() {
     }
 
     setSubmitting(true)
-    const { data, error: rpcError } = await supabase.rpc('create_custom_request', {
-      p_payload: {
-        idempotency_key: idempotencyKey.current,
-        customer_name: name.trim(),
-        phone: normalized,
-        email: email.trim() || null,
-        title: title.trim(),
-        description: description.trim(),
-        intended_use: intendedUse.trim() || null,
-        dimensions: hasAllDimensions ? `${lengthMm} x ${widthMm} x ${heightMm}` : null,
-        dimension_unit: 'mm',
-        dim_length_mm: hasAllDimensions ? Number(lengthMm) : null,
-        dim_width_mm: hasAllDimensions ? Number(widthMm) : null,
-        dim_height_mm: hasAllDimensions ? Number(heightMm) : null,
-        material_preference: material || null,
-        color_preference: color.trim() || null,
-        quantity: Number(quantity) || 1,
-        manufacturing_options: options,
-        rush,
-        estimate_accepted: Boolean(estimate && estimateAccepted),
-        delivery: {
-          wilaya_code: Number(wilayaCode),
-          commune_id: communeId,
-          method,
-          address: method === 'domicile' ? address.trim() : null,
-          pickup_point_id: method === 'stopdesk' ? pickupId : null,
+    try {
+      const { data, error: rpcError } = await supabase.rpc('create_custom_request', {
+        p_payload: {
+          idempotency_key: idempotencyKey.current,
+          customer_name: name.trim(),
+          phone: normalized,
+          email: email.trim() || null,
+          title: title.trim(),
+          description: description.trim(),
+          intended_use: intendedUse.trim() || null,
+          dimensions: hasAllDimensions ? `${lengthMm} x `${widthMm} x `${heightMm}` : null,
+          dimension_unit: 'mm',
+          dim_length_mm: hasAllDimensions ? Number(lengthMm) : null,
+          dim_width_mm: hasAllDimensions ? Number(widthMm) : null,
+          dim_height_mm: hasAllDimensions ? Number(heightMm) : null,
+          material_preference: material || null,
+          color_preference: color.trim() || null,
+          quantity: Number(quantity) || 1,
+          manufacturing_options: options,
+          rush,
+          estimate_accepted: Boolean(estimate && estimateAccepted),
+          delivery: {
+            wilaya_code: Number(wilayaCode),
+            commune_id: communeId,
+            method,
+            address: method === 'domicile' ? address.trim() : null,
+            pickup_point_id: method === 'stopdesk' ? pickupId : null,
+          },
+          files: files.map((file) => ({
+            path: file.path,
+            name: file.name,
+            mime: file.mime,
+            size: file.size,
+            kind: file.kind,
+          })),
         },
-        files: files.map((file) => ({
-          path: file.path,
-          name: file.name,
-          mime: file.mime,
-          size: file.size,
-          kind: file.kind,
-        })),
-      },
-    })
-    setSubmitting(false)
+      })
 
-    if (rpcError) {
-      setError(
-        orderErrorMessage(
-          rpcError.message,
-          "La demande n'a pas pu être enregistrée. Vérifiez vos informations."
+      if (rpcError) {
+        setError(
+          orderErrorMessage(
+            rpcError.message,
+            "La demande n'a pas pu être enregistrée. Vérifiez vos informations."
+          )
         )
-      )
-      return
+        return
+      }
+      setCreated(data as CreatedRequest)
+    } catch {
+      setError("Connexion interrompue : la demande n'a pas pu être confirmée. Réessayez ; la clé d'idempotence évite les doublons.")
+    } finally {
+      setSubmitting(false)
     }
-    setCreated(data as CreatedRequest)
   }
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import { AlertCircle, Loader2, ShoppingBag, Truck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCart } from '@/lib/cart'
 import { formatDzd } from '@/lib/format'
+import { getMarketingAttribution } from '@/lib/marketingAttribution'
 import {
   DELIVERY_METHOD_LABELS,
   normalizeAlgerianPhone,
@@ -192,6 +193,13 @@ export default function CheckoutPage() {
     }
 
     const created = data as CreatedOrder
+    try {
+      await supabase.rpc('record_marketing_attribution', {
+        p_payload: { ...getMarketingAttribution(), lead_type: 'order', idempotency_key: idempotencyKey.current },
+      })
+    } catch {
+      // Attribution is best-effort and must never block a valid COD order.
+    }
     clear()
     navigate(`/boutique/commande/confirmation?token=${created.tracking_token}`)
   }

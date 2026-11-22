@@ -75,6 +75,22 @@ BEGIN
   IF length(v_description) > 5000 THEN RAISE EXCEPTION 'DESCRIPTION_TROP_LONGUE'; END IF;
   IF v_quantity < 1 OR v_quantity > 500 THEN RAISE EXCEPTION 'QUANTITE_INVALIDE'; END IF;
   IF v_unit NOT IN ('mm', 'cm', 'm') THEN RAISE EXCEPTION 'UNITE_INVALIDE'; END IF;
+
+  -- Validation serveur : ne jamais accepter des dimensions partielles ou hors limites,
+  -- même si un client contourne les contrôles du formulaire.
+  IF (v_length IS NOT NULL OR v_width IS NOT NULL OR v_height IS NOT NULL)
+     AND (v_length IS NULL OR v_width IS NULL OR v_height IS NULL) THEN
+    RAISE EXCEPTION 'DIMENSIONS_INCOMPLETES';
+  END IF;
+  IF v_length IS NOT NULL AND (
+    v_length <= 0 OR v_width <= 0 OR v_height <= 0
+    OR v_length > 2000 OR v_width > 2000 OR v_height > 2000
+  ) THEN
+    RAISE EXCEPTION 'DIMENSIONS_INVALIDES';
+  END IF;
+  IF v_length IS NOT NULL AND v_material IS NULL THEN
+    RAISE EXCEPTION 'MATIERE_REQUISE';
+  END IF;
   IF jsonb_typeof(v_files) <> 'array' OR jsonb_array_length(v_files) > 10 THEN
     RAISE EXCEPTION 'FICHIERS_INVALIDES';
   END IF;

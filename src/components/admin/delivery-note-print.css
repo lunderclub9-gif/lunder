@@ -5,8 +5,10 @@
     min-height: var(--print-page-height) !important;
     max-height: var(--print-page-height) !important;
     overflow: hidden !important;
+    break-before: avoid-page !important;
     break-inside: avoid-page !important;
     break-after: auto !important;
+    page-break-before: avoid !important;
     page-break-inside: avoid !important;
     page-break-after: auto !important;
   }
@@ -15,7 +17,11 @@
     position: relative !important;
     display: block !important;
     overflow: visible !important;
-    break-inside: avoid !important;
+    break-before: avoid-page !important;
+    break-after: avoid-page !important;
+    break-inside: avoid-page !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
     page-break-inside: avoid !important;
   }
 

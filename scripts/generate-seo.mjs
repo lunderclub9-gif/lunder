@@ -29,8 +29,11 @@ const [products, categories] = await Promise.all([
   fetchRows('categories', 'select=id,name,slug,description&is_active=eq.true&limit=1000'),
 ])
 let productKeywords = []
-let categorySeo = []\ntry { productKeywords = await fetchRows('products', 'select=id,seo_keywords&status=eq.published&limit=1000') } catch { console.warn('[SEO] Colonne products.seo_keywords absente : appliquez la migration 014.') }\ntry { categorySeo = await fetchRows('categories', 'select=id,seo_title,seo_description,seo_keywords&is_active=eq.true&limit=1000') } catch { console.warn('[SEO] Colonnes SEO des catégories absentes : appliquez la migration 015.') }
-const productKeywordsById = new Map(productKeywords.map((row) => [row.id, row.seo_keywords || []]))\nconst categorySeoById = new Map(categorySeo.map((row) => [row.id, row]))\nconst images = products.length
+let categorySeo = []
+try { productKeywords = await fetchRows('products', 'select=id,seo_keywords&status=eq.published&limit=1000') } catch { console.warn('[SEO] Colonne products.seo_keywords absente : appliquez la migration 014.') }
+try { categorySeo = await fetchRows('categories', 'select=id,seo_title,seo_description,seo_keywords&is_active=eq.true&limit=1000') } catch { console.warn('[SEO] Colonnes SEO des catégories absentes : appliquez la migration 015.') }
+const productKeywordsById = new Map(productKeywords.map((row) => [row.id, row.seo_keywords || []]))
+const categorySeoById = new Map(categorySeo.map((row) => [row.id, row]))\nconst images = products.length
   ? await fetchRows('product_images', `select=product_id,image_url,alt_text,is_primary&product_id=in.(${products.map((item) => item.id).join(',')})&limit=5000`)
   : []
 const imageByProduct = new Map()
@@ -88,7 +91,9 @@ const urls = [
 
 const listingPath = path.join(dist, 'boutique', 'produits.html')
 fs.mkdirSync(path.dirname(listingPath), { recursive: true })
-fs.writeFileSync(listingPath, pageHtml({ title: settingsMap.seo_title || 'Boutique | LUNDER’S 3D STUDIO', description: globalDescription, keywords: globalKeywords, canonical: `${siteUrl}/boutique/produits`, schema: { '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Boutique LUNDER’S 3D STUDIO', url: `${siteUrl}/boutique/produits`, mainEntity: { '@type': 'ItemList', itemListElement: products.map((product, index) => ({ '@type': 'ListItem', position: index + 1, url: `${siteUrl}/boutique/produits/${encodeURIComponent(product.slug)}`, name: product.name })) } } }))\n\nfor (const product of products) {
+fs.writeFileSync(listingPath, pageHtml({ title: settingsMap.seo_title || 'Boutique | LUNDER’S 3D STUDIO', description: globalDescription, keywords: globalKeywords, canonical: `${siteUrl}/boutique/produits`, schema: { '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Boutique LUNDER’S 3D STUDIO', url: `${siteUrl}/boutique/produits`, mainEntity: { '@type': 'ItemList', itemListElement: products.map((product, index) => ({ '@type': 'ListItem', position: index + 1, url: `${siteUrl}/boutique/produits/${encodeURIComponent(product.slug)}`, name: product.name })) } } }))
+
+for (const product of products) {
   if (!product.slug) continue
   const productUrl = `${siteUrl}/boutique/produits/${encodeURIComponent(product.slug)}`
   const productImages = (imageByProduct.get(product.id) || []).sort((a, b) => Number(b.is_primary) - Number(a.is_primary))

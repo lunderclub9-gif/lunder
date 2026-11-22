@@ -334,3 +334,20 @@ sans prix au gramme, tarif horaire ni marge. La ventilation renvoyée au client
 par `get_custom_request_by_token` est également assainie par
 `customer_quote_breakdown` : les postes internes sont regroupés et la marge
 n'est jamais exposée.
+
+## Owner analytics and business intelligence
+
+The owner-only analytics workspace is available at `/admin/analytics` from the admin sidebar (`Analytics & Growth`). It reads the existing owner-protected order, order-item, product, product-cost, material and active-wilaya data. No new production schema is required for this first analytics release.
+
+### Metric definitions and limitations
+
+- Delivered revenue is the sum of `orders.subtotal_dzd` for non-archived orders with status `delivered`; delivery charges are reported separately.
+- Open pipeline is the subtotal of non-cancelled orders not yet marked delivered.
+- Product gross-margin estimates use the configured product-cost sheet: material, machine, labour, failure allowance, packaging and return reserve. A product without a complete material cost reference is excluded from the estimated profit total and counted as missing coverage.
+- Custom-made order margin is not estimated because the current order snapshot does not preserve enough internal production-cost data to calculate it reliably.
+- COD delivery status is not a cash-reconciliation record. The analytics workspace does not label delivered order value as confirmed cash collected.
+- Current order source values identify the checkout path (`store` or `custom`), not advertising attribution. Campaign UTMs, ad spend and customer acquisition cost are not yet available.
+- Wilaya ranking uses the active rows in the geography table rather than a hard-coded number of wilayas.
+- The CSV export contains the visible period's wilaya and product summaries. Customer phone numbers are never exported or displayed.
+
+The charts are client-rendered SVG/CSS and respect the user's reduced-motion preference. The page is responsive and does not add a charting dependency.

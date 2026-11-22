@@ -315,9 +315,9 @@ export default function AdminAnalytics() {
     const repeatRate = uniqueCustomers ? (repeatCustomers / uniqueCustomers) * 100 : 0
 
     const costByProduct = new Map<string, number | null>()
-    const materialById = new Map(data.materials.map((material) => [material.id, material]))
+    const materialById = new Map(data.materials.map((material) => [material.id, material] as const))
     for (const cost of data.costs) costByProduct.set(cost.product_id, estimateUnitCost(cost, materialById.get(cost.material_id ?? '')))
-    const productInfo = new Map(data.products.map((product) => [product.id, product]))
+    const productInfo = new Map(data.products.map((product) => [product.id, product] as const))
     const productStats = new Map<string, { name: string; quantity: number; revenue: number; estimatedProfit: number; knownCostUnits: number; totalUnits: number; stock: number; status: string }>()
     let estimatedProfit = 0
     let knownCostUnits = 0

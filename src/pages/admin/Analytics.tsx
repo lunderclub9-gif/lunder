@@ -85,6 +85,7 @@ const money = (value: number) => formatDzd(Math.round(value || 0))
 const number = (value: number) => new Intl.NumberFormat('fr-DZ', { maximumFractionDigits: 0 }).format(value || 0)
 const percent = (value: number) => (Number.isFinite(value) ? value.toFixed(1).replace('.', ',') : '0,0') + ' %'
 const shortDate = (date: Date) => new Intl.DateTimeFormat('fr-DZ', { day: '2-digit', month: 'short' }).format(date)
+const localDayKey = (date: Date) => date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0')
 
 function periodStart(period: Period, now: Date) {
   if (period === 'all') return null
@@ -365,6 +366,8 @@ export default function AdminAnalytics() {
       wilayaStats.set(order.wilaya_code, current)
     }
     const wilayas = [...wilayaStats.values()].sort((a, b) => b.orders - a.orders || b.revenue - a.revenue)
+    const storeOrders = validOrders.filter((order) => order.source === 'store').length
+    const customOrders = validOrders.filter((order) => order.source === 'custom').length
     const statusStats = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].map((key) => ({
       key, count: currentOrders.filter((order) => order.status === key).length,
     }))
@@ -376,12 +379,12 @@ export default function AdminAnalytics() {
         const date = new Date(now)
         date.setDate(date.getDate() - i)
         date.setHours(0, 0, 0, 0)
-        const key = date.toISOString().slice(0, 10)
+        const key = localDayKey(date)
         buckets.set(key, { label: shortDate(date), value: 0, date })
       }
       for (const order of delivered) {
         const date = new Date(order.created_at)
-        const key = date.toISOString().slice(0, 10)
+        const key = localDayKey(date)
         const bucket = buckets.get(key)
         if (bucket) bucket.value += Number(order.subtotal_dzd || 0)
       }
@@ -399,7 +402,7 @@ export default function AdminAnalytics() {
         const bucketDate = new Date(now)
         bucketDate.setDate(bucketDate.getDate() - Math.min(12, Math.max(0, diff)) * 7)
         bucketDate.setHours(0, 0, 0, 0)
-        const key = bucketDate.toISOString().slice(0, 10)
+        const key = localDayKey(bucketDate)
         const bucket = buckets.get(key)
         if (bucket) bucket.value += Number(order.subtotal_dzd || 0)
       }
@@ -420,8 +423,9 @@ export default function AdminAnalytics() {
     const previousStart = start ? new Date(start) : null
     let previousOrders: Order[] = []
     if (previousStart && period !== 'all') {
-      const duration = now.getTime() - previousStart.getTime()
-      const priorStart = new Date(previousStart.getTime() - duration - 86400000)
+      const durationDays = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 365
+      const priorStart = new Date(previousStart)
+      priorStart.setDate(priorStart.getDate() - durationDays)
       previousOrders = activeOrders.filter((order) => {
         const date = new Date(order.created_at)
         return date >= priorStart && date < previousStart
@@ -432,7 +436,7 @@ export default function AdminAnalytics() {
     const orderTrend = previousOrders.length > 0 ? ((validOrders.length - previousOrders.filter((order) => order.status !== 'cancelled').length) / previousOrders.filter((order) => order.status !== 'cancelled').length) * 100 : null
 
     return {
-      currentOrders, validOrders, delivered, revenue, deliveryRevenue, pipeline, cancelled,
+      currentOrders, validOrders, delivered, revenue, deliveryRevenue, pipeline, cancelled, storeOrders, customOrders,
       uniqueCustomers, repeatCustomers, repeatRate, products, mostProfitable, estimatedProfit,
       marginCoverage, wilayas, statusStats, trend, revenueTrend,
       conversion: currentOrders.length ? (delivered.length / currentOrders.length) * 100 : 0,
@@ -542,7 +546,7 @@ export default function AdminAnalytics() {
             <Card>
               <div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Géographie des ventes</p><h2 className="mt-1 text-lg font-bold text-white">Performance par wilaya</h2><p className="mt-1 text-xs text-neutral-500">Classement selon les commandes non annulées</p></div><span className="rounded-xl bg-red-500/10 p-2.5 text-red-400"><MapPin size={18} /></span></div>
               {analysis.wilayas.some((item) => item.orders > 0) ? <div className="space-y-4">{analysis.wilayas.filter((item) => item.orders > 0).slice(0, 7).map((item, index) => <HorizontalBar key={item.code} label={String(item.code).padStart(2, '0') + ' · ' + item.name} value={item.orders} max={analysis.wilayas[0]?.orders ?? 1} detail={number(item.orders) + ' cmd'} index={index} />)}</div> : <EmptyState text="Les données des wilayas apparaîtront après les premières commandes." />}
-              <div className="mt-5 border-t border-white/[0.07] pt-4"><div className="flex items-center justify-between text-xs"><span className="text-neutral-400">Wilaya en tête</span><strong className="text-white">{analysis.wilayas[0]?.orders ? analysis.wilayas[0].name : 'Pas encore de données'}</strong></div><p className="mt-1 text-[10px] text-neutral-600">Le classement complet des 58 wilayas est disponible plus bas.</p></div>
+              <div className="mt-5 border-t border-white/[0.07] pt-4"><div className="flex items-center justify-between text-xs"><span className="text-neutral-400">Wilaya en tête</span><strong className="text-white">{analysis.wilayas[0]?.orders ? analysis.wilayas[0].name : 'Pas encore de données'}</strong></div><p className="mt-1 text-[10px] text-neutral-600">Le classement complet des wilayas actives est disponible plus bas.</p></div>
             </Card>
             <Card>
               <div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Catalogue performant</p><h2 className="mt-1 text-lg font-bold text-white">Produits les plus vendus</h2><p className="mt-1 text-xs text-neutral-500">Basé sur les commandes livrées</p></div><span className="rounded-xl bg-orange-500/10 p-2.5 text-orange-300"><Package size={18} /></span></div>
@@ -585,7 +589,7 @@ export default function AdminAnalytics() {
           </div>
 
           <Card>
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Couverture nationale</p><h2 className="mt-1 text-lg font-bold text-white">Les 58 wilayas</h2><p className="mt-1 text-xs text-neutral-500">Recherchez une wilaya et comparez le volume de commandes et les ventes livrées.</p></div><label className="flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-neutral-900 px-3"><Filter size={14} className="text-neutral-500" /><input value={wilayaSearch} onChange={(event) => setWilayaSearch(event.target.value)} placeholder="Rechercher une wilaya…" className="w-40 bg-transparent text-xs text-white outline-none placeholder:text-neutral-600 sm:w-52" /></label></div>
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Couverture nationale</p><h2 className="mt-1 text-lg font-bold text-white">Toutes les wilayas actives</h2><p className="mt-1 text-xs text-neutral-500">Recherchez une wilaya et comparez le volume de commandes et les ventes livrées.</p></div><label className="flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-neutral-900 px-3"><Filter size={14} className="text-neutral-500" /><input value={wilayaSearch} onChange={(event) => setWilayaSearch(event.target.value)} placeholder="Rechercher une wilaya…" className="w-40 bg-transparent text-xs text-white outline-none placeholder:text-neutral-600 sm:w-52" /></label></div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {filteredWilayas.map((item) => {
                 const maxOrders = Math.max(1, analysis.wilayas[0]?.orders ?? 0)
@@ -599,15 +603,16 @@ export default function AdminAnalytics() {
             </div>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
             <Card><div className="flex items-center gap-3"><div className="rounded-xl bg-red-500/10 p-2.5 text-red-400"><Activity size={18} /></div><div><p className="text-xs text-neutral-500">Commandes annulées</p><p className="text-xl font-bold text-white">{number(analysis.cancelled)}</p></div></div><p className="mt-3 text-[11px] text-neutral-500">À surveiller pour identifier les problèmes de confirmation ou de livraison.</p></Card>
             <Card><div className="flex items-center gap-3"><div className="rounded-xl bg-sky-500/10 p-2.5 text-sky-400"><Truck size={18} /></div><div><p className="text-xs text-neutral-500">Frais de livraison facturés</p><p className="text-xl font-bold text-white">{money(analysis.deliveryRevenue)}</p></div></div><p className="mt-3 text-[11px] text-neutral-500">Montant de livraison sur les commandes livrées, séparé du chiffre d'affaires produits.</p></Card>
             <Card><div className="flex items-center gap-3"><div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400"><ShoppingBag size={18} /></div><div><p className="text-xs text-neutral-500">Taux de livraison</p><p className="text-xl font-bold text-white">{percent(analysis.conversion)}</p></div></div><p className="mt-3 text-[11px] text-neutral-500">Part des commandes de la période marquées comme livrées.</p></Card>
+            <Card><div className="flex items-center gap-3"><div className="rounded-xl bg-orange-500/10 p-2.5 text-orange-300"><Target size={18} /></div><div><p className="text-xs text-neutral-500">Type de commande</p><p className="text-xl font-bold text-white">{number(analysis.storeOrders + analysis.customOrders)}</p></div></div><div className="mt-3 flex justify-between text-[11px] text-neutral-500"><span>Boutique : {number(analysis.storeOrders)}</span><span>Sur mesure : {number(analysis.customOrders)}</span></div><p className="mt-2 text-[10px] text-neutral-600">Origine interne de la commande, pas encore la source publicitaire.</p></Card>
           </div>
 
           <div className="flex flex-wrap items-start gap-2 rounded-xl border border-white/[0.06] bg-neutral-900/50 p-4 text-[11px] leading-5 text-neutral-500">
             <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" />
-            <p><strong className="text-neutral-300">À propos des chiffres :</strong> le chiffre d'affaires correspond aux sous-totaux des commandes marquées « livrées », hors frais de livraison. Le système actuel ne possède pas de champ de rapprochement des paiements COD : ce montant n'est donc pas présenté comme de l'argent encaissé. La marge est une estimation basée sur les fiches de coûts produits renseignées, sans coûts publicitaires ni frais généraux. Les commandes sur mesure dont le coût réel n'est pas enregistré sont exclues du calcul de marge.</p>
+            <p><strong className="text-neutral-300">À propos des chiffres :</strong> le chiffre d'affaires correspond aux sous-totaux des commandes marquées « livrées », hors frais de livraison. Le système actuel ne possède pas de champ de rapprochement des paiements COD : ce montant n'est donc pas présenté comme de l'argent encaissé. La marge est une estimation basée sur les fiches de coûts produits renseignées, sans coûts publicitaires ni frais généraux. Les commandes sur mesure dont le coût réel n'est pas enregistré sont exclues du calcul de marge. Les sources publicitaires (Facebook, Instagram, TikTok, etc.) ne sont pas encore collectées : « Boutique » et « Sur mesure » désignent uniquement le parcours de commande.</p>
           </div>
         </>
       )}

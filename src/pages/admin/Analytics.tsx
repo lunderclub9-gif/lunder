@@ -393,7 +393,7 @@ export default function AdminAnalytics() {
         const date = new Date(now)
         date.setDate(date.getDate() - i * 7)
         date.setHours(0, 0, 0, 0)
-        const key = date.toISOString().slice(0, 10)
+        const key = localDayKey(date)
         buckets.set(key, { label: shortDate(date), value: 0, date })
       }
       for (const order of delivered) {
@@ -433,7 +433,6 @@ export default function AdminAnalytics() {
     }
     const previousRevenue = previousOrders.filter((order) => order.status === 'delivered').reduce((sum, order) => sum + Number(order.subtotal_dzd || 0), 0)
     const revenueTrend = previousRevenue > 0 ? ((revenue - previousRevenue) / previousRevenue) * 100 : null
-    const orderTrend = previousOrders.length > 0 ? ((validOrders.length - previousOrders.filter((order) => order.status !== 'cancelled').length) / previousOrders.filter((order) => order.status !== 'cancelled').length) * 100 : null
 
     return {
       currentOrders, validOrders, delivered, revenue, deliveryRevenue, pipeline, cancelled, storeOrders, customOrders,

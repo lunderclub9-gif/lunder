@@ -161,6 +161,8 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261114224500_013_owner_notifications.sql` | owner notification counters and notification RPC | 012 |
 | `20261122120000_014_product_seo_keywords.sql` | product SEO keyword array | 001 |
 | `20261122123000_015_category_seo_metadata.sql` | category SEO title, description and keyword fields | 001 |
+| `20261122120000_016_flexible_custom_requests.sql` | allows manual custom requests without dimensions, material or an accepted estimate | 012 |
+| `20261122130000_017_order_level_manufacturing_pricing.sql` | applies setup fees and minimum order adjustment once per order | 008 |
 
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
 seed rows use `ON CONFLICT DO NOTHING`.
@@ -232,15 +234,15 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
 
 ## Workflow fabrication sur mesure (011)
 
-1. Le client saisit le projet, les trois dimensions en millimètres, la quantité, la matière, la
-   couleur et les options. Il ne saisit jamais de poids ni d'heures d'impression.
-2. `estimate_manufacturing_dimensions` calcule un poids et un temps à partir du volume de la boîte
-   englobante, du taux de remplissage (`effective_volume_percent`), de la densité de la matière
-   (`density_g_cm3`) et de la vitesse d'impression (`print_speed_g_per_hour`). Le résultat est
-   explicitement présenté comme une estimation non vérifiée, pas comme un devis ferme.
-3. Le client accepte l'estimation. Le formulaire de coordonnées et de livraison apparaît alors
-   seulement, et `create_custom_request` n'enregistre la demande qu'avec cette acceptation, les
-   coordonnées et la livraison complètes. Aucune commande n'est créée à cette étape.
+1. Le client décrit son projet et peut joindre une photo ou un fichier de référence. Les dimensions,
+   la matière et les options techniques sont facultatives ; le client ne saisit jamais de poids ni
+   d'heures d'impression.
+2. Si les trois dimensions et une matière sont connues, `estimate_manufacturing_dimensions`
+   calcule un poids et un temps indicatifs. Cette estimation n'est pas un devis ferme et son
+   acceptation reste facultative pour une demande manuelle.
+3. Le formulaire de coordonnées et de livraison permet d'envoyer la demande sans compte client.
+   `create_custom_request` enregistre les informations validées ; aucune commande n'est créée à
+   cette étape.
 4. Le propriétaire voit la demande complète, les fichiers, les dimensions, l'estimation et son
    détail interne, l'acceptation éventuelle du client et l'historique des devis. Il peut créer un
    devis depuis l'estimation, saisir un devis manuel ou un devis technique, puis l'envoyer.
@@ -268,16 +270,17 @@ pas supprimables par cette action.
   without separate approval.
 - **Automated coverage is partial.** `npm test` runs the Vitest unit suite; it does not exercise RLS,
   Postgres RPC transactions, Storage permissions, end-to-end customer flows or mobile layouts.
-- **Admin notifications remain incomplete.** The dashboard now uses real counters through an owner-only
-  RPC, but there is no durable read/unread notification center or event-driven notification delivery.
+- **Owner notifications:** the in-app notification center supports read/unread state and realtime with
+  a polling fallback. It does not send email or SMS notifications.
 - **Storage deletion race is not fully closed.** The final RPC checks that the known request objects are
   absent, but anonymous bucket inserts are not serialized against that check. Do not deploy request
   deletion until uploads are bound to server-issued sessions or an equivalent reconciliation/cleanup
   mechanism prevents a concurrent re-upload from becoming orphaned.
 - **Production stage is not tracked separately.** Orders support pending/confirmed/shipped/delivered;
   there is no distinct manufacturing-in-progress status, so the dashboard does not invent one.
-- **No transactional email or SMS.** No order confirmation, quote notification or password reset is
-  sent; guests must keep their tracking link. Password recovery is therefore hidden.
+- **No transactional email or SMS.** No order confirmation or quote notification is sent; guests
+  should keep their order/request reference and tracking link. There is no customer-account or
+  customer-sign-in feature by design.
 - **Uploads:** the private custom-request bucket accepts anonymous inserts (guests must upload without
   an account). Storage caps individual size and declared MIME, but there is no quota/rate limit or
   server-side geometry parser; abandoned/partially uploaded files require cleanup.

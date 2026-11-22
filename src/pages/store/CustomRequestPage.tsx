@@ -669,8 +669,13 @@ export default function CustomRequestPage() {
           )}
         </div>
 
-        {estimateAccepted && (
+        {(!estimate || estimateAccepted) && (
           <>
+            {!estimate && (
+              <div className="rounded-xl border border-brand-red/20 bg-brand-red/5 px-4 py-3 text-sm leading-6 text-charcoal-300">
+                Vous pouvez envoyer votre demande sans estimation automatique. Le studio étudiera votre description et vos références, puis vous proposera un devis adapté.
+              </div>
+            )}
             <div className="admin-card">
               <h2 className="mb-4 text-lg font-semibold text-offwhite">Vos coordonnées</h2>
               <div className="grid gap-4 sm:grid-cols-2">

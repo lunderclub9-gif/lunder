@@ -191,45 +191,57 @@ export function calculateManufacturingQuote(
 
   const laborTotal = laborLines.reduce((sum, line) => sum + line.amountDzd, 0)
 
-  const productionCost = round(
-    materialCost + printingCost + laborTotal + Math.max(0, rules.extraProductionDzd)
-  )
-
+  // Les coûts variables et options de fabrication sont calculés par pièce.
+  const productionCost = round(materialCost + printingCost + laborTotal)
   const complexity = round(Math.max(0, rules.complexityFeeDzd))
   const costWithComplexity = round(productionCost + complexity)
 
   const marginPercent = Math.min(200, Math.max(0, rules.marginPercent))
   const margin = round((costWithComplexity * marginPercent) / 100)
+  const unitPrice = round(costWithComplexity + margin)
 
-  const unitPrice = Math.max(round(costWithComplexity + margin), round(rules.minimumOrderDzd))
-
-  const subtotal = round(unitPrice * quantity)
+  // Les frais fixes et le minimum s'appliquent une seule fois par commande.
+  const setupFee = round(Math.max(0, rules.extraProductionDzd))
+  const subtotal = round(unitPrice * quantity + setupFee)
   const discountPercent = discountForQuantity(rules, quantity)
   const discount = round((subtotal * discountPercent) / 100)
   const rushPercent = input.rush ? Math.max(0, rules.rushFeePercent) : 0
   const rushFee = round(((subtotal - discount) * rushPercent) / 100)
-
-  const total = Math.max(round(subtotal - discount + rushFee), round(rules.minimumOrderDzd))
+  const beforeMinimum = round(subtotal - discount + rushFee)
+  const minimumAdjustment = Math.max(0, round(rules.minimumOrderDzd) - beforeMinimum)
+  const total = round(beforeMinimum + minimumAdjustment)
 
   const lines: QuoteLine[] = [
     {
       label: 'Matière',
-      amountDzd: materialCost,
-      detail: `${material.name} · ${round(gramsWithWaste)} g × ${round(material.pricePerGramDzd)} DA/g (perte ${Math.max(0, rules.wastePercent)} %)`,
+      amountDzd: materialCost * quantity,
+      detail: `${material.name} · ${round(gramsWithWaste)} g × ${round(material.pricePerGramDzd)} DA/g par pièce (perte ${Math.max(0, rules.wastePercent)} %)`,
     },
     {
       label: 'Impression',
-      amountDzd: printingCost,
-      detail: `${formatHours(input.printHours)} h × ${round(hourlyCost)} DA/h`,
+      amountDzd: printingCost * quantity,
+      detail: `${formatHours(input.printHours)} h × ${round(hourlyCost)} DA/h par pièce`,
     },
-    ...laborLines,
+    ...laborLines.map((line) => ({ ...line, amountDzd: line.amountDzd * quantity })),
   ]
 
   if (complexity > 0) {
-    lines.push({ label: 'Complexité', amountDzd: complexity, detail: null })
+    lines.push({ label: 'Complexité', amountDzd: complexity * quantity, detail: null })
   }
   if (margin > 0) {
-    lines.push({ label: 'Marge studio', amountDzd: margin, detail: `${marginPercent} %` })
+    lines.push({ label: 'Marge studio', amountDzd: margin * quantity, detail: `${marginPercent} %` })
+  }
+  if (setupFee > 0) {
+    lines.push({ label: 'Préparation de commande', amountDzd: setupFee, detail: 'Facturée une seule fois' })
+  }
+  if (discount > 0) {
+    lines.push({ label: 'Remise quantité', amountDzd: -discount, detail: `${discountPercent} %` })
+  }
+  if (rushFee > 0) {
+    lines.push({ label: 'Supplément urgence', amountDzd: rushFee, detail: null })
+  }
+  if (minimumAdjustment > 0) {
+    lines.push({ label: 'Ajustement minimum de commande', amountDzd: minimumAdjustment, detail: null })
   }
 
   return {
@@ -246,7 +258,8 @@ export function calculateManufacturingQuote(
     geometryVerified: false,
     assumptions: [
       'Le poids de matière et le temps d’impression sont des estimations de production, pas des mesures garanties.',
-      'Le prix ferme est confirmé par le studio après réception du fichier ou des dimensions définitives.',
+      'Les frais fixes de préparation et le minimum sont appliqués une seule fois par commande.',
+      'Le prix ferme est confirmé par le studio après vérification de la référence et des dimensions définitives.',
       'Les frais de livraison sont calculés séparément selon la wilaya et la commune.',
     ],
   }

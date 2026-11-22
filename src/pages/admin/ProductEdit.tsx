@@ -466,18 +466,21 @@ export default function AdminProductEdit() {
         is_featured: form.is_featured,
         seo_title: form.seo_title || null,
         seo_description: form.seo_description || null,
-        seo_keywords: form.seo_keywords.split(',').map((keyword) => keyword.trim()).filter(Boolean),
       }
+      const { error: seoColumnError } = await supabase.from('products').select('seo_keywords').limit(1)
+      const savePayload = seoColumnError
+        ? payload
+        : { ...payload, seo_keywords: form.seo_keywords.split(',').map((keyword) => keyword.trim()).filter(Boolean) }
 
       if (isNew) {
-        const { data, error: insErr } = await supabase.from('products').insert(payload).select('*').single()
+        const { data, error: insErr } = await supabase.from('products').insert(savePayload).select('*').single()
         if (insErr) throw insErr
         if (isPostHogEnabled) {
           posthog.capture('product_created', { product_id: (data as Product).id, has_model: Boolean(payload.model_url) })
         }
         navigate(`/admin/produits/${(data as Product).id}`, { replace: true })
       } else if (id) {
-        const { error: upErr } = await supabase.from('products').update(payload).eq('id', id)
+        const { error: upErr } = await supabase.from('products').update(savePayload).eq('id', id)
         if (upErr) throw upErr
         if (originalModelUrl && originalModelUrl !== payload.model_url) {
           const previousPath = storagePath(originalModelUrl, 'product-models')
@@ -495,6 +498,7 @@ export default function AdminProductEdit() {
         }
         // Le bandeau de visibilité doit refléter l'état réellement enregistré.
         setForm((prev) => ({ ...prev, status: payload.status }))
+        if (seoColumnError && form.seo_keywords.trim()) setError('Produit enregistré. Les mots-clés SEO seront sauvegardés après application de la migration 014.')
       }
     } catch {
       setError("Erreur lors de l'enregistrement. Vérifiez les champs.")

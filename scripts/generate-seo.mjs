@@ -25,7 +25,7 @@ if (!/^https:\/\/[\w.-]+(?:\.[\w.-]+)+(?:\/.*)?$/i.test(siteUrl)) {
 }
 
 const [products, categories] = await Promise.all([
-  fetchRows('products', 'select=id,name,slug,description,price_dzd,stock_quantity,made_to_order,status,seo_title,seo_description,updated_at,category_id&status=eq.published&order=updated_at.desc&limit=1000'),
+  fetchRows('products', 'select=id,name,slug,sku,description,price_dzd,stock_quantity,made_to_order,status,seo_title,seo_description,updated_at,category_id&status=eq.published&order=updated_at.desc&limit=1000'),
   fetchRows('categories', 'select=id,name,slug,description&is_active=eq.true&limit=1000'),
 ])
 let productKeywords = []
@@ -48,7 +48,7 @@ const dist = path.resolve('dist')
 const template = fs.readFileSync(path.join(dist, 'index.html'), 'utf8')
 const esc = (value = '') => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 const jsonLd = (value) => JSON.stringify(value).replace(/</g, '\\u003c')
-function pageHtml({ title, description, keywords = [], canonical, image, schema }) {
+function pageHtml({ title, description, keywords = [], canonical, image, schema, type = 'website' }) {
   let html = template
   html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${esc(title)}</title>`)
   html = html.replace(/<meta\s+name=["']description["'][^>]*>/i, `<meta name="description" content="${esc(description)}" />`)
@@ -58,7 +58,7 @@ function pageHtml({ title, description, keywords = [], canonical, image, schema 
   const extras = [
     `<meta name="keywords" content="${esc(keywords.join(', '))}" />`,
     `<link rel="canonical" href="${esc(canonical)}" />`,
-    '<meta property="og:type" content="website" />',
+    `<meta property="og:type" content="${type}" />`,
     `<meta property="og:title" content="${esc(title)}" />`,
     `<meta property="og:description" content="${esc(description)}" />`,
     `<meta property="og:url" content="${esc(canonical)}" />`,
@@ -83,7 +83,7 @@ fs.writeFileSync(path.join(dist, 'index.html'), pageHtml({
   schema: { '@context': 'https://schema.org', '@type': 'Store', name: "LUNDER'S 3D STUDIO", url: `${siteUrl}/boutique`, description: globalDescription, areaServed: { '@type': 'Country', name: 'Algeria' } },
 }))
 
-const urls = [
+const staticPages = [\n  { path: 'sur-mesure', title: 'Fabrication sur mesure | LUNDER’S 3D STUDIO', description: 'Décrivez votre projet et demandez une fabrication 3D sur mesure en Algérie.' },\n  { path: 'informations', title: 'Informations et politiques | LUNDER’S 3D STUDIO', description: 'Retrouvez les informations, conditions et politiques de LUNDER’S 3D STUDIO.' },\n]\nfor (const page of staticPages) {\n  const filename = path.join(dist, 'boutique', `${page.path}.html`)\n  fs.mkdirSync(path.dirname(filename), { recursive: true })\n  fs.writeFileSync(filename, pageHtml({ title: page.title, description: page.description, canonical: `${siteUrl}/boutique/${page.path}`, schema: { '@context': 'https://schema.org', '@type': 'WebPage', name: page.title, description: page.description, url: `${siteUrl}/boutique/${page.path}` } }))\n}\n\nconst urls = [
   { loc: `${siteUrl}/boutique`, changefreq: 'weekly', priority: '1.0' },
   { loc: `${siteUrl}/boutique/produits`, changefreq: 'daily', priority: '0.9' },
   { loc: `${siteUrl}/boutique/sur-mesure`, changefreq: 'monthly', priority: '0.7' },
@@ -103,12 +103,12 @@ for (const product of products) {
   const title = product.seo_title || `${product.name} | LUNDER'S 3D STUDIO`
   const schema = {
     '@context': 'https://schema.org', '@type': 'Product', name: product.name, description,
-    sku: product.id, url: productUrl, ...(image ? { image: productImages.map((item) => item.image_url) } : {}),
-    offers: { '@type': 'Offer', priceCurrency: 'DZD', price: product.price_dzd, availability: product.made_to_order || product.stock_quantity > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', url: productUrl },
+    sku: product.sku || product.id, url: productUrl, ...(image ? { image: productImages.map((item) => item.image_url) } : {}),
+    offers: { '@type': 'Offer', priceCurrency: 'DZD', price: product.price_dzd, availability: product.made_to_order ? 'https://schema.org/PreOrder' : product.stock_quantity > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', url: productUrl },
   }
   const filename = path.join(dist, 'boutique', 'produits', `${product.slug}.html`)
   fs.mkdirSync(path.dirname(filename), { recursive: true })
-  fs.writeFileSync(filename, pageHtml({ title, description, keywords: productKeywordsById.get(product.id) || [], canonical: productUrl, image, schema }))
+  fs.writeFileSync(filename, pageHtml({ title, description, keywords: productKeywordsById.get(product.id) || [], canonical: productUrl, image, schema, type: 'product' }))
   urls.push({ loc: productUrl, lastmod: product.updated_at, changefreq: 'weekly', priority: '0.8' })
 }
 

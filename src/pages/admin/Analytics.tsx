@@ -20,6 +20,7 @@ type OrderItem = {
 }
 type Order = {
   id: string
+  idempotency_key: string
   order_number: string
   status: string
   source: string
@@ -49,8 +50,10 @@ type ProductCost = {
 }
 type Material = { id: string; cost_per_kg_dzd: number }
 type Wilaya = { code: number; name_fr: string }
+type AttributionRow = { lead_type: 'order' | 'custom_request'; idempotency_key: string; utm_source: string | null; utm_medium: string | null; utm_campaign: string | null; utm_content: string | null; utm_term: string | null; referrer: string | null; landing_path: string | null; created_at: string }
 type AnalyticsData = {
   orders: Order[]
+  attributions: AttributionRow[]
   products: Product[]
   costs: ProductCost[]
   materials: Material[]
@@ -102,7 +105,7 @@ async function loadOrders(): Promise<Order[]> {
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, order_number, status, source, archived_at, customer_name, phone, wilaya_code, wilaya_name, subtotal_dzd, delivery_dzd, total_dzd, created_at, order_items(id, product_id, product_name, quantity, unit_price_dzd, line_total_dzd)')
+      .select('id, idempotency_key, order_number, status, source, archived_at, customer_name, phone, wilaya_code, wilaya_name, subtotal_dzd, delivery_dzd, total_dzd, created_at, order_items(id, product_id, product_name, quantity, unit_price_dzd, line_total_dzd)')
       .order('created_at', { ascending: false })
       .range(from, from + pageSize - 1)
     if (error) throw error
@@ -114,17 +117,19 @@ async function loadOrders(): Promise<Order[]> {
 }
 
 async function loadAnalytics(): Promise<AnalyticsData> {
-  const [orders, productsResult, costsResult, materialsResult, wilayasResult] = await Promise.all([
+  const [orders, productsResult, costsResult, materialsResult, wilayasResult, attributionResult] = await Promise.all([
     loadOrders(),
     supabase.from('products').select('id, name, price_dzd, status, stock_quantity'),
     supabase.from('product_costs').select('product_id, material_id, print_grams, print_hours, machine_hour_rate_dzd, labor_minutes, labor_hour_rate_dzd, packaging_dzd, failure_rate_pct, return_reserve_dzd'),
     supabase.from('materials').select('id, cost_per_kg_dzd'),
     supabase.from('wilayas').select('code, name_fr').eq('is_active', true).order('code'),
+    supabase.from('marketing_attributions').select('lead_type, idempotency_key, utm_source, utm_medium, utm_campaign, utm_content, utm_term, referrer, landing_path, created_at').order('created_at', { ascending: false }),
   ])
-  const failed = [productsResult.error, costsResult.error, materialsResult.error, wilayasResult.error].find(Boolean)
+  const failed = [productsResult.error, costsResult.error, materialsResult.error, wilayasResult.error, attributionResult.error].find(Boolean)
   if (failed) throw failed
   return {
     orders,
+    attributions: (attributionResult.data as AttributionRow[]) ?? [],
     products: (productsResult.data as Product[]) ?? [],
     costs: (costsResult.data as ProductCost[]) ?? [],
     materials: (materialsResult.data as Material[]) ?? [],
@@ -372,6 +377,32 @@ export default function AdminAnalytics() {
       key, count: currentOrders.filter((order) => order.status === key).length,
     }))
 
+    const orderByKey = new Map(currentOrders.map((order) => [order.idempotency_key, order] as const))
+    const campaignMap = new Map<string, { name: string; source: string; medium: string; leads: number; orders: number; delivered: number; revenue: number }>()
+    const currentAttributions = data.attributions.filter((row) => {
+      const date = new Date(row.created_at)
+      return (!start || date >= start) && date <= now
+    })
+    for (const row of currentAttributions) {
+      const source = row.utm_source || row.referrer || 'Direct / non attribué'
+      const name = row.utm_campaign || source
+      const key = [source, row.utm_medium || '', name].join('::')
+      const current = campaignMap.get(key) ?? { name, source, medium: row.utm_medium || '—', leads: 0, orders: 0, delivered: 0, revenue: 0 }
+      current.leads += 1
+      if (row.lead_type === 'order') {
+        const order = orderByKey.get(row.idempotency_key)
+        if (order) {
+          current.orders += 1
+          if (order.status === 'delivered') { current.delivered += 1; current.revenue += Number(order.subtotal_dzd || 0) }
+        }
+      }
+      campaignMap.set(key, current)
+    }
+    const campaigns = [...campaignMap.values()].sort((a, b) => b.revenue - a.revenue || b.leads - a.leads)
+    const attributedOrders = campaigns.reduce((sum, campaign) => sum + campaign.orders, 0)
+    const attributedRevenue = campaigns.reduce((sum, campaign) => sum + campaign.revenue, 0)
+    const customRequestLeads = currentAttributions.filter((row) => row.lead_type === 'custom_request').length
+
     const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 13 : 12
     const buckets = new Map<string, { label: string; value: number; date: Date }>()
     if (period === '7d' || period === '30d') {
@@ -436,6 +467,7 @@ export default function AdminAnalytics() {
 
     return {
       currentOrders, validOrders, delivered, revenue, deliveryRevenue, pipeline, cancelled, storeOrders, customOrders,
+      campaigns, attributedOrders, attributedRevenue, customRequestLeads,
       uniqueCustomers, repeatCustomers, repeatRate, products, mostProfitable, estimatedProfit,
       marginCoverage, wilayas, statusStats, trend, revenueTrend,
       conversion: currentOrders.length ? (delivered.length / currentOrders.length) * 100 : 0,
@@ -567,6 +599,12 @@ export default function AdminAnalytics() {
             {analysis.marginCoverage < 100 && <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-500/15 bg-amber-500/[0.06] p-3 text-xs leading-5 text-amber-100/80"><AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-400" /><span>La marge affichée ne couvre que les articles dont les coûts sont suffisamment renseignés. Les demandes sur mesure et les produits sans fiche de coût ne sont pas comptés dans ce bénéfice estimé.</span></div>}
           </Card>
 
+          <Card>
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Acquisition & marketing</p><h2 className="mt-1 text-lg font-bold text-white">Quelles campagnes apportent des clients ?</h2><p className="mt-1 text-xs text-neutral-500">Attribution première visite · paramètres UTM</p></div><div className="flex gap-4 text-xs"><div><p className="text-neutral-500">Commandes attribuées</p><strong className="text-white">{number(analysis.attributedOrders)}</strong></div><div><p className="text-neutral-500">CA livré attribué</p><strong className="text-emerald-400">{money(analysis.attributedRevenue)}</strong></div><div><p className="text-neutral-500">Demandes sur mesure</p><strong className="text-white">{number(analysis.customRequestLeads)}</strong></div></div></div>
+            {analysis.campaigns.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead><tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-neutral-500"><th className="pb-3 pr-3">Campagne / source</th><th className="pb-3 pr-3">Support</th><th className="pb-3 pr-3">Leads</th><th className="pb-3 pr-3">Commandes</th><th className="pb-3 pr-3">Livrées</th><th className="pb-3">CA livré</th></tr></thead><tbody>{analysis.campaigns.slice(0, 10).map((item, index) => <tr key={item.name + item.source + index} className="border-b border-white/[0.05] last:border-0"><td className="py-3 pr-3"><strong className="text-neutral-200">{item.name}</strong><p className="mt-1 text-[10px] text-neutral-500">{item.source}</p></td><td className="py-3 pr-3 text-neutral-400">{item.medium}</td><td className="py-3 pr-3 text-neutral-300">{number(item.leads)}</td><td className="py-3 pr-3 text-neutral-300">{number(item.orders)}</td><td className="py-3 pr-3 text-neutral-300">{number(item.delivered)}</td><td className="py-3 font-semibold text-emerald-400">{money(item.revenue)}</td></tr>)}</tbody></table></div> : <EmptyState text="Aucune campagne attribuée sur cette période. Ajoutez des paramètres UTM à vos liens publicitaires pour mesurer les résultats." />}
+            <p className="mt-4 text-[10px] leading-5 text-neutral-600">Les ventes sont reliées aux commandes livrées. Les dépenses publicitaires ne sont pas encore saisies : ce tableau ne calcule donc pas le ROI.</p>
+          </Card>
+
           <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
             <Card>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Fidélisation</p><h2 className="mt-1 text-lg font-bold text-white">Vos clients</h2><p className="mt-1 text-xs text-neutral-500">Analyse agrégée, sans afficher les numéros de téléphone</p>
@@ -611,7 +649,7 @@ export default function AdminAnalytics() {
 
           <div className="flex flex-wrap items-start gap-2 rounded-xl border border-white/[0.06] bg-neutral-900/50 p-4 text-[11px] leading-5 text-neutral-500">
             <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" />
-            <p><strong className="text-neutral-300">À propos des chiffres :</strong> le chiffre d'affaires correspond aux sous-totaux des commandes marquées « livrées », hors frais de livraison. Le système actuel ne possède pas de champ de rapprochement des paiements COD : ce montant n'est donc pas présenté comme de l'argent encaissé. La marge est une estimation basée sur les fiches de coûts produits renseignées, sans coûts publicitaires ni frais généraux. Les commandes sur mesure dont le coût réel n'est pas enregistré sont exclues du calcul de marge. Les sources publicitaires (Facebook, Instagram, TikTok, etc.) ne sont pas encore collectées : « Boutique » et « Sur mesure » désignent uniquement le parcours de commande.</p>
+            <p><strong className="text-neutral-300">À propos des chiffres :</strong> le chiffre d'affaires correspond aux sous-totaux des commandes marquées « livrées », hors frais de livraison. Le système actuel ne possède pas de champ de rapprochement des paiements COD : ce montant n'est donc pas présenté comme de l'argent encaissé. La marge est une estimation basée sur les fiches de coûts produits renseignées, sans coûts publicitaires ni frais généraux. Les commandes sur mesure dont le coût réel n'est pas enregistré sont exclues du calcul de marge. Les UTM enregistrent la première source, le support et la campagne de la visite, puis relient cette attribution aux commandes et demandes invitées. Les dépenses publicitaires ne sont pas encore intégrées.</p>
           </div>
         </>
       )}

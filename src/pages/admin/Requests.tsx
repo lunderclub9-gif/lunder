@@ -587,18 +587,7 @@ export default function AdminRequests() {
                                         <span>{formatDzd(line.amountDzd)}</span>
                                       </li>
                                     ))}
-                                    {quote.breakdown.discountPercent ? (
-                                      <li className="flex justify-between gap-2 text-green-400">
-                                        <span>Remise {quote.breakdown.discountPercent} %</span>
-                                        <span>-{formatDzd(quote.breakdown.discountDzd ?? 0)}</span>
-                                      </li>
-                                    ) : null}
-                                    {quote.breakdown.rushFeeDzd ? (
-                                      <li className="flex justify-between gap-2">
-                                        <span>Supplément urgence</span>
-                                        <span>{formatDzd(quote.breakdown.rushFeeDzd)}</span>
-                                      </li>
-                                    ) : null}
+                                    {/* Remise et urgence figurent déjà dans les lignes du devis. */}
                                   </ul>
                                 )}
                                 {quote.terms && (

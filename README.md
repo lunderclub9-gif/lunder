@@ -121,7 +121,7 @@ npm run dev             # http://localhost:5173 (Vite default)
 npm run typecheck       # tsc --noEmit
 npm run lint            # eslint
 npm test                # Vitest unit tests
-npm run build           # production bundle in dist/
+npm run build           # production bundle + SEO HTML, sitemap.xml and robots.txt
 ```
 
 Without the two environment variables the app renders a French "Configuration requise" screen
@@ -132,7 +132,7 @@ instead of failing on a blank page.
 | Variable | Required | Notes |
 |---|---|---|
 | `VITE_SUPABASE_URL` | yes | Project URL, e.g. `https://xxxx.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | yes | Public anon key |
+| `VITE_SUPABASE_ANON_KEY` | yes | Public anon key |\n| `VITE_SITE_URL` | recommended | Public HTTPS origin, e.g. `https://your-domain.example`; used to generate canonical URLs, sitemap.xml and robots.txt |
 
 Both are **public** — they ship to the browser. Never put a `service_role` key, a database password
 or any API secret in `.env`, in `store_settings`, or in client code. On a hosting provider, set
@@ -161,7 +161,7 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
 seed rows use `ON CONFLICT DO NOTHING`.
 
-The geography dataset is the 69-wilaya structure of Loi 26-06 (4 April 2026), sourced from
+The SEO build reads published products, product images, active categories and public SEO settings through the Supabase anon key. Set `VITE_SITE_URL` (or the public `seo_site_url` setting) so the build can emit canonical URLs, per-product/per-category HTML metadata, Product/CollectionPage JSON-LD, `sitemap.xml` and `robots.txt`. If the URL is missing, the app build still succeeds but the static SEO output is skipped. Apply migrations 014 and 015 before using product/category SEO keyword fields in the admin.\n\nThe geography dataset is the 69-wilaya structure of Loi 26-06 (4 April 2026), sourced from
 `el-amin-dev/algeria-wilayas-communes` and retrieved 12 Nov 2026. Wilayas 59–69 are legally in force
 but administered by their mother wilayas until 31 Dec 2026; each can be disabled in Admin → Livraison.
 

@@ -6,6 +6,7 @@ import {
   Wallet, AlertTriangle, Boxes, Truck,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import '@/styles/analytics.css'
 import { formatDzd } from '@/lib/format'
 
 type Period = '7d' | '30d' | '90d' | '365d' | 'all'

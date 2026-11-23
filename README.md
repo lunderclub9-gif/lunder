@@ -36,7 +36,7 @@ Every write that carries money, stock, privacy or status is only reachable throu
 | `create_guest_order(payload)` | `SECURITY DEFINER` | anon | Re-reads every price and total from tables, locks product rows `FOR UPDATE`, validates commune↔wilaya and an active delivery rate, reserves stock once, one order per idempotency key (advisory lock + unique key) |
 | `estimate_manufacturing_dimensions(l, w, h, material, qty, options, rush)` | `SECURITY DEFINER` | anon | Derives estimated grams and print hours from the bounding-box volume, the configured fill ratio and material density, then runs the same pricing engine and returns a customer-safe breakdown |
 | `decide_custom_quote(token, decision)` | `SECURITY DEFINER` | anon | Accepts or refuses a sent quote; customer acceptance never creates an order |
-| `create_custom_request(payload)` | `SECURITY DEFINER` | anon | Validates phone, dimensions, delivery and acceptance, computes the estimate server-side, verifies each uploaded path really exists in the private bucket before recording it |
+| `create_custom_request(payload)` | `SECURITY DEFINER` | anon | Validates contact and delivery details; dimensions, material, files and estimate acceptance are optional; computes an estimate server-side when enough inputs exist and verifies each uploaded path before recording it |
 | `create_custom_quote(...)` | `SECURITY DEFINER` | owner | Computes the next version server-side and expires the previous `sent` quote, so only one version is ever approvable |
 | `create_custom_quote_from_estimate(request)` | `SECURITY DEFINER` | owner | Issues the next quote version directly from the stored automatic estimate, keeping the immutable snapshot |
 | `owner_approve_custom_request(quote, note)` | `SECURITY DEFINER` | owner | The only path from a valid `sent` or `accepted` quote to an order: locks quote and request, re-quotes delivery, creates exactly one order derived from the quote id, and is idempotent |
@@ -161,6 +161,10 @@ Later files depend on `public.is_owner()` and on the tables created earlier.
 | `20261114224500_013_owner_notifications.sql` | owner notification counters and notification RPC | 012 |
 | `20261122120000_014_product_seo_keywords.sql` | product SEO keyword array | 001 |
 | `20261122123000_015_category_seo_metadata.sql` | category SEO title, description and keyword fields | 001 |
+| `20261122124000_016_flexible_custom_requests.sql` | allows manual custom requests without dimensions, material or an accepted estimate | 012 |
+| `20261122130000_017_order_level_manufacturing_pricing.sql` | applies setup fees and minimum order adjustment once per order | 008 |
+| `20261123100000_018_marketing_attribution.sql` | stores privacy-minimal first-touch UTM attribution for guest orders and custom requests; owner-only read and validated RPC write | 005, 016 |
+| `20261123110000_019_marketing_campaign_spend.sql` | owner-only daily campaign spend records with RLS and DZD amount validation | 002, 018 |
 
 Every file is safe to re-run: tables use `IF NOT EXISTS`, policies are dropped before creation, and
 seed rows use `ON CONFLICT DO NOTHING`.
@@ -170,6 +174,12 @@ The SEO build reads published products, product images, active categories and pu
 The geography dataset is the 69-wilaya structure of Loi 26-06 (4 April 2026), sourced from
 `el-amin-dev/algeria-wilayas-communes` and retrieved 12 Nov 2026. Wilayas 59–69 are legally in force
 but administered by their mother wilayas until 31 Dec 2026; each can be disabled in Admin → Livraison.
+
+
+
+### Marketing attribution (018)
+
+Store and custom-request forms capture first-touch `utm_source`, `utm_medium`, `utm_campaign`, `utm_content` and `utm_term` values from the landing URL. Values are kept in the browser tab session and submitted only after a guest order/request succeeds. Attribution is linked by the existing idempotency key; no customer name, phone, email, payment detail or cookie is added. Referrer is reduced to its hostname. The owner-only Analytics page reports attributed leads, orders and delivered revenue. Add UTM parameters to campaign links, for example `?utm_source=facebook&utm_medium=paid_social&utm_campaign=summer_launch`. In the same page, record daily ad spend using the exact same source, medium and campaign values; the dashboard calculates ROAS as attributed delivered revenue divided by recorded spend. ROAS is not net profit and excludes unrecorded fees, refunds and overhead. Apply migrations 018 and 019 before using campaign attribution and spend reporting; neither is applied automatically.
 
 ## First owner account
 
@@ -225,22 +235,24 @@ Open `/admin` manually — it is not linked from the storefront and must not be 
 | "Stock insuffisant" | quantity exceeds available stock (counted on variant, else product) |
 | "Trop de tentatives" | more than 8 tracking lookups for one order in 15 minutes |
 | "Devis expiré" | quote passed `valid_until`; issue a new version |
-| `DIMENSIONS_INVALIDES` | one of the three dimensions is missing, non-positive or above 2000 mm |
+| `DIMENSIONS_INCOMPLETES` | only one or two dimensions were supplied; provide all three or none for a manual quote |
+| `DIMENSIONS_INVALIDES` | one of the three dimensions is non-positive or above 2000 mm |
+| `MATIERE_REQUISE` | all dimensions were supplied without a material choice |
 | `ESTIMATION_INDISPONIBLE` | the customer accepted but no server-side estimate could be computed |
 | `LIVRAISON_REQUISE` | owner approval attempted on a request without complete delivery information |
 | `COMMANDE_NON_LIVREE` | hard delete attempted on an order that is not `delivered` |
 
-## Workflow fabrication sur mesure (011)
+## Workflow fabrication sur mesure (011–016)
 
-1. Le client saisit le projet, les trois dimensions en millimètres, la quantité, la matière, la
-   couleur et les options. Il ne saisit jamais de poids ni d'heures d'impression.
-2. `estimate_manufacturing_dimensions` calcule un poids et un temps à partir du volume de la boîte
-   englobante, du taux de remplissage (`effective_volume_percent`), de la densité de la matière
-   (`density_g_cm3`) et de la vitesse d'impression (`print_speed_g_per_hour`). Le résultat est
-   explicitement présenté comme une estimation non vérifiée, pas comme un devis ferme.
-3. Le client accepte l'estimation. Le formulaire de coordonnées et de livraison apparaît alors
-   seulement, et `create_custom_request` n'enregistre la demande qu'avec cette acceptation, les
-   coordonnées et la livraison complètes. Aucune commande n'est créée à cette étape.
+1. Le client décrit son projet et peut joindre une photo ou un fichier de référence. Les dimensions,
+   la matière et les options techniques sont facultatives ; le client ne saisit jamais de poids ni
+   d'heures d'impression.
+2. Si les trois dimensions et une matière sont connues, `estimate_manufacturing_dimensions`
+   calcule un poids et un temps indicatifs. Cette estimation n'est pas un devis ferme et son
+   acceptation reste facultative pour une demande manuelle.
+3. Le formulaire de coordonnées et de livraison permet d'envoyer la demande sans compte client.
+   `create_custom_request` enregistre les informations validées ; aucune commande n'est créée à
+   cette étape.
 4. Le propriétaire voit la demande complète, les fichiers, les dimensions, l'estimation et son
    détail interne, l'acceptation éventuelle du client et l'historique des devis. Il peut créer un
    devis depuis l'estimation, saisir un devis manuel ou un devis technique, puis l'envoyer.
@@ -268,16 +280,17 @@ pas supprimables par cette action.
   without separate approval.
 - **Automated coverage is partial.** `npm test` runs the Vitest unit suite; it does not exercise RLS,
   Postgres RPC transactions, Storage permissions, end-to-end customer flows or mobile layouts.
-- **Admin notifications remain incomplete.** The dashboard now uses real counters through an owner-only
-  RPC, but there is no durable read/unread notification center or event-driven notification delivery.
+- **Owner notifications:** the in-app notification center supports read/unread state and realtime with
+  a polling fallback. It does not send email or SMS notifications.
 - **Storage deletion race is not fully closed.** The final RPC checks that the known request objects are
   absent, but anonymous bucket inserts are not serialized against that check. Do not deploy request
   deletion until uploads are bound to server-issued sessions or an equivalent reconciliation/cleanup
   mechanism prevents a concurrent re-upload from becoming orphaned.
 - **Production stage is not tracked separately.** Orders support pending/confirmed/shipped/delivered;
   there is no distinct manufacturing-in-progress status, so the dashboard does not invent one.
-- **No transactional email or SMS.** No order confirmation, quote notification or password reset is
-  sent; guests must keep their tracking link. Password recovery is therefore hidden.
+- **No transactional email or SMS.** No order confirmation or quote notification is sent; guests
+  should keep their order/request reference and tracking link. There is no customer-account or
+  customer-sign-in feature by design.
 - **Uploads:** the private custom-request bucket accepts anonymous inserts (guests must upload without
   an account). Storage caps individual size and declared MIME, but there is no quota/rate limit or
   server-side geometry parser; abandoned/partially uploaded files require cleanup.
@@ -307,6 +320,13 @@ Ordre d'exécution complet, du plus ancien au plus récent :
 10. `20261113160000_010_pricing_security_and_public_estimate.sql`
 11. `20261113170000_011_custom_workflow_and_delivered_deletion.sql`
 12. `20261113180000_012_owner_approval_and_safe_request_deletion.sql`
+13. `20261114224500_013_owner_notifications.sql`
+14. `20261122120000_014_product_seo_keywords.sql`
+15. `20261122123000_015_category_seo_metadata.sql`
+16. `20261122124000_016_flexible_custom_requests.sql`
+17. `20261122130000_017_order_level_manufacturing_pricing.sql`
+18. `20261123100000_018_marketing_attribution.sql` (facultative si le suivi marketing n'est pas utilisé)
+19. `20261123110000_019_marketing_campaign_spend.sql` (facultative si le suivi des dépenses n'est pas utilisé)
 
 Après application, renseigner au moins une matière et les tarifs : la ligne
 unique de `manufacturing_pricing` est initialisée à zéro, un devis rendrait donc
@@ -324,3 +344,20 @@ sans prix au gramme, tarif horaire ni marge. La ventilation renvoyée au client
 par `get_custom_request_by_token` est également assainie par
 `customer_quote_breakdown` : les postes internes sont regroupés et la marge
 n'est jamais exposée.
+
+## Owner analytics and business intelligence
+
+The owner-only analytics workspace is available at `/admin/analytics` from the admin sidebar (`Analytics & Growth`), which opens it in a separate browser tab. The standalone route remains protected by the owner guard. Core reporting reads the existing owner-protected order, order-item, product, product-cost, material and active-wilaya data. Optional campaign attribution and ad-spend reporting use migrations 018 and 019; if those tables are not yet installed, the core analytics page remains usable and displays an activation notice. The cinematic intro is shown once per tab session and respects reduced-motion preferences.
+
+### Metric definitions and limitations
+
+- Delivered revenue is the sum of `orders.subtotal_dzd` for non-archived orders with status `delivered`; delivery charges are reported separately.
+- Open pipeline is the subtotal of non-cancelled orders not yet marked delivered.
+- Product gross-margin estimates use the configured product-cost sheet: material, machine, labour, failure allowance, packaging and return reserve. A product without a complete material cost reference is excluded from the estimated profit total and counted as missing coverage.
+- Custom-made order margin is not estimated because the current order snapshot does not preserve enough internal production-cost data to calculate it reliably.
+- COD delivery status is not a cash-reconciliation record. The analytics workspace does not label delivered order value as confirmed cash collected.
+- Current order source values identify the checkout path (`store` or `custom`), not advertising attribution. When migrations 018 and 019 are installed, first-touch UTM attribution is linked to guest orders and custom requests, and daily ad spend can be entered manually. ROAS compares attributed delivered revenue with recorded campaign spend; it is not net profit or customer acquisition cost.
+- Wilaya ranking uses the active rows in the geography table rather than a hard-coded number of wilayas.
+- The CSV export contains the visible period's wilaya and product summaries. Customer phone numbers are never exported or displayed.
+
+The charts are client-rendered SVG/CSS and respect the user's reduced-motion preference. The standalone workspace and collapsible detail sections are responsive and do not add a charting dependency.

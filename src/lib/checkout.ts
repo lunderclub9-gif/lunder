@@ -70,6 +70,8 @@ const RPC_MESSAGES: Record<string, string> = {
   COMMANDE_LIEE_INTROUVABLE: 'La commande liée au devis est introuvable. Vérification manuelle nécessaire.',
   TARIF_LIVRAISON_INVALIDE: 'Le tarif de livraison n’est pas valide pour cette destination.',
   DIMENSIONS_INVALIDES: 'Les trois dimensions doivent être renseignées et positives.',
+  DIMENSIONS_INCOMPLETES: 'Renseignez les trois dimensions ou laissez-les toutes vides pour un devis manuel.',
+  MATIERE_REQUISE: 'Choisissez une matière pour calculer une estimation avec ces dimensions.',
   ESTIMATION_INDISPONIBLE: 'Aucune estimation automatique n’est disponible pour cette demande.',
   DEVIS_REQUIS: 'Un devis doit être émis avant l’approbation par le propriétaire.',
   DEMANDE_NON_APPROUVABLE: 'Cette demande ne peut pas être approuvée dans son état actuel.',

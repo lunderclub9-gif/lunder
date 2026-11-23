@@ -4,6 +4,7 @@ import { AlertCircle, Loader2, ShoppingBag, Truck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCart } from '@/lib/cart'
 import { formatDzd } from '@/lib/format'
+import { getMarketingAttribution } from '@/lib/marketingAttribution'
 import {
   DELIVERY_METHOD_LABELS,
   normalizeAlgerianPhone,
@@ -59,11 +60,12 @@ export default function CheckoutPage() {
   }, [])
 
   useEffect(() => {
+    let active = true
     setCommunes([])
     setCommuneId('')
     setPickupPoints([])
     setPickupId('')
-    if (!wilayaCode) return
+    if (!wilayaCode) return () => { active = false }
 
     supabase
       .from('communes')
@@ -71,7 +73,9 @@ export default function CheckoutPage() {
       .eq('wilaya_code', Number(wilayaCode))
       .eq('is_active', true)
       .order('name_fr')
-      .then(({ data }) => setCommunes((data as Commune[]) ?? []))
+      .then(({ data }) => {
+        if (active) setCommunes((data as Commune[]) ?? [])
+      })
 
     supabase
       .from('pickup_points')
@@ -79,7 +83,10 @@ export default function CheckoutPage() {
       .eq('wilaya_code', Number(wilayaCode))
       .eq('is_active', true)
       .order('name')
-      .then(({ data }) => setPickupPoints((data as PickupPoint[]) ?? []))
+      .then(({ data }) => {
+        if (active) setPickupPoints((data as PickupPoint[]) ?? [])
+      })
+    return () => { active = false }
   }, [wilayaCode])
 
   // Devis de livraison : la seule source de prix autorisée.
@@ -89,7 +96,7 @@ export default function CheckoutPage() {
     if (!wilayaCode || !communeId || items.length === 0) return
 
     let cancelled = false
-    supabase
+    Promise.resolve(supabase
       .rpc('quote_delivery', {
         p_wilaya_code: Number(wilayaCode),
         p_commune_id: communeId,
@@ -108,6 +115,11 @@ export default function CheckoutPage() {
           return
         }
         setQuote(row)
+      }))
+      .catch(() => {
+        if (cancelled) return
+        setQuote(null)
+        setQuoteError('Connexion interrompue : impossible de calculer les frais de livraison. Vérifiez votre connexion et réessayez.')
       })
 
     return () => {
@@ -160,40 +172,55 @@ export default function CheckoutPage() {
     }
 
     setSubmitting(true)
-    const { data, error: rpcError } = await supabase.rpc('create_guest_order', {
-      p_payload: {
-        idempotency_key: idempotencyKey.current,
-        customer_name: name.trim(),
-        phone: normalizedPhone,
-        email: email.trim() || null,
-        wilaya_code: Number(wilayaCode),
-        commune_id: communeId,
-        delivery_method: method,
-        address: method === 'domicile' ? address.trim() : null,
-        pickup_point_id: method === 'stopdesk' ? pickupId : null,
-        note: note.trim() || null,
-        items: items.map((line) => ({
-          product_id: line.productId,
-          variant_id: line.variantId,
-          quantity: line.quantity,
-        })),
-      },
-    })
+    try {
+      const { data, error: rpcError } = await supabase.rpc('create_guest_order', {
+        p_payload: {
+          idempotency_key: idempotencyKey.current,
+          customer_name: name.trim(),
+          phone: normalizedPhone,
+          email: email.trim() || null,
+          wilaya_code: Number(wilayaCode),
+          commune_id: communeId,
+          delivery_method: method,
+          address: method === 'domicile' ? address.trim() : null,
+          pickup_point_id: method === 'stopdesk' ? pickupId : null,
+          note: note.trim() || null,
+          items: items.map((line) => ({
+            product_id: line.productId,
+            variant_id: line.variantId,
+            quantity: line.quantity,
+          })),
+        },
+      })
 
-    if (rpcError) {
-      setSubmitting(false)
-      setError(
-        orderErrorMessage(
+      if (rpcError) {
+        setError(orderErrorMessage(
           rpcError.message,
           "La commande n'a pas pu être enregistrée. Vérifiez vos informations et réessayez."
-        )
-      )
-      return
-    }
+        ))
+        return
+      }
 
-    const created = data as CreatedOrder
-    clear()
-    navigate(`/boutique/commande/confirmation?token=${created.tracking_token}`)
+      const created = data as CreatedOrder | null
+      if (!created?.tracking_token) {
+        setError("La réponse du serveur est incomplète. Vérifiez le suivi avant de réessayer pour éviter une commande en double.")
+        return
+      }
+
+      try {
+        await supabase.rpc('record_marketing_attribution', {
+          p_payload: { ...getMarketingAttribution(), lead_type: 'order', idempotency_key: idempotencyKey.current },
+        })
+      } catch {
+        // Attribution is best-effort and must never block a valid COD order.
+      }
+      clear()
+      navigate(`/boutique/commande/confirmation?token=${encodeURIComponent(created.tracking_token)}`)
+    } catch {
+      setError("Connexion interrompue : la commande n'a pas pu être confirmée. Vérifiez votre suivi avant de réessayer.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (

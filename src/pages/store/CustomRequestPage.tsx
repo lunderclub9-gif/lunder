@@ -7,6 +7,7 @@ import { validateCustomFile } from '@/lib/media'
 import { DELIVERY_METHOD_LABELS, normalizeAlgerianPhone, orderErrorMessage } from '@/lib/checkout'
 import { formatDzd } from '@/lib/format'
 import { downloadTicketImage } from '@/lib/ticketImage'
+import { getMarketingAttribution } from '@/lib/marketingAttribution'
 
 type UploadedFile = { path: string; name: string; mime: string; size: number; kind: 'image' | 'model' }
 type CreatedRequest = { request_number: string; tracking_token: string }
@@ -74,7 +75,12 @@ export default function CustomRequestPage() {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`
   )
   const uploadLock = useRef(false)
-  const idempotencyKey = useRef<string>(crypto.randomUUID())
+  const estimateRequestId = useRef(0)
+  const idempotencyKey = useRef<string>(
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  )
 
   useEffect(() => {
     let active = true
@@ -89,7 +95,6 @@ export default function CustomRequestPage() {
           colors: (m.colors as string[]) ?? [],
         }))
         setMaterials(mats)
-        if (mats.length > 0) setMaterial((current) => current || mats[0].name)
       })
     supabase
       .from('wilayas')
@@ -105,26 +110,36 @@ export default function CustomRequestPage() {
   }, [])
 
   useEffect(() => {
+    let active = true
+    setCommunes([])
     setCommuneId('')
     setPickupPoints([])
     setPickupId('')
-    if (!wilayaCode) return
+    if (!wilayaCode) return () => { active = false }
+
     supabase
       .from('communes')
       .select('id, name_fr')
       .eq('wilaya_code', Number(wilayaCode))
       .eq('is_active', true)
       .order('name_fr')
-      .then(({ data }) => setCommunes((data as Commune[]) ?? []))
+      .then(({ data }) => {
+        if (active) setCommunes((data as Commune[]) ?? [])
+      })
     supabase
       .from('pickup_points')
       .select('id, name, address')
       .eq('wilaya_code', Number(wilayaCode))
       .eq('is_active', true)
-      .then(({ data }) => setPickupPoints((data as PickupPoint[]) ?? []))
+      .order('name')
+      .then(({ data }) => {
+        if (active) setPickupPoints((data as PickupPoint[]) ?? [])
+      })
+    return () => { active = false }
   }, [wilayaCode])
 
   const runEstimate = useCallback(async () => {
+    const requestId = ++estimateRequestId.current
     const l = Number(lengthMm)
     const w = Number(widthMm)
     const h = Number(heightMm)
@@ -132,43 +147,55 @@ export default function CustomRequestPage() {
     if (!material || !Number.isFinite(l) || l <= 0 || !Number.isFinite(w) || w <= 0 || !Number.isFinite(h) || h <= 0) {
       setEstimate(null)
       setEstimateError(null)
+      setEstimateLoading(false)
       return
     }
     setEstimateLoading(true)
     setEstimateError(null)
-    const { data, error: rpcError } = await supabase.rpc('estimate_manufacturing_dimensions', {
-      p_length_mm: l,
-      p_width_mm: w,
-      p_height_mm: h,
-      p_material_name: material,
-      p_quantity: qty,
-      p_options: options,
-      p_rush: rush,
-    })
-    setEstimateLoading(false)
-    if (rpcError || !data) {
+    try {
+      const { data, error: rpcError } = await supabase.rpc('estimate_manufacturing_dimensions', {
+        p_length_mm: l,
+        p_width_mm: w,
+        p_height_mm: h,
+        p_material_name: material,
+        p_quantity: qty,
+        p_options: options,
+        p_rush: rush,
+      })
+      if (requestId !== estimateRequestId.current) return
+      if (rpcError || !data) {
+        setEstimate(null)
+        setEstimateError(orderErrorMessage(rpcError?.message, 'Estimation impossible pour ces dimensions.'))
+        return
+      }
+      const d = data as Record<string, unknown>
+      setEstimate({
+        lines: (d.lines as Estimate['lines']) ?? [],
+        totalDzd: Number(d.totalDzd ?? 0),
+        quantity: Number(d.quantity ?? qty),
+        discountPercent: Number(d.discountPercent ?? 0),
+        discountDzd: Number(d.discountDzd ?? 0),
+        rushFeeDzd: Number(d.rushFeeDzd ?? 0),
+        assumptions: (d.assumptions as string[]) ?? [],
+        estimates: d.estimates as Estimate['estimates'],
+      })
+    } catch {
+      if (requestId !== estimateRequestId.current) return
       setEstimate(null)
-      setEstimateError(orderErrorMessage(rpcError?.message, 'Estimation impossible pour ces dimensions.'))
-      return
+      setEstimateError('Connexion impossible pendant le calcul. Vous pouvez réessayer ou envoyer une demande de devis manuel.')
+    } finally {
+      if (requestId === estimateRequestId.current) setEstimateLoading(false)
     }
-    const d = data as Record<string, unknown>
-    setEstimate({
-      lines: (d.lines as Estimate['lines']) ?? [],
-      totalDzd: Number(d.totalDzd ?? 0),
-      quantity: Number(d.quantity ?? qty),
-      discountPercent: Number(d.discountPercent ?? 0),
-      discountDzd: Number(d.discountDzd ?? 0),
-      rushFeeDzd: Number(d.rushFeeDzd ?? 0),
-      assumptions: (d.assumptions as string[]) ?? [],
-      estimates: d.estimates as Estimate['estimates'],
-    })
   }, [lengthMm, widthMm, heightMm, material, quantity, options, rush])
 
   useEffect(() => {
     const timer = setTimeout(() => {
       void runEstimate()
     }, 450)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      estimateRequestId.current += 1
+    }
   }, [runEstimate])
 
   // Toute modification des paramètres invalide l'acceptation précédente : le
@@ -225,12 +252,16 @@ export default function CustomRequestPage() {
   const removeFile = async (path: string) => {
     if (uploadLock.current) return
     setError(null)
-    const { error: removeError } = await supabase.storage.from('custom-requests').remove([path])
-    if (removeError) {
-      setError('Impossible de supprimer ce fichier du stockage privé. Réessayez avant d’envoyer la demande.')
-      return
+    try {
+      const { error: removeError } = await supabase.storage.from('custom-requests').remove([path])
+      if (removeError) {
+        setError('Impossible de supprimer ce fichier du stockage privé. Réessayez avant d’envoyer la demande.')
+        return
+      }
+      setFiles((current) => current.filter((file) => file.path !== path))
+    } catch {
+      setError('Connexion interrompue : le fichier n’a pas pu être supprimé. Réessayez.')
     }
-    setFiles((current) => current.filter((file) => file.path !== path))
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -287,54 +318,71 @@ export default function CustomRequestPage() {
     }
 
     setSubmitting(true)
-    const { data, error: rpcError } = await supabase.rpc('create_custom_request', {
-      p_payload: {
-        idempotency_key: idempotencyKey.current,
-        customer_name: name.trim(),
-        phone: normalized,
-        email: email.trim() || null,
-        title: title.trim(),
-        description: description.trim(),
-        intended_use: intendedUse.trim() || null,
-        dimensions: hasAllDimensions ? `${lengthMm} x ${widthMm} x ${heightMm}` : null,
-        dimension_unit: 'mm',
-        dim_length_mm: hasAllDimensions ? Number(lengthMm) : null,
-        dim_width_mm: hasAllDimensions ? Number(widthMm) : null,
-        dim_height_mm: hasAllDimensions ? Number(heightMm) : null,
-        material_preference: material || null,
-        color_preference: color.trim() || null,
-        quantity: Number(quantity) || 1,
-        manufacturing_options: options,
-        rush,
-        estimate_accepted: Boolean(estimate && estimateAccepted),
-        delivery: {
-          wilaya_code: Number(wilayaCode),
-          commune_id: communeId,
-          method,
-          address: method === 'domicile' ? address.trim() : null,
-          pickup_point_id: method === 'stopdesk' ? pickupId : null,
+    try {
+      const { data, error: rpcError } = await supabase.rpc('create_custom_request', {
+        p_payload: {
+          idempotency_key: idempotencyKey.current,
+          customer_name: name.trim(),
+          phone: normalized,
+          email: email.trim() || null,
+          title: title.trim(),
+          description: description.trim(),
+          intended_use: intendedUse.trim() || null,
+          dimensions: hasAllDimensions ? [lengthMm, widthMm, heightMm].join(' x ') : null,
+          dimension_unit: 'mm',
+          dim_length_mm: hasAllDimensions ? Number(lengthMm) : null,
+          dim_width_mm: hasAllDimensions ? Number(widthMm) : null,
+          dim_height_mm: hasAllDimensions ? Number(heightMm) : null,
+          material_preference: material || null,
+          color_preference: color.trim() || null,
+          quantity: Number(quantity) || 1,
+          manufacturing_options: options,
+          rush,
+          estimate_accepted: Boolean(estimate && estimateAccepted),
+          delivery: {
+            wilaya_code: Number(wilayaCode),
+            commune_id: communeId,
+            method,
+            address: method === 'domicile' ? address.trim() : null,
+            pickup_point_id: method === 'stopdesk' ? pickupId : null,
+          },
+          files: files.map((file) => ({
+            path: file.path,
+            name: file.name,
+            mime: file.mime,
+            size: file.size,
+            kind: file.kind,
+          })),
         },
-        files: files.map((file) => ({
-          path: file.path,
-          name: file.name,
-          mime: file.mime,
-          size: file.size,
-          kind: file.kind,
-        })),
-      },
-    })
-    setSubmitting(false)
+      })
 
-    if (rpcError) {
-      setError(
-        orderErrorMessage(
-          rpcError.message,
-          "La demande n'a pas pu être enregistrée. Vérifiez vos informations."
+      if (rpcError) {
+        setError(
+          orderErrorMessage(
+            rpcError.message,
+            "La demande n'a pas pu être enregistrée. Vérifiez vos informations."
+          )
         )
-      )
-      return
+        return
+      }
+      try {
+        await supabase.rpc('record_marketing_attribution', {
+          p_payload: { ...getMarketingAttribution(), lead_type: 'custom_request', idempotency_key: idempotencyKey.current },
+        })
+      } catch {
+        // Attribution is best-effort and must never block a valid guest request.
+      }
+      const result = data as CreatedRequest | null
+      if (!result?.request_number || !result?.tracking_token) {
+        setError("La réponse du serveur est incomplète. Contactez le studio avant de renvoyer la demande afin d'éviter un doublon.")
+        return
+      }
+      setCreated(result)
+    } catch {
+      setError("Connexion interrompue : la demande n'a pas pu être confirmée. Réessayez ; la clé d'idempotence évite les doublons.")
+    } finally {
+      setSubmitting(false)
     }
-    setCreated(data as CreatedRequest)
   }
 
   useEffect(() => {
@@ -401,6 +449,7 @@ export default function CustomRequestPage() {
               <input
                 type="text"
                 required
+                minLength={3}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 className="input-field"
@@ -445,9 +494,9 @@ export default function CustomRequestPage() {
           <div className="grid gap-4 sm:grid-cols-3">
             {(
               [
-                ['Longueur (mm) *', lengthMm, setLengthMm],
-                ['Largeur (mm) *', widthMm, setWidthMm],
-                ['Hauteur (mm) *', heightMm, setHeightMm],
+                ['Longueur (mm)', lengthMm, setLengthMm],
+                ['Largeur (mm)', widthMm, setWidthMm],
+                ['Hauteur (mm)', heightMm, setHeightMm],
               ] as const
             ).map(([label, value, setter]) => (
               <label key={label} className="block">
@@ -669,8 +718,13 @@ export default function CustomRequestPage() {
           )}
         </div>
 
-        {estimateAccepted && (
+        {(!estimate || estimateAccepted) && (
           <>
+            {!estimate && (
+              <div className="rounded-xl border border-brand-red/20 bg-brand-red/5 px-4 py-3 text-sm leading-6 text-charcoal-300">
+                Vous pouvez envoyer votre demande sans estimation automatique. Le studio étudiera votre description et vos références, puis vous proposera un devis adapté.
+              </div>
+            )}
             <div className="admin-card">
               <h2 className="mb-4 text-lg font-semibold text-offwhite">Vos coordonnées</h2>
               <div className="grid gap-4 sm:grid-cols-2">

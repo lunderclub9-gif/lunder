@@ -1,14 +1,85 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Printer, ArrowRight, Package, AlertTriangle, RefreshCw } from 'lucide-react'
-import { supabase, type Product } from '@/lib/supabase'
+import {
+  ArrowRight,
+  Box,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  Layers3,
+  Lightbulb,
+  Package,
+  Printer,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Truck,
+  Wrench,
+  AlertTriangle,
+} from 'lucide-react'
+import { supabase, type Category, type Product } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
+import { formatDzd } from '@/lib/format'
+import { setPageSeo } from '@/lib/seo'
+
+const steps = [
+  {
+    number: '01',
+    icon: Lightbulb,
+    title: 'Partagez votre idée',
+    description: 'Choisissez un produit du catalogue ou décrivez votre projet personnalisé, même avec une simple photo.',
+  },
+  {
+    number: '02',
+    icon: Wrench,
+    title: 'Nous préparons votre projet',
+    description: 'Le studio vérifie les détails, la faisabilité, la matière et le prix avant de lancer la fabrication.',
+  },
+  {
+    number: '03',
+    icon: Package,
+    title: 'Recevez votre création',
+    description: 'Suivez votre commande et choisissez la livraison disponible pour votre destination.',
+  },
+]
+
+const benefits = [
+  { icon: Layers3, title: 'Des créations variées', description: 'Des pièces pratiques, décoratives et des petites séries.' },
+  { icon: Wrench, title: 'Du sur-mesure', description: 'Une demande adaptée à votre besoin, même si vous ne connaissez pas les détails techniques.' },
+  { icon: ShieldCheck, title: 'Un prix expliqué', description: 'Les options et les frais sont présentés avant la validation de votre commande.' },
+  { icon: Truck, title: 'Livraison organisée', description: 'Les modes et tarifs disponibles sont proposés selon votre wilaya et votre commune.' },
+]
+
+const questions = [
+  {
+    question: 'Dois-je créer un compte pour commander ?',
+    answer: 'Non. Vous pouvez commander en tant que client invité. Gardez simplement votre numéro de commande et le téléphone utilisé pour la retrouver.',
+  },
+  {
+    question: 'Puis-je demander une pièce sans connaître ses dimensions ?',
+    answer: 'Oui. Décrivez votre idée et ajoutez une photo ou un fichier si vous en avez un. Le studio étudiera votre demande et préparera un devis manuel.',
+  },
+  {
+    question: 'Le prix affiché est-il définitif pour une demande sur mesure ?',
+    answer: 'Une estimation automatique est indicative. Le studio vérifie la faisabilité et vous transmet un devis avant toute fabrication.',
+  },
+  {
+    question: 'Comment suivre ma commande ?',
+    answer: 'Ouvrez la page « Suivre ma commande » et saisissez la référence de commande ainsi que le numéro de téléphone utilisé lors de l’achat.',
+  },
+  {
+    question: 'Quels sont les moyens de paiement ?',
+    answer: 'Le paiement à la livraison est proposé. Les modes et frais de livraison sont affichés pendant la commande selon la destination.',
+  },
+]
 
 export default function HomePage() {
   const [featured, setFeatured] = useState<Product[]>([])
   const [recent, setRecent] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  const [heroIndex, setHeroIndex] = useState(0)
 
   const loadProducts = useCallback(async () => {
     setLoading(true)
@@ -29,132 +100,291 @@ export default function HomePage() {
       .order('created_at', { ascending: false })
       .limit(8)
 
-    const [featuredResult, recentResult] = await Promise.all([featuredQuery, recentQuery])
+    const categoryQuery = supabase
+      .from('categories')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order')
+      .limit(6)
 
-    // Une erreur réseau ou RLS ne doit jamais ressembler à un catalogue vide.
-    if (featuredResult.error || recentResult.error) {
+    const [featuredResult, recentResult, categoryResult] = await Promise.all([
+      featuredQuery,
+      recentQuery,
+      categoryQuery,
+    ])
+
+    if (recentResult.error) {
       console.error('[LUNDER] chargement du catalogue impossible')
       setFeatured([])
       setRecent([])
+      setCategories([])
       setFailed(true)
       setLoading(false)
       return
     }
 
-    setFeatured((featuredResult.data as Product[]) ?? [])
+    setFeatured(featuredResult.error ? [] : (featuredResult.data as Product[]) ?? [])
     setRecent((recentResult.data as Product[]) ?? [])
+    setCategories(categoryResult.error ? [] : (categoryResult.data as Category[]) ?? [])
     setLoading(false)
   }, [])
 
   useEffect(() => {
     void loadProducts()
+    setPageSeo({
+      title: 'LUNDER’S 3D STUDIO | Impression 3D et créations sur mesure',
+      description: 'Découvrez les créations LUNDER, commandez en ligne ou partagez votre idée pour une fabrication 3D sur mesure en Algérie.',
+      canonicalUrl: `${window.location.origin}/boutique`,
+    })
   }, [loadProducts])
 
-  const primaryImage = (p: Product) => p.product_images?.find((img) => img.is_primary)?.image_url ?? p.product_images?.[0]?.image_url
+  const primaryImage = (product: Product) =>
+    product.product_images?.find((image) => image.is_primary)?.image_url ??
+    product.product_images?.[0]?.image_url
+
+  const heroSlides = (featured.length ? featured : recent).slice(0, 5)
+  const heroProduct = heroSlides[heroIndex] ?? recent[0]
+  const heroImage = heroProduct ? primaryImage(heroProduct) : undefined
+
+  useEffect(() => {
+    if (heroSlides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const timer = window.setInterval(() => setHeroIndex((current) => (current + 1) % heroSlides.length), 5200)
+    return () => window.clearInterval(timer)
+  }, [heroSlides.length])
 
   return (
-    <div>
-      <section className="relative overflow-hidden border-b border-charcoal-400/10 bg-charcoal-950">
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-red/10 via-transparent to-transparent" />
-        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-32">
-          <div className="max-w-2xl animate-slide-up">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-red/30 bg-brand-red/10 px-3 py-1">
-              <Printer className="h-3.5 w-3.5 text-brand-red" />
-              <span className="text-xs font-medium tracking-wide text-brand-red-light">Impression 3D professionnelle</span>
+    <div className="overflow-hidden">
+      <section className="relative isolate border-b border-charcoal-400/10 bg-charcoal-950">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_80%_20%,rgba(220,38,38,0.18),transparent_42%),radial-gradient(ellipse_at_10%_90%,rgba(120,53,15,0.12),transparent_40%)]" />
+        <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1.05fr_.95fr] lg:px-8 lg:py-24">
+          <div className="animate-slide-up">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-red/30 bg-brand-red/10 px-3 py-1.5 text-xs font-semibold text-brand-red-light">
+              <Sparkles className="h-3.5 w-3.5" />
+              STUDIO D’IMPRESSION 3D · ALGÉRIE
             </div>
-            <h1 className="text-4xl font-extrabold leading-tight text-offwhite sm:text-5xl lg:text-6xl">
-              LUNDER'S 3D STUDIO
+            <h1 className="max-w-2xl text-4xl font-extrabold leading-[1.08] tracking-tight text-offwhite sm:text-5xl lg:text-6xl">
+              Votre idée prend forme.
+              <span className="mt-2 block text-brand-red-light">Nous lui donnons vie en 3D.</span>
             </h1>
-            <p className="mt-4 text-lg text-charcoal-300">
-              Design · Print · Create — From Imagination to Reality
+            <p className="mt-6 max-w-xl text-base leading-7 text-charcoal-300 sm:text-lg">
+              Découvrez notre catalogue ou confiez-nous une création personnalisée.
+              De la première idée à la pièce fabriquée, chaque projet commence par votre besoin.
             </p>
-            <p className="mt-2 text-base text-charcoal-400">
-              Studio d'impression 3D professionnel en Algérie. Des pièces uniques, fabriquées sur mesure, livrées chez vous.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/boutique/produits" className="btn-primary">
-                Découvrir la boutique
-                <ArrowRight className="h-4 w-4" />
+                Explorer la boutique <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link to="/boutique/sur-mesure" className="btn-secondary">
+                Parler de mon projet <ChevronRight className="h-4 w-4" />
               </Link>
             </div>
+            <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs text-charcoal-400">
+              <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-400" /> Commande sans compte</span>
+              <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-400" /> Paiement à la livraison</span>
+              <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-400" /> Projets personnalisés</span>
+            </div>
+          </div>
+
+          <div className="relative mx-auto w-full max-w-xl">
+            <div className="absolute -inset-5 rounded-[2rem] bg-brand-red/10 blur-3xl" />
+            <div className="relative overflow-hidden rounded-3xl border border-charcoal-400/20 bg-charcoal-800 shadow-2xl">
+              {heroImage ? (
+                <Link to={heroProduct ? `/boutique/produits/${heroProduct.slug}` : '/boutique/produits'} className="group relative block overflow-hidden">
+                  <img key={heroProduct?.id} src={heroImage} alt={heroProduct?.name ?? 'Création imprimée en 3D'} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-red-light">À DÉCOUVRIR CHEZ LUNDER</p>
+                    <h2 className="mt-2 max-w-sm text-xl font-bold text-white sm:text-2xl">{heroProduct?.name}</h2>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <span className="text-sm font-semibold text-white">{heroProduct?.price_dzd ? formatDzd(heroProduct.price_dzd) : 'Voir le produit'}</span>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-black transition group-hover:bg-brand-red group-hover:text-white">Découvrir <ArrowRight className="h-4 w-4" /></span>
+                    </div>
+                  </div>
+                </Link>
+              ) : (
+                <div className="flex aspect-[4/3] items-center justify-center bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.2),transparent_55%),linear-gradient(135deg,#262626,#111111)]">
+                  <div className="flex h-36 w-36 items-center justify-center rounded-[2rem] border border-brand-red/30 bg-charcoal-900/70 shadow-2xl"><Printer className="h-20 w-20 text-brand-red-light" strokeWidth={1.1} /></div>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3 border-t border-charcoal-400/15 p-4 sm:p-5">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-red-light">DESIGN · PRINT · CREATE</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-offwhite">{heroProduct?.name ?? 'De l’imagination à l’objet'}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {heroSlides.length > 1 && <span className="mr-1 text-[10px] text-charcoal-400">{heroIndex + 1} / {heroSlides.length}</span>}
+                  <Link to="/boutique/produits" aria-label="Voir tous les produits" className="flex h-9 w-9 items-center justify-center rounded-full border border-charcoal-400/20 text-charcoal-200 transition hover:border-brand-red hover:text-white"><ArrowRight className="h-4 w-4" /></Link>
+                </div>
+              </div>
+            </div>
+            {heroSlides.length > 1 && <div className="mt-4 flex items-center justify-center gap-2" aria-label="Choisir un produit à découvrir">
+              {heroSlides.map((product, index) => <button key={product.id} type="button" onClick={() => setHeroIndex(index)} aria-label={`Afficher ${product.name}`} aria-current={heroIndex === index ? 'true' : undefined} className={`h-1.5 rounded-full transition-all ${heroIndex === index ? 'w-8 bg-brand-red' : 'w-3 bg-charcoal-500 hover:bg-charcoal-300'}`} />)}
+            </div>}
           </div>
         </div>
       </section>
 
-      {featured.length > 0 && (
-        <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <h2 className="mb-6 text-2xl font-bold text-offwhite">Produits en vedette</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {featured.map((p) => (
-              <ProductCard key={p.id} product={p} imageUrl={primaryImage(p)} />
+      <section className="border-b border-charcoal-400/10 bg-charcoal-900">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-4 px-4 py-6 sm:px-6 md:grid-cols-4 lg:px-8">
+          {benefits.map((benefit) => (
+            <div key={benefit.title} className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-charcoal-800 text-brand-red-light">
+                <benefit.icon className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xs font-semibold text-offwhite sm:text-sm">{benefit.title}</h2>
+                <p className="mt-1 text-[11px] leading-5 text-charcoal-400 sm:text-xs">{benefit.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {categories.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <p className="admin-eyebrow">TROUVEZ VOTRE INSPIRATION</p>
+              <h2 className="text-2xl font-bold text-offwhite sm:text-3xl">Explorer par catégorie</h2>
+            </div>
+            <Link to="/boutique/produits" className="hidden items-center gap-1 text-sm font-semibold text-brand-red-light hover:text-offwhite sm:inline-flex">
+              Tout le catalogue <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {categories.map((category, index) => (
+              <Link
+                key={category.id}
+                to={`/boutique/categories/${category.slug}`}
+                className="group flex min-h-28 items-center justify-between gap-4 rounded-2xl border border-charcoal-400/15 bg-charcoal-800/60 p-5 transition hover:-translate-y-0.5 hover:border-brand-red/40 hover:bg-charcoal-800"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-charcoal-700 text-brand-red-light transition group-hover:bg-brand-red/10">
+                    {index % 3 === 0 ? <Box className="h-6 w-6" /> : index % 3 === 1 ? <Layers3 className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-offwhite">{category.name}</h3>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-charcoal-400">{category.description || 'Voir les créations de cette catégorie'}</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 shrink-0 text-charcoal-500 transition group-hover:translate-x-1 group-hover:text-brand-red-light" />
+              </Link>
             ))}
           </div>
         </section>
       )}
 
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-offwhite">Nouveautés</h2>
-          <Link to="/boutique/produits" className="text-sm font-medium text-brand-red hover:text-brand-red-light">
-            Tout voir →
-          </Link>
+      <section className="border-y border-charcoal-400/10 bg-charcoal-950/70">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="mb-7 flex items-end justify-between gap-4">
+            <div>
+              <p className="admin-eyebrow">SÉLECTION DU STUDIO</p>
+              <h2 className="text-2xl font-bold text-offwhite sm:text-3xl">Produits à découvrir</h2>
+              <p className="mt-2 text-sm text-charcoal-400">Des créations disponibles dans notre catalogue.</p>
+            </div>
+            <Link to="/boutique/produits" className="hidden items-center gap-1 text-sm font-semibold text-brand-red-light hover:text-offwhite sm:inline-flex">
+              Voir tout <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          {loading ? (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4" aria-busy="true">
+              {Array.from({ length: 4 }).map((_, index) => <div key={index} className="aspect-[4/5] animate-pulse rounded-2xl bg-charcoal-800" />)}
+            </div>
+          ) : failed ? (
+            <div className="card py-12 text-center" role="alert">
+              <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-brand-red" />
+              <p className="text-sm text-charcoal-300">Impossible de charger le catalogue pour le moment.</p>
+              <button type="button" onClick={() => void loadProducts()} className="btn-ghost mx-auto mt-4">
+                <RefreshCw className="h-4 w-4" /> Réessayer
+              </button>
+            </div>
+          ) : (featured.length > 0 || recent.length > 0) ? (
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+              {(featured.length > 0 ? featured : recent.slice(0, 4)).map((product) => (
+                <ProductCard key={product.id} product={product} imageUrl={primaryImage(product)} />
+              ))}
+            </div>
+          ) : (
+            <div className="card py-12 text-center">
+              <Package className="mx-auto mb-3 h-10 w-10 text-charcoal-500" />
+              <p className="text-sm text-charcoal-300">Le catalogue se prépare. Revenez bientôt découvrir nos créations.</p>
+            </div>
+          )}
         </div>
-        {loading ? (
-          <div className="card py-16 text-center" aria-busy="true">
-            <Package className="mx-auto mb-4 h-12 w-12 animate-pulse text-charcoal-500" />
-            <p className="text-charcoal-400">Chargement des produits…</p>
-          </div>
-        ) : failed ? (
-          <div className="card py-16 text-center" role="alert">
-            <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-brand-red" />
-            <p className="text-charcoal-300">Impossible de charger les produits pour le moment.</p>
-            <p className="mt-1 text-xs text-charcoal-500">
-              Vérifiez votre connexion, puis réessayez.
-            </p>
-            <button type="button" onClick={() => void loadProducts()} className="btn-ghost mx-auto mt-4">
-              <RefreshCw className="h-4 w-4" />
-              Réessayer
-            </button>
-          </div>
-        ) : recent.length === 0 ? (
-          <div className="card text-center py-16">
-            <Package className="mx-auto mb-4 h-12 w-12 text-charcoal-500" />
-            <p className="text-charcoal-400">La boutique ouvre bientôt. Revenez vite !</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {recent.map((p) => (
-              <ProductCard key={p.id} product={p} imageUrl={primaryImage(p)} />
-            ))}
-          </div>
-        )}
       </section>
 
-      <section className="border-t border-charcoal-400/10 bg-charcoal-950 py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-6 sm:grid-cols-3">
-            <div className="text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-charcoal-800">
-                <Printer className="h-6 w-6 text-brand-red" />
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="max-w-2xl">
+          <p className="admin-eyebrow">SIMPLE ET TRANSPARENT</p>
+          <h2 className="text-2xl font-bold text-offwhite sm:text-3xl">Comment ça marche ?</h2>
+          <p className="mt-2 text-sm leading-6 text-charcoal-400">Vous gardez le contrôle à chaque étape : nous clarifions le besoin avant de fabriquer.</p>
+        </div>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {steps.map((step) => (
+            <article key={step.number} className="relative rounded-2xl border border-charcoal-400/15 bg-charcoal-800/50 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-red/10 text-brand-red-light"><step.icon className="h-5 w-5" /></div>
+                <span className="font-mono text-sm font-bold text-charcoal-500">{step.number}</span>
               </div>
-              <h3 className="text-sm font-semibold text-offwhite">Impression 3D professionnelle</h3>
-              <p className="mt-1 text-xs text-charcoal-400">PLA, PETG et plus. Qualité garantie.</p>
-            </div>
-            <div className="text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-charcoal-800">
-                <Package className="h-6 w-6 text-brand-red" />
+              <h3 className="mt-5 text-base font-semibold text-offwhite">{step.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-charcoal-400">{step.description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
+        <div className="relative overflow-hidden rounded-3xl border border-brand-red/25 bg-[radial-gradient(ellipse_at_90%_0%,rgba(220,38,38,0.2),transparent_45%),linear-gradient(135deg,#202020,#111111)] p-6 sm:p-10 lg:p-12">
+          <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_auto]">
+            <div className="max-w-2xl">
+              <p className="text-xs font-bold tracking-[0.18em] text-brand-red-light">VOUS AVEZ UNE IDÉE ?</p>
+              <h2 className="mt-3 text-2xl font-bold text-offwhite sm:text-3xl">Même une simple photo peut être le début de votre projet.</h2>
+              <p className="mt-3 text-sm leading-6 text-charcoal-300">Pas besoin de connaître les dimensions, le poids ou la matière. Expliquez ce que vous voulez, ajoutez une référence si vous en avez une, et le studio étudiera votre demande.</p>
+              <div className="mt-5 flex flex-wrap gap-3 text-xs text-charcoal-300">
+                <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-400" /> Sans compte client</span>
+                <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-400" /> Photos et fichiers facultatifs</span>
+                <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-400" /> Devis étudié par le studio</span>
               </div>
-              <h3 className="text-sm font-semibold text-offwhite">Sur mesure</h3>
-              <p className="mt-1 text-xs text-charcoal-400">Vous avez une idée ? On l'imprime.</p>
             </div>
-            <div className="text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-charcoal-800">
-                <ArrowRight className="h-6 w-6 text-brand-red" />
-              </div>
-              <h3 className="text-sm font-semibold text-offwhite">Livraison en Algérie</h3>
-              <p className="mt-1 text-xs text-charcoal-400">Paiement à la livraison.</p>
-            </div>
+            <Link to="/boutique/sur-mesure" className="btn-primary whitespace-nowrap">
+              Décrire mon projet <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-charcoal-400/10 bg-charcoal-950 py-14">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <p className="admin-eyebrow">BESOIN D’INFORMATIONS ?</p>
+            <h2 className="text-2xl font-bold text-offwhite sm:text-3xl">Questions fréquentes</h2>
+            <p className="mt-2 text-sm text-charcoal-400">Les réponses utiles avant de passer commande.</p>
+          </div>
+          <div className="mt-8 space-y-3">
+            {questions.map((item) => (
+              <details key={item.question} className="group rounded-xl border border-charcoal-400/15 bg-charcoal-900 px-4 py-4 open:border-brand-red/30">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-offwhite">
+                  {item.question}
+                  <span className="text-brand-red-light transition group-open:rotate-45">＋</span>
+                </summary>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-charcoal-400">{item.answer}</p>
+              </details>
+            ))}
+          </div>
+          <div className="mt-8 text-center">
+            <Link to="/boutique/informations" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-red-light hover:text-offwhite">
+              Toutes les informations et politiques <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-10 text-center sm:px-6 lg:px-8">
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-red/10 text-brand-red-light"><Clock3 className="h-6 w-6" /></div>
+          <h2 className="text-xl font-bold text-offwhite">Prêt à commencer ?</h2>
+          <p className="max-w-xl text-sm text-charcoal-400">Parcourez les produits ou envoyez-nous votre idée. Votre commande reste accessible sans créer de compte.</p>
+          <Link to="/boutique/produits" className="btn-primary mt-2">Découvrir les créations <ArrowRight className="h-4 w-4" /></Link>
         </div>
       </section>
     </div>

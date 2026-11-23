@@ -514,13 +514,18 @@ export default function AdminAnalytics() {
       return
     }
     setSavingSpend(true)
-    const { error: insertError } = await supabase.from('marketing_campaign_spend').insert({
-      spend_date: spendDate, source: spendSource.trim(), medium: spendMedium.trim(),
-      campaign: spendCampaign.trim(), spend_dzd: amount, notes: spendNotes.trim() || null,
-    })
-    if (insertError) setSpendError(insertError.message)
-    else { setSpendCampaign(''); setSpendAmount(''); setSpendNotes(''); await refresh(true) }
-    setSavingSpend(false)
+    try {
+      const { error: insertError } = await supabase.from('marketing_campaign_spend').insert({
+        spend_date: spendDate, source: spendSource.trim(), medium: spendMedium.trim(),
+        campaign: spendCampaign.trim(), spend_dzd: amount, notes: spendNotes.trim() || null,
+      })
+      if (insertError) setSpendError(insertError.message)
+      else { setSpendCampaign(''); setSpendAmount(''); setSpendNotes(''); await refresh(true) }
+    } catch {
+      setSpendError('Connexion interrompue : la dépense n’a pas pu être enregistrée.')
+    } finally {
+      setSavingSpend(false)
+    }
   }
 
   const exportCsv = () => {

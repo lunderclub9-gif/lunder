@@ -89,9 +89,6 @@ export default function StoreLayout() {
             <NavLink to="/boutique/suivi" className={navLinkClass}>
               Suivre ma commande
             </NavLink>
-            <NavLink to="/boutique/informations" className={navLinkClass}>
-              Aide & infos
-            </NavLink>
           </nav>
 
           <div className="flex items-center gap-2">
@@ -184,13 +181,6 @@ export default function StoreLayout() {
               className="block py-2 text-sm font-medium text-charcoal-200"
             >
               Suivre ma commande
-            </NavLink>
-            <NavLink
-              to="/boutique/informations"
-              onClick={() => setMobileOpen(false)}
-              className="block py-2 text-sm font-medium text-charcoal-200"
-            >
-              Aide & informations
             </NavLink>
           </nav>
         )}

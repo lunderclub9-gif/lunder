@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { supabase, type Category, type Product } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
+import { formatDzd } from '@/lib/format'
 import { setPageSeo } from '@/lib/seo'
 
 const steps = [
@@ -79,6 +80,7 @@ export default function HomePage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  const [heroIndex, setHeroIndex] = useState(0)
 
   const loadProducts = useCallback(async () => {
     setLoading(true)
@@ -141,8 +143,15 @@ export default function HomePage() {
     product.product_images?.find((image) => image.is_primary)?.image_url ??
     product.product_images?.[0]?.image_url
 
-  const heroProduct = featured[0] ?? recent[0]
+  const heroSlides = (featured.length ? featured : recent).slice(0, 5)
+  const heroProduct = heroSlides[heroIndex] ?? recent[0]
   const heroImage = heroProduct ? primaryImage(heroProduct) : undefined
+
+  useEffect(() => {
+    if (heroSlides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const timer = window.setInterval(() => setHeroIndex((current) => (current + 1) % heroSlides.length), 5200)
+    return () => window.clearInterval(timer)
+  }, [heroSlides.length])
 
   return (
     <div className="overflow-hidden">
@@ -181,26 +190,37 @@ export default function HomePage() {
             <div className="absolute -inset-5 rounded-[2rem] bg-brand-red/10 blur-3xl" />
             <div className="relative overflow-hidden rounded-3xl border border-charcoal-400/20 bg-charcoal-800 shadow-2xl">
               {heroImage ? (
-                <img src={heroImage} alt={heroProduct?.name ?? 'Création imprimée en 3D'} className="aspect-[4/3] w-full object-cover" />
+                <Link to={heroProduct ? `/boutique/produits/${heroProduct.slug}` : '/boutique/produits'} className="group relative block overflow-hidden">
+                  <img key={heroProduct?.id} src={heroImage} alt={heroProduct?.name ?? 'Création imprimée en 3D'} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-red-light">À DÉCOUVRIR CHEZ LUNDER</p>
+                    <h2 className="mt-2 max-w-sm text-xl font-bold text-white sm:text-2xl">{heroProduct?.name}</h2>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <span className="text-sm font-semibold text-white">{heroProduct?.price_dzd ? formatDzd(heroProduct.price_dzd) : 'Voir le produit'}</span>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-black transition group-hover:bg-brand-red group-hover:text-white">Découvrir <ArrowRight className="h-4 w-4" /></span>
+                    </div>
+                  </div>
+                </Link>
               ) : (
                 <div className="flex aspect-[4/3] items-center justify-center bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.2),transparent_55%),linear-gradient(135deg,#262626,#111111)]">
-                  <div className="flex h-36 w-36 items-center justify-center rounded-[2rem] border border-brand-red/30 bg-charcoal-900/70 shadow-2xl">
-                    <Printer className="h-20 w-20 text-brand-red-light" strokeWidth={1.1} />
-                  </div>
+                  <div className="flex h-36 w-36 items-center justify-center rounded-[2rem] border border-brand-red/30 bg-charcoal-900/70 shadow-2xl"><Printer className="h-20 w-20 text-brand-red-light" strokeWidth={1.1} /></div>
                 </div>
               )}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-charcoal-400/15 p-4 sm:p-5">
-                <div>
+              <div className="flex items-center justify-between gap-3 border-t border-charcoal-400/15 p-4 sm:p-5">
+                <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-red-light">DESIGN · PRINT · CREATE</p>
-                  <p className="mt-1 text-sm font-semibold text-offwhite">De l’imagination à l’objet</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-offwhite">{heroProduct?.name ?? 'De l’imagination à l’objet'}</p>
                 </div>
-                <span className="rounded-full border border-charcoal-400/20 bg-charcoal-900 px-3 py-1.5 text-xs text-charcoal-300">LUNDER’S 3D STUDIO</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {heroSlides.length > 1 && <span className="mr-1 text-[10px] text-charcoal-400">{heroIndex + 1} / {heroSlides.length}</span>}
+                  <Link to="/boutique/produits" aria-label="Voir tous les produits" className="flex h-9 w-9 items-center justify-center rounded-full border border-charcoal-400/20 text-charcoal-200 transition hover:border-brand-red hover:text-white"><ArrowRight className="h-4 w-4" /></Link>
+                </div>
               </div>
             </div>
-            <div className="absolute -bottom-5 -left-2 hidden rounded-xl border border-charcoal-400/20 bg-charcoal-900 px-4 py-3 shadow-xl sm:block">
-              <p className="flex items-center gap-2 text-xs font-semibold text-offwhite"><BadgeCheck className="h-4 w-4 text-green-400" /> Un projet, une solution</p>
-              <p className="mt-1 text-[11px] text-charcoal-400">Catalogue et fabrication personnalisée</p>
-            </div>
+            {heroSlides.length > 1 && <div className="mt-4 flex items-center justify-center gap-2" aria-label="Choisir un produit à découvrir">
+              {heroSlides.map((product, index) => <button key={product.id} type="button" onClick={() => setHeroIndex(index)} aria-label={`Afficher ${product.name}`} aria-current={heroIndex === index ? 'true' : undefined} className={`h-1.5 rounded-full transition-all ${heroIndex === index ? 'w-8 bg-brand-red' : 'w-3 bg-charcoal-500 hover:bg-charcoal-300'}`} />)}
+            </div>}
           </div>
         </div>
       </section>

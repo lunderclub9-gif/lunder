@@ -60,11 +60,12 @@ export default function CheckoutPage() {
   }, [])
 
   useEffect(() => {
+    let active = true
     setCommunes([])
     setCommuneId('')
     setPickupPoints([])
     setPickupId('')
-    if (!wilayaCode) return
+    if (!wilayaCode) return () => { active = false }
 
     supabase
       .from('communes')
@@ -72,7 +73,9 @@ export default function CheckoutPage() {
       .eq('wilaya_code', Number(wilayaCode))
       .eq('is_active', true)
       .order('name_fr')
-      .then(({ data }) => setCommunes((data as Commune[]) ?? []))
+      .then(({ data }) => {
+        if (active) setCommunes((data as Commune[]) ?? [])
+      })
 
     supabase
       .from('pickup_points')
@@ -80,7 +83,10 @@ export default function CheckoutPage() {
       .eq('wilaya_code', Number(wilayaCode))
       .eq('is_active', true)
       .order('name')
-      .then(({ data }) => setPickupPoints((data as PickupPoint[]) ?? []))
+      .then(({ data }) => {
+        if (active) setPickupPoints((data as PickupPoint[]) ?? [])
+      })
+    return () => { active = false }
   }, [wilayaCode])
 
   // Devis de livraison : la seule source de prix autorisée.

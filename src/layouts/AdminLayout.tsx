@@ -106,15 +106,22 @@ export default function AdminLayout() {
               <h2 className={`mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-charcoal-500 ${sidebarCollapsed ? "md:sr-only" : ""}`}>{group.label}</h2>
               <div className="flex flex-col gap-1">
                 {group.items.map((item) => (
-                  <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} title={sidebarCollapsed ? item.label : undefined} aria-label={sidebarCollapsed ? item.label : undefined} className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${sidebarCollapsed ? "md:justify-center md:px-2 md:relative" : ""} ${
-                      isActive ? 'bg-brand-red/10 text-brand-red' : 'text-charcoal-300 hover:bg-charcoal-800 hover:text-offwhite'
-                    }`
-                  }>
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    <span className={sidebarCollapsed ? "md:hidden" : ""}>{item.label}</span>
-                    {item.to === '/admin/demandes' && newRequests > 0 && <span className={`ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white ${sidebarCollapsed ? "md:absolute md:right-1 md:top-1" : ""}`}>{newRequests}</span>}
-                  </NavLink>
+                  {item.to === '/admin/analytics' ? (
+                    <a key={item.to} href={item.to} target="_blank" rel="noopener noreferrer" onClick={() => setSidebarOpen(false)} title={sidebarCollapsed ? item.label : undefined} aria-label={item.label} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${sidebarCollapsed ? "md:justify-center md:px-2" : ""} text-charcoal-300 hover:bg-charcoal-800 hover:text-offwhite`}>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className={sidebarCollapsed ? "md:hidden" : ""}>{item.label}</span>
+                    </a>
+                  ) : (
+                    <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} title={sidebarCollapsed ? item.label : undefined} aria-label={sidebarCollapsed ? item.label : undefined} className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${sidebarCollapsed ? "md:justify-center md:px-2 md:relative" : ""} ${
+                        isActive ? 'bg-brand-red/10 text-brand-red' : 'text-charcoal-300 hover:bg-charcoal-800 hover:text-offwhite'
+                      }`
+                    }>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className={sidebarCollapsed ? "md:hidden" : ""}>{item.label}</span>
+                      {item.to === '/admin/demandes' && newRequests > 0 && <span className={`ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white ${sidebarCollapsed ? "md:absolute md:right-1 md:top-1" : ""}`}>{newRequests}</span>}
+                    </NavLink>
+                  )}
                 ))}
               </div>
             </section>

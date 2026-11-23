@@ -121,7 +121,7 @@ export default function AdminLayout() {
                       <span className={sidebarCollapsed ? "md:hidden" : ""}>{item.label}</span>
                       {item.to === '/admin/demandes' && newRequests > 0 && <span className={`ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold text-white ${sidebarCollapsed ? "md:absolute md:right-1 md:top-1" : ""}`}>{newRequests}</span>}
                     </NavLink>
-                  )}
+                  )
                 ))}
               </div>
             </section>

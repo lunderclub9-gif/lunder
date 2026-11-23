@@ -32,40 +32,57 @@ export function getMarketingAttribution(): MarketingAttribution {
   }
   if (typeof window === 'undefined') return empty
 
-  try {
-    const params = new URLSearchParams(window.location.search)
-    const hasCampaign = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']
-      .some((key) => params.has(key))
-    const now = Date.now()
-    const stored = sessionStorage.getItem(STORAGE_KEY)
-    const previous = stored ? JSON.parse(stored) as { saved_at?: number; data?: MarketingAttribution } : null
+  const params = new URLSearchParams(window.location.search)
+  const hasCampaign = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']
+    .some((key) => params.has(key))
+  const now = Date.now()
 
-    if (previous?.data && typeof previous.saved_at === 'number' && now - previous.saved_at < MAX_AGE_MS) {
+  // A broken or blocked sessionStorage must not discard campaign data from the URL.
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY)
+    const previous = stored
+      ? JSON.parse(stored) as { saved_at?: number; data?: MarketingAttribution }
+      : null
+    const age = previous?.saved_at === undefined ? -1 : now - previous.saved_at
+    if (
+      previous?.data &&
+      typeof previous.saved_at === 'number' &&
+      age >= 0 &&
+      age < MAX_AGE_MS
+    ) {
       return { ...empty, ...previous.data, landing_path: previous.data.landing_path || empty.landing_path }
     }
+  } catch {
+    // Ignore malformed or unavailable browser storage and use the current visit.
+  }
 
-    if (hasCampaign) {
-      const data: MarketingAttribution = {
+  let referrer: string | null = null
+  try {
+    referrer = clean(document.referrer ? new URL(document.referrer).hostname : null, 180)
+  } catch {
+    // An invalid referrer must not prevent valid UTM parameters from being captured.
+  }
+
+  const data: MarketingAttribution = hasCampaign
+    ? {
         utm_source: clean(params.get('utm_source')),
         utm_medium: clean(params.get('utm_medium')),
         utm_campaign: clean(params.get('utm_campaign')),
         utm_content: clean(params.get('utm_content')),
         utm_term: clean(params.get('utm_term')),
-        referrer: clean(document.referrer ? new URL(document.referrer).hostname : null, 180),
+        referrer,
         landing_path: window.location.pathname.slice(0, 300),
       }
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ saved_at: now, data }))
-      return data
-    }
+    : {
+        ...empty,
+        utm_source: referrer,
+        referrer,
+      }
 
-    const data = {
-      ...empty,
-      utm_source: clean(document.referrer ? new URL(document.referrer).hostname : null),
-      referrer: clean(document.referrer ? new URL(document.referrer).hostname : null, 180),
-    }
+  try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ saved_at: now, data }))
-    return data
   } catch {
-    return empty
+    // Attribution remains available for this submission even when storage is blocked.
   }
+  return data
 }

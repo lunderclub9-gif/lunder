@@ -325,6 +325,8 @@ Ordre d'exécution complet, du plus ancien au plus récent :
 15. `20261122123000_015_category_seo_metadata.sql`
 16. `20261122124000_016_flexible_custom_requests.sql`
 17. `20261122130000_017_order_level_manufacturing_pricing.sql`
+18. `20261123100000_018_marketing_attribution.sql` (facultative si le suivi marketing n'est pas utilisé)
+19. `20261123110000_019_marketing_campaign_spend.sql` (facultative si le suivi des dépenses n'est pas utilisé)
 
 Après application, renseigner au moins une matière et les tarifs : la ligne
 unique de `manufacturing_pricing` est initialisée à zéro, un devis rendrait donc

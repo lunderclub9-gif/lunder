@@ -96,7 +96,7 @@ export default function CheckoutPage() {
     if (!wilayaCode || !communeId || items.length === 0) return
 
     let cancelled = false
-    supabase
+    Promise.resolve(supabase
       .rpc('quote_delivery', {
         p_wilaya_code: Number(wilayaCode),
         p_commune_id: communeId,
@@ -115,7 +115,7 @@ export default function CheckoutPage() {
           return
         }
         setQuote(row)
-      })
+      }))
       .catch(() => {
         if (cancelled) return
         setQuote(null)

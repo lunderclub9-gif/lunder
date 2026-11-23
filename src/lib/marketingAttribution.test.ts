@@ -81,13 +81,13 @@ describe('getMarketingAttribution', () => {
     })
   })
 
-  it('does not throw when browser storage is unavailable', () => {
+  it('keeps current campaign data when browser storage is unavailable', () => {
     vi.stubGlobal('sessionStorage', {
       getItem: () => { throw new Error('storage disabled') },
       setItem: () => { throw new Error('storage disabled') },
     })
 
     expect(getMarketingAttribution().landing_path).toBe('/boutique/produits/test')
-    expect(getMarketingAttribution().utm_source).toBeNull()
+    expect(getMarketingAttribution().utm_source).toBe('facebook')
   })
 })

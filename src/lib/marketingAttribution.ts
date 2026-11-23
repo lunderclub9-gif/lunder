@@ -40,6 +40,10 @@ export function getMarketingAttribution(): MarketingAttribution {
     const stored = sessionStorage.getItem(STORAGE_KEY)
     const previous = stored ? JSON.parse(stored) as { saved_at?: number; data?: MarketingAttribution } : null
 
+    if (previous?.data && typeof previous.saved_at === 'number' && now - previous.saved_at < MAX_AGE_MS) {
+      return { ...empty, ...previous.data, landing_path: previous.data.landing_path || empty.landing_path }
+    }
+
     if (hasCampaign) {
       const data: MarketingAttribution = {
         utm_source: clean(params.get('utm_source')),
@@ -47,15 +51,11 @@ export function getMarketingAttribution(): MarketingAttribution {
         utm_campaign: clean(params.get('utm_campaign')),
         utm_content: clean(params.get('utm_content')),
         utm_term: clean(params.get('utm_term')),
-        referrer: clean(previous?.data?.referrer ?? (document.referrer ? new URL(document.referrer).hostname : null), 180),
-        landing_path: previous?.data?.landing_path ?? window.location.pathname.slice(0, 300),
+        referrer: clean(document.referrer ? new URL(document.referrer).hostname : null, 180),
+        landing_path: window.location.pathname.slice(0, 300),
       }
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ saved_at: now, data }))
       return data
-    }
-
-    if (previous?.data && typeof previous.saved_at === 'number' && now - previous.saved_at < MAX_AGE_MS) {
-      return { ...empty, ...previous.data, landing_path: previous.data.landing_path || empty.landing_path }
     }
 
     const data = {

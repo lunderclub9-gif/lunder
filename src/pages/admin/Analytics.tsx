@@ -669,7 +669,7 @@ export default function AdminAnalytics() {
 
           <details className="analytics-fold" id="profit">
             <summary><span><strong>Produits & rentabilité</strong><small>Ouvrir les détails de cette rubrique</small></span><ChevronDown size={18} /></summary>
-            <Card id="profit">
+            <Card>
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Marge & rentabilité</p><h2 className="mt-1 text-lg font-bold text-white">Quels produits rapportent le plus ?</h2><p className="mt-1 text-xs text-neutral-500">Classement estimatif après déduction des coûts enregistrés dans les fiches produits.</p></div><span className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[10px] text-amber-200">Estimation · pas une comptabilité certifiée</span></div>
             {analysis.mostProfitable.length ? (
               <div className="overflow-x-auto">
@@ -685,7 +685,7 @@ export default function AdminAnalytics() {
 
           <details className="analytics-fold" id="campaigns">
             <summary><span><strong>Campagnes & dépenses publicitaires</strong><small>Ouvrir les détails de cette rubrique</small></span><ChevronDown size={18} /></summary>
-            <Card id="campaigns">
+            <Card>
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Acquisition & marketing</p><h2 className="mt-1 text-lg font-bold text-white">Quelles campagnes apportent des clients ?</h2><p className="mt-1 text-xs text-neutral-500">Attribution première visite · paramètres UTM</p></div><div className="flex flex-wrap gap-4 text-xs"><div><p className="text-neutral-500">Commandes attribuées</p><strong className="text-white">{number(analysis.attributedOrders)}</strong></div><div><p className="text-neutral-500">CA livré attribué</p><strong className="text-emerald-400">{money(analysis.attributedRevenue)}</strong></div><div><p className="text-neutral-500">Dépenses pub.</p><strong className="text-white">{money(analysis.totalAdSpend)}</strong></div><div><p className="text-neutral-500">ROAS global</p><strong className="text-white">{analysis.overallRoas === null ? '—' : analysis.overallRoas.toFixed(2) + 'x'}</strong></div><div><p className="text-neutral-500">Demandes sur mesure</p><strong className="text-white">{number(analysis.customRequestLeads)}</strong></div></div></div>
             <form onSubmit={handleAddSpend} className="mb-5 grid gap-2 rounded-xl border border-white/[0.07] bg-neutral-900/70 p-3 sm:grid-cols-2 xl:grid-cols-6">
               <label className="text-[10px] text-neutral-500">Date<input required type="date" value={spendDate} onChange={(event) => setSpendDate(event.target.value)} className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
@@ -705,7 +705,7 @@ export default function AdminAnalytics() {
           <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
             <details className="analytics-fold" id="customers">
             <summary><span><strong>Fidélisation & clients</strong><small>Ouvrir les détails de cette rubrique</small></span><ChevronDown size={18} /></summary>
-            <Card id="customers">
+            <Card>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Fidélisation</p><h2 className="mt-1 text-lg font-bold text-white">Vos clients</h2><p className="mt-1 text-xs text-neutral-500">Analyse agrégée, sans afficher les numéros de téléphone</p>
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-neutral-900 p-4"><Users size={17} className="text-sky-400" /><p className="mt-3 text-2xl font-bold text-white">{number(analysis.uniqueCustomers)}</p><p className="mt-1 text-[11px] text-neutral-500">Clients distincts</p></div>
@@ -716,7 +716,7 @@ export default function AdminAnalytics() {
             </details>
             <details className="analytics-fold" id="growth">
             <summary><span><strong>Recommandations de croissance</strong><small>Ouvrir les détails de cette rubrique</small></span><ChevronDown size={18} /></summary>
-            <Card id="growth">
+            <Card>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Actions de croissance</p><h2 className="mt-1 text-lg font-bold text-white">Pistes pour développer LUNDER</h2><p className="mt-1 text-xs text-neutral-500">Suggestions générées à partir de vos données réelles</p>
               <div className="mt-5 space-y-3">
                 {analysis.wilayas[0]?.orders ? <Insight icon={Target} title={'Tester une campagne dans ' + analysis.wilayas[0].name} text={'Cette wilaya concentre le plus de commandes (' + number(analysis.wilayas[0].orders) + '). Testez une campagne locale puis comparez les commandes livrées et le coût publicitaire.'} /> : <Insight icon={Target} title="Préparer votre première campagne" text="Commencez à suivre les demandes et commandes par wilaya. Ajoutez ensuite les dépenses publicitaires pour mesurer le coût d'acquisition." />}

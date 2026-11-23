@@ -60,6 +60,7 @@ type AnalyticsData = {
   costs: ProductCost[]
   materials: Material[]
   wilayas: Wilaya[]
+  marketingReady: boolean
 }
 
 const periods: { value: Period; label: string }[] = [
@@ -128,16 +129,24 @@ async function loadAnalytics(): Promise<AnalyticsData> {
     supabase.from('marketing_attributions').select('lead_type, idempotency_key, utm_source, utm_medium, utm_campaign, utm_content, utm_term, referrer, landing_path, created_at').order('created_at', { ascending: false }),
     supabase.from('marketing_campaign_spend').select('id, spend_date, source, medium, campaign, spend_dzd, notes').order('spend_date', { ascending: false }),
   ])
-  const failed = [productsResult.error, costsResult.error, materialsResult.error, wilayasResult.error, attributionResult.error, spendResult.error].find(Boolean)
+  const missingMarketingTable = (error: { code?: string } | null) =>
+    Boolean(error && ['42P01', 'PGRST205'].includes(error.code ?? ''))
+  const marketingReady = !missingMarketingTable(attributionResult.error) && !missingMarketingTable(spendResult.error)
+  const failed = [
+    productsResult.error, costsResult.error, materialsResult.error, wilayasResult.error,
+    ...(missingMarketingTable(attributionResult.error) ? [] : [attributionResult.error]),
+    ...(missingMarketingTable(spendResult.error) ? [] : [spendResult.error]),
+  ].find(Boolean)
   if (failed) throw failed
   return {
     orders,
-    attributions: (attributionResult.data as AttributionRow[]) ?? [],
-    spend: (spendResult.data as CampaignSpend[]) ?? [],
+    attributions: marketingReady ? (attributionResult.data as AttributionRow[]) ?? [] : [],
+    spend: marketingReady ? (spendResult.data as CampaignSpend[]) ?? [] : [],
     products: (productsResult.data as Product[]) ?? [],
     costs: (costsResult.data as ProductCost[]) ?? [],
     materials: (materialsResult.data as Material[]) ?? [],
     wilayas: (wilayasResult.data as Wilaya[]) ?? [],
+    marketingReady,
   }
 }
 
@@ -687,6 +696,7 @@ export default function AdminAnalytics() {
             <summary><span><strong>Campagnes & dépenses publicitaires</strong><small>Ouvrir les détails de cette rubrique</small></span><ChevronDown size={18} /></summary>
             <Card>
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Acquisition & marketing</p><h2 className="mt-1 text-lg font-bold text-white">Quelles campagnes apportent des clients ?</h2><p className="mt-1 text-xs text-neutral-500">Attribution première visite · paramètres UTM</p></div><div className="flex flex-wrap gap-4 text-xs"><div><p className="text-neutral-500">Commandes attribuées</p><strong className="text-white">{number(analysis.attributedOrders)}</strong></div><div><p className="text-neutral-500">CA livré attribué</p><strong className="text-emerald-400">{money(analysis.attributedRevenue)}</strong></div><div><p className="text-neutral-500">Dépenses pub.</p><strong className="text-white">{money(analysis.totalAdSpend)}</strong></div><div><p className="text-neutral-500">ROAS global</p><strong className="text-white">{analysis.overallRoas === null ? '—' : analysis.overallRoas.toFixed(2) + 'x'}</strong></div><div><p className="text-neutral-500">Demandes sur mesure</p><strong className="text-white">{number(analysis.customRequestLeads)}</strong></div></div></div>
+            {data.marketingReady ? (
             <form onSubmit={handleAddSpend} className="mb-5 grid gap-2 rounded-xl border border-white/[0.07] bg-neutral-900/70 p-3 sm:grid-cols-2 xl:grid-cols-6">
               <label className="text-[10px] text-neutral-500">Date<input required type="date" value={spendDate} onChange={(event) => setSpendDate(event.target.value)} className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
               <label className="text-[10px] text-neutral-500">Source<input required value={spendSource} onChange={(event) => setSpendSource(event.target.value)} maxLength={120} placeholder="facebook" className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
@@ -697,6 +707,11 @@ export default function AdminAnalytics() {
               <div className="flex items-end"><button disabled={savingSpend} className="min-h-9 w-full rounded-lg bg-red-600 px-3 text-xs font-bold text-white disabled:opacity-50">{savingSpend ? 'Enregistrement…' : 'Ajouter dépense'}</button></div>
               {spendError && <p role="alert" className="text-xs text-red-300 sm:col-span-2 xl:col-span-6">{spendError}</p>}
             </form>
+            ) : (
+              <div role="status" className="mb-5 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-200">
+                Le suivi marketing n’est pas encore activé dans la base de données. Appliquez les migrations Supabase 018 (attribution) et 019 (dépenses publicitaires) pour activer les campagnes et la saisie des dépenses. Les autres statistiques restent disponibles.
+              </div>
+            )}
             {analysis.campaigns.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead><tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-neutral-500"><th className="pb-3 pr-3">Campagne / source</th><th className="pb-3 pr-3">Support</th><th className="pb-3 pr-3">Leads</th><th className="pb-3 pr-3">Commandes</th><th className="pb-3 pr-3">Livrées</th><th className="pb-3 pr-3">Dépenses</th><th className="pb-3 pr-3">CA livré</th><th className="pb-3">ROAS</th></tr></thead><tbody>{analysis.campaigns.slice(0, 10).map((item, index) => <tr key={item.name + item.source + index} className="border-b border-white/[0.05] last:border-0"><td className="py-3 pr-3"><strong className="text-neutral-200">{item.name}</strong><p className="mt-1 text-[10px] text-neutral-500">{item.source}</p></td><td className="py-3 pr-3 text-neutral-400">{item.medium}</td><td className="py-3 pr-3 text-neutral-300">{number(item.leads)}</td><td className="py-3 pr-3 text-neutral-300">{number(item.orders)}</td><td className="py-3 pr-3 text-neutral-300">{number(item.delivered)}</td><td className="py-3 pr-3 text-neutral-300">{money(item.spendDzd)}</td><td className="py-3 pr-3 font-semibold text-emerald-400">{money(item.revenue)}</td><td className="py-3 font-semibold text-white">{item.spendDzd > 0 ? (item.revenue / item.spendDzd).toFixed(2) + 'x' : '—'}</td></tr>)}</tbody></table></div> : <EmptyState text="Aucune campagne attribuée sur cette période. Ajoutez des paramètres UTM à vos liens publicitaires pour mesurer les résultats." />}
             <p className="mt-4 text-[10px] leading-5 text-neutral-600">Les ventes sont reliées aux commandes livrées. Les dépenses sont saisies manuellement par campagne et par date. Le ROAS compare le chiffre d'affaires livré attribué aux dépenses enregistrées ; il ne représente pas un bénéfice net.</p>
           </Card>

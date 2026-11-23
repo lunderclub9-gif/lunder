@@ -345,7 +345,7 @@ n'est jamais exposée.
 
 ## Owner analytics and business intelligence
 
-The owner-only analytics workspace is available at `/admin/analytics` from the admin sidebar (`Analytics & Growth`). It reads the existing owner-protected order, order-item, product, product-cost, material and active-wilaya data. No new production schema is required for this first analytics release.
+The owner-only analytics workspace is available at `/admin/analytics` from the admin sidebar (`Analytics & Growth`), which opens it in a separate browser tab. The standalone route remains protected by the owner guard. Core reporting reads the existing owner-protected order, order-item, product, product-cost, material and active-wilaya data. Optional campaign attribution and ad-spend reporting use migrations 018 and 019; if those tables are not yet installed, the core analytics page remains usable and displays an activation notice. The cinematic intro is shown once per tab session and respects reduced-motion preferences.
 
 ### Metric definitions and limitations
 
@@ -354,8 +354,8 @@ The owner-only analytics workspace is available at `/admin/analytics` from the a
 - Product gross-margin estimates use the configured product-cost sheet: material, machine, labour, failure allowance, packaging and return reserve. A product without a complete material cost reference is excluded from the estimated profit total and counted as missing coverage.
 - Custom-made order margin is not estimated because the current order snapshot does not preserve enough internal production-cost data to calculate it reliably.
 - COD delivery status is not a cash-reconciliation record. The analytics workspace does not label delivered order value as confirmed cash collected.
-- Current order source values identify the checkout path (`store` or `custom`), not advertising attribution. Campaign UTMs, ad spend and customer acquisition cost are not yet available.
+- Current order source values identify the checkout path (`store` or `custom`), not advertising attribution. When migrations 018 and 019 are installed, first-touch UTM attribution is linked to guest orders and custom requests, and daily ad spend can be entered manually. ROAS compares attributed delivered revenue with recorded campaign spend; it is not net profit or customer acquisition cost.
 - Wilaya ranking uses the active rows in the geography table rather than a hard-coded number of wilayas.
 - The CSV export contains the visible period's wilaya and product summaries. Customer phone numbers are never exported or displayed.
 
-The charts are client-rendered SVG/CSS and respect the user's reduced-motion preference. The page is responsive and does not add a charting dependency.
+The charts are client-rendered SVG/CSS and respect the user's reduced-motion preference. The standalone workspace and collapsible detail sections are responsive and do not add a charting dependency.

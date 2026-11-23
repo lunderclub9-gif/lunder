@@ -3,7 +3,7 @@ import {
   Activity, ArrowDownRight, ArrowRight, ArrowUpRight, CalendarDays,
   CheckCircle2, ChevronDown, CircleDollarSign, Download, Filter, MapPin,
   Package, RefreshCw, ShoppingBag, Sparkles, Target, TrendingUp, Users,
-  Wallet, AlertTriangle, Boxes, Truck,
+  Wallet, AlertTriangle, Boxes, Truck, Printer,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import '@/styles/analytics.css'

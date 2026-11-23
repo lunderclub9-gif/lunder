@@ -53,7 +53,7 @@ DECLARE
   v_referrer text := nullif(left(btrim(coalesce(p_payload->>'referrer', '')), 180), '');
   v_path text := nullif(left(btrim(coalesce(p_payload->>'landing_path', '')), 300), '');
 BEGIN
-  IF v_type NOT IN ('order', 'custom_request') OR v_key IS NULL OR length(v_key) > 100 THEN
+  IF v_type IS NULL OR v_type NOT IN ('order', 'custom_request') OR v_key IS NULL OR length(v_key) > 100 THEN
     RAISE EXCEPTION 'ATTRIBUTION_INVALIDE';
   END IF;
 

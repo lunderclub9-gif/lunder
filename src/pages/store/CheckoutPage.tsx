@@ -167,47 +167,55 @@ export default function CheckoutPage() {
     }
 
     setSubmitting(true)
-    const { data, error: rpcError } = await supabase.rpc('create_guest_order', {
-      p_payload: {
-        idempotency_key: idempotencyKey.current,
-        customer_name: name.trim(),
-        phone: normalizedPhone,
-        email: email.trim() || null,
-        wilaya_code: Number(wilayaCode),
-        commune_id: communeId,
-        delivery_method: method,
-        address: method === 'domicile' ? address.trim() : null,
-        pickup_point_id: method === 'stopdesk' ? pickupId : null,
-        note: note.trim() || null,
-        items: items.map((line) => ({
-          product_id: line.productId,
-          variant_id: line.variantId,
-          quantity: line.quantity,
-        })),
-      },
-    })
+    try {
+      const { data, error: rpcError } = await supabase.rpc('create_guest_order', {
+        p_payload: {
+          idempotency_key: idempotencyKey.current,
+          customer_name: name.trim(),
+          phone: normalizedPhone,
+          email: email.trim() || null,
+          wilaya_code: Number(wilayaCode),
+          commune_id: communeId,
+          delivery_method: method,
+          address: method === 'domicile' ? address.trim() : null,
+          pickup_point_id: method === 'stopdesk' ? pickupId : null,
+          note: note.trim() || null,
+          items: items.map((line) => ({
+            product_id: line.productId,
+            variant_id: line.variantId,
+            quantity: line.quantity,
+          })),
+        },
+      })
 
-    if (rpcError) {
-      setSubmitting(false)
-      setError(
-        orderErrorMessage(
+      if (rpcError) {
+        setError(orderErrorMessage(
           rpcError.message,
           "La commande n'a pas pu être enregistrée. Vérifiez vos informations et réessayez."
-        )
-      )
-      return
-    }
+        ))
+        return
+      }
 
-    const created = data as CreatedOrder
-    try {
-      await supabase.rpc('record_marketing_attribution', {
-        p_payload: { ...getMarketingAttribution(), lead_type: 'order', idempotency_key: idempotencyKey.current },
-      })
+      const created = data as CreatedOrder | null
+      if (!created?.tracking_token) {
+        setError("La réponse du serveur est incomplète. Vérifiez le suivi avant de réessayer pour éviter une commande en double.")
+        return
+      }
+
+      try {
+        await supabase.rpc('record_marketing_attribution', {
+          p_payload: { ...getMarketingAttribution(), lead_type: 'order', idempotency_key: idempotencyKey.current },
+        })
+      } catch {
+        // Attribution is best-effort and must never block a valid COD order.
+      }
+      clear()
+      navigate(`/boutique/commande/confirmation?token=${encodeURIComponent(created.tracking_token)}`)
     } catch {
-      // Attribution is best-effort and must never block a valid COD order.
+      setError("Connexion interrompue : la commande n'a pas pu être confirmée. Vérifiez votre suivi avant de réessayer.")
+    } finally {
+      setSubmitting(false)
     }
-    clear()
-    navigate(`/boutique/commande/confirmation?token=${created.tracking_token}`)
   }
 
   return (

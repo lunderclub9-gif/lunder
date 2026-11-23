@@ -116,6 +116,11 @@ export default function CheckoutPage() {
         }
         setQuote(row)
       })
+      .catch(() => {
+        if (cancelled) return
+        setQuote(null)
+        setQuoteError('Connexion interrompue : impossible de calculer les frais de livraison. Vérifiez votre connexion et réessayez.')
+      })
 
     return () => {
       cancelled = true

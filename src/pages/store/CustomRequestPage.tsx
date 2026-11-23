@@ -110,23 +110,32 @@ export default function CustomRequestPage() {
   }, [])
 
   useEffect(() => {
+    let active = true
+    setCommunes([])
     setCommuneId('')
     setPickupPoints([])
     setPickupId('')
-    if (!wilayaCode) return
+    if (!wilayaCode) return () => { active = false }
+
     supabase
       .from('communes')
       .select('id, name_fr')
       .eq('wilaya_code', Number(wilayaCode))
       .eq('is_active', true)
       .order('name_fr')
-      .then(({ data }) => setCommunes((data as Commune[]) ?? []))
+      .then(({ data }) => {
+        if (active) setCommunes((data as Commune[]) ?? [])
+      })
     supabase
       .from('pickup_points')
       .select('id, name, address')
       .eq('wilaya_code', Number(wilayaCode))
       .eq('is_active', true)
-      .then(({ data }) => setPickupPoints((data as PickupPoint[]) ?? []))
+      .order('name')
+      .then(({ data }) => {
+        if (active) setPickupPoints((data as PickupPoint[]) ?? [])
+      })
+    return () => { active = false }
   }, [wilayaCode])
 
   const runEstimate = useCallback(async () => {

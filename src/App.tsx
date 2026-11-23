@@ -89,6 +89,7 @@ export default function App() {
           <Suspense fallback={<FullPageLoader />}>
             <Routes>
               <Route path="/admin" element={<AdminLogin />} />
+              <Route path="/admin/analytics" element={<RequireOwner><AdminAnalytics /></RequireOwner>} />
               <Route
                 path="/admin/*"
                 element={
@@ -98,7 +99,6 @@ export default function App() {
                 }
               >
                 <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="produits" element={<AdminProducts />} />
                 <Route path="produits/nouveau" element={<AdminProductEdit />} />
                 <Route path="produits/:id" element={<AdminProductEdit />} />

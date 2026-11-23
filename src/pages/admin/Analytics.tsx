@@ -151,8 +151,8 @@ function estimateUnitCost(cost: ProductCost | undefined, material: Material | un
   return materialCost + machineCost + laborCost + failures + Number(cost.packaging_dzd) + Number(cost.return_reserve_dzd)
 }
 
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <section className={'rounded-2xl border border-white/[0.07] bg-[#171717] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.18)] sm:p-5 ' + className}>{children}</section>
+function Card({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
+  return <section id={id} className={'rounded-2xl border border-white/[0.07] bg-[#171717] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.18)] sm:p-5 ' + className}>{children}</section>
 }
 
 function KpiCard({ label, value, note, icon: Icon, accent = 'red', trend }: {
@@ -273,6 +273,7 @@ function Donut({ statuses, total }: { statuses: { key: string; count: number }[]
 }
 
 export default function AdminAnalytics() {
+  const [introVisible, setIntroVisible] = useState(() => { try { return !sessionStorage.getItem('lunder.analytics.intro') } catch { return true } })
   const [period, setPeriod] = useState<Period>('30d')
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -306,6 +307,16 @@ export default function AdminAnalytics() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    if (!introVisible) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const delay = window.setTimeout(() => {
+      setIntroVisible(false)
+      try { sessionStorage.setItem('lunder.analytics.intro', 'seen') } catch { /* optional */ }
+    }, reduced ? 450 : 2850)
+    return () => window.clearTimeout(delay)
+  }, [introVisible])
 
   const analysis = useMemo(() => {
     if (!data) return null
@@ -545,12 +556,37 @@ export default function AdminAnalytics() {
     URL.revokeObjectURL(url)
   }
 
+  const intro = introVisible ? (
+    <div className="analytics-intro" role="status" aria-label="Ouverture du centre Analytics LUNDER">
+      <div className="analytics-intro-glow" />
+      <div className="analytics-intro-mark"><span className="analytics-intro-symbol"><Printer size={34} strokeWidth={1.35} /></span><span className="analytics-intro-word">LUNDER</span><span className="analytics-intro-caption">BUSINESS INTELLIGENCE</span></div>
+      <div className="analytics-intro-light" />
+    </div>
+  ) : null
+
   if (loading && !data) {
-    return <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-neutral-400"><div className="h-10 w-10 animate-spin rounded-full border-2 border-neutral-700 border-t-red-500" /><p className="text-sm">Préparation de votre centre analytique…</p></div>
+    return <div className="analytics-loading"><div className="flex min-h-screen flex-col items-center justify-center gap-3 text-neutral-400"><div className="h-10 w-10 animate-spin rounded-full border-2 border-neutral-700 border-t-red-500" /><p className="text-sm">Préparation de votre centre analytique…</p></div>{intro}</div>
   }
 
   return (
-    <div className="animate-fade-in space-y-6 pb-10">
+    <div className="analytics-app">
+      <aside className="analytics-sidebar">
+        <a href="/admin/dashboard" className="analytics-brand"><span className="analytics-brand-icon"><Printer size={18} /></span><span><strong>LUNDER</strong><small>BUSINESS INTELLIGENCE</small></span></a>
+        <div className="analytics-sidebar-label">CENTRE DE PILOTAGE</div>
+        <nav className="analytics-nav" aria-label="Sections analytiques">
+          <a href="#overview"><Wallet size={16} />Vue générale</a>
+          <a href="#sales"><TrendingUp size={16} />Ventes & commandes</a>
+          <a href="#products"><Package size={16} />Produits & rentabilité</a>
+          <a href="#wilayas"><MapPin size={16} />Wilayas</a>
+          <a href="#campaigns"><Target size={16} />Campagnes</a>
+          <a href="#customers"><Users size={16} />Clients</a>
+          <a href="#growth"><Sparkles size={16} />Croissance</a>
+        </nav>
+        <div className="analytics-sidebar-bottom"><a href="/admin/dashboard"><ArrowRight size={15} />Retour à l’administration</a><span>ESPACE PROPRIÉTAIRE</span></div>
+      </aside>
+      <main className="analytics-main">
+        <div className="analytics-mobile-brand"><a href="/admin/dashboard">← Administration</a><span>LUNDER / ANALYTICS</span></div>
+        <div className="animate-fade-in space-y-6 pb-10">
       <div className="relative overflow-hidden rounded-3xl border border-red-500/20 bg-[radial-gradient(ellipse_at_top_right,rgba(220,38,38,0.18),transparent_42%),linear-gradient(125deg,#1d1d1d,#111111_65%)] p-5 sm:p-7">
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border border-red-500/10" />
         <div className="pointer-events-none absolute -right-8 -top-12 h-48 w-48 rounded-full border border-red-500/10" />
@@ -590,14 +626,14 @@ export default function AdminAnalytics() {
 
       {analysis && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+          <div id="overview" className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
             <KpiCard label="Chiffre d'affaires livré" value={money(analysis.revenue)} note="Sous-total des commandes livrées, hors livraison" icon={Wallet} accent="green" trend={analysis.revenueTrend} />
             <KpiCard label="Marge brute estimée" value={money(analysis.estimatedProfit)} note={number(analysis.marginCoverage) + ' % des unités avec coût renseigné'} icon={CircleDollarSign} accent="red" />
             <KpiCard label="Valeur en cours" value={money(analysis.pipeline)} note="Commandes non annulées et pas encore livrées" icon={Truck} accent="blue" />
             <KpiCard label="Panier moyen livré" value={money(analysis.averageOrder)} note={number(analysis.delivered.length) + ' commandes livrées'} icon={ShoppingBag} accent="amber" />
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+          <div id="sales" className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
             <Card>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Performance commerciale</p><h2 className="mt-1 text-lg font-bold text-white">Évolution du chiffre d'affaires</h2><p className="mt-1 text-xs text-neutral-500">Commandes livrées uniquement · hors frais de livraison</p></div>
@@ -618,7 +654,7 @@ export default function AdminAnalytics() {
             </Card>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div id="products" className="grid gap-4 xl:grid-cols-2">
             <Card>
               <div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Géographie des ventes</p><h2 className="mt-1 text-lg font-bold text-white">Performance par wilaya</h2><p className="mt-1 text-xs text-neutral-500">Classement selon les commandes non annulées</p></div><span className="rounded-xl bg-red-500/10 p-2.5 text-red-400"><MapPin size={18} /></span></div>
               {analysis.wilayas.some((item) => item.orders > 0) ? <div className="space-y-4">{analysis.wilayas.filter((item) => item.orders > 0).slice(0, 7).map((item, index) => <HorizontalBar key={item.code} label={String(item.code).padStart(2, '0') + ' · ' + item.name} value={item.orders} max={analysis.wilayas[0]?.orders ?? 1} detail={number(item.orders) + ' cmd'} index={index} />)}</div> : <EmptyState text="Les données des wilayas apparaîtront après les premières commandes." />}
@@ -631,7 +667,7 @@ export default function AdminAnalytics() {
             </Card>
           </div>
 
-          <Card>
+          <Card id="profit">
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Marge & rentabilité</p><h2 className="mt-1 text-lg font-bold text-white">Quels produits rapportent le plus ?</h2><p className="mt-1 text-xs text-neutral-500">Classement estimatif après déduction des coûts enregistrés dans les fiches produits.</p></div><span className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[10px] text-amber-200">Estimation · pas une comptabilité certifiée</span></div>
             {analysis.mostProfitable.length ? (
               <div className="overflow-x-auto">
@@ -644,7 +680,7 @@ export default function AdminAnalytics() {
             {analysis.marginCoverage < 100 && <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-500/15 bg-amber-500/[0.06] p-3 text-xs leading-5 text-amber-100/80"><AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-400" /><span>La marge affichée ne couvre que les articles dont les coûts sont suffisamment renseignés. Les demandes sur mesure et les produits sans fiche de coût ne sont pas comptés dans ce bénéfice estimé.</span></div>}
           </Card>
 
-          <Card>
+          <Card id="campaigns">
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Acquisition & marketing</p><h2 className="mt-1 text-lg font-bold text-white">Quelles campagnes apportent des clients ?</h2><p className="mt-1 text-xs text-neutral-500">Attribution première visite · paramètres UTM</p></div><div className="flex flex-wrap gap-4 text-xs"><div><p className="text-neutral-500">Commandes attribuées</p><strong className="text-white">{number(analysis.attributedOrders)}</strong></div><div><p className="text-neutral-500">CA livré attribué</p><strong className="text-emerald-400">{money(analysis.attributedRevenue)}</strong></div><div><p className="text-neutral-500">Dépenses pub.</p><strong className="text-white">{money(analysis.totalAdSpend)}</strong></div><div><p className="text-neutral-500">ROAS global</p><strong className="text-white">{analysis.overallRoas === null ? '—' : analysis.overallRoas.toFixed(2) + 'x'}</strong></div><div><p className="text-neutral-500">Demandes sur mesure</p><strong className="text-white">{number(analysis.customRequestLeads)}</strong></div></div></div>
             <form onSubmit={handleAddSpend} className="mb-5 grid gap-2 rounded-xl border border-white/[0.07] bg-neutral-900/70 p-3 sm:grid-cols-2 xl:grid-cols-6">
               <label className="text-[10px] text-neutral-500">Date<input required type="date" value={spendDate} onChange={(event) => setSpendDate(event.target.value)} className="mt-1 min-h-9 w-full rounded-lg border border-white/10 bg-neutral-950 px-2 text-xs text-white" /></label>
@@ -661,7 +697,7 @@ export default function AdminAnalytics() {
           </Card>
 
           <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
-            <Card>
+            <Card id="customers">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Fidélisation</p><h2 className="mt-1 text-lg font-bold text-white">Vos clients</h2><p className="mt-1 text-xs text-neutral-500">Analyse agrégée, sans afficher les numéros de téléphone</p>
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-neutral-900 p-4"><Users size={17} className="text-sky-400" /><p className="mt-3 text-2xl font-bold text-white">{number(analysis.uniqueCustomers)}</p><p className="mt-1 text-[11px] text-neutral-500">Clients distincts</p></div>
@@ -669,7 +705,7 @@ export default function AdminAnalytics() {
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-white/[0.07] pt-4"><span className="text-xs text-neutral-400">Taux de clients récurrents</span><strong className="text-lg text-white">{percent(analysis.repeatRate)}</strong></div>
             </Card>
-            <Card>
+            <Card id="growth">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Actions de croissance</p><h2 className="mt-1 text-lg font-bold text-white">Pistes pour développer LUNDER</h2><p className="mt-1 text-xs text-neutral-500">Suggestions générées à partir de vos données réelles</p>
               <div className="mt-5 space-y-3">
                 {analysis.wilayas[0]?.orders ? <Insight icon={Target} title={'Tester une campagne dans ' + analysis.wilayas[0].name} text={'Cette wilaya concentre le plus de commandes (' + number(analysis.wilayas[0].orders) + '). Testez une campagne locale puis comparez les commandes livrées et le coût publicitaire.'} /> : <Insight icon={Target} title="Préparer votre première campagne" text="Commencez à suivre les demandes et commandes par wilaya. Ajoutez ensuite les dépenses publicitaires pour mesurer le coût d'acquisition." />}
@@ -680,7 +716,9 @@ export default function AdminAnalytics() {
             </Card>
           </div>
 
-          <Card>
+          <details className="analytics-fold group" id="wilayas">
+            <summary><span><strong>Couverture nationale · toutes les wilayas</strong><small>Déplier le classement détaillé des commandes et ventes par wilaya</small></span><ChevronDown size={18} /></summary>
+            <Card>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Couverture nationale</p><h2 className="mt-1 text-lg font-bold text-white">Toutes les wilayas actives</h2><p className="mt-1 text-xs text-neutral-500">Recherchez une wilaya et comparez le volume de commandes et les ventes livrées.</p></div><label className="flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-neutral-900 px-3"><Filter size={14} className="text-neutral-500" /><input value={wilayaSearch} onChange={(event) => setWilayaSearch(event.target.value)} placeholder="Rechercher une wilaya…" className="w-40 bg-transparent text-xs text-white outline-none placeholder:text-neutral-600 sm:w-52" /></label></div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {filteredWilayas.map((item) => {
@@ -693,7 +731,8 @@ export default function AdminAnalytics() {
                 </div>
               })}
             </div>
-          </Card>
+            </Card>
+          </details>
 
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
             <Card><div className="flex items-center gap-3"><div className="rounded-xl bg-red-500/10 p-2.5 text-red-400"><Activity size={18} /></div><div><p className="text-xs text-neutral-500">Commandes annulées</p><p className="text-xl font-bold text-white">{number(analysis.cancelled)}</p></div></div><p className="mt-3 text-[11px] text-neutral-500">À surveiller pour identifier les problèmes de confirmation ou de livraison.</p></Card>
@@ -708,6 +747,9 @@ export default function AdminAnalytics() {
           </div>
         </>
       )}
+        </div>
+      </main>
+      {intro}
     </div>
   )
 }

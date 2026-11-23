@@ -252,12 +252,16 @@ export default function CustomRequestPage() {
   const removeFile = async (path: string) => {
     if (uploadLock.current) return
     setError(null)
-    const { error: removeError } = await supabase.storage.from('custom-requests').remove([path])
-    if (removeError) {
-      setError('Impossible de supprimer ce fichier du stockage privé. Réessayez avant d’envoyer la demande.')
-      return
+    try {
+      const { error: removeError } = await supabase.storage.from('custom-requests').remove([path])
+      if (removeError) {
+        setError('Impossible de supprimer ce fichier du stockage privé. Réessayez avant d’envoyer la demande.')
+        return
+      }
+      setFiles((current) => current.filter((file) => file.path !== path))
+    } catch {
+      setError('Connexion interrompue : le fichier n’a pas pu être supprimé. Réessayez.')
     }
-    setFiles((current) => current.filter((file) => file.path !== path))
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -368,7 +372,12 @@ export default function CustomRequestPage() {
       } catch {
         // Attribution is best-effort and must never block a valid guest request.
       }
-      setCreated(data as CreatedRequest)
+      const result = data as CreatedRequest | null
+      if (!result?.request_number || !result?.tracking_token) {
+        setError("La réponse du serveur est incomplète. Contactez le studio avant de renvoyer la demande afin d'éviter un doublon.")
+        return
+      }
+      setCreated(result)
     } catch {
       setError("Connexion interrompue : la demande n'a pas pu être confirmée. Réessayez ; la clé d'idempotence évite les doublons.")
     } finally {

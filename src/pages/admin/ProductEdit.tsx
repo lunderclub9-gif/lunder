@@ -148,7 +148,7 @@ export default function AdminProductEdit() {
         const { error: upErr } = await supabase.storage
           .from('product-images')
           .upload(path, file, { contentType: check.contentType, upsert: false })
-        if (upErr) throw new Error(`« ${file.name} » a été refusé par le stockage (format ou taille).`)
+        if (upErr) throw new Error(`Échec de l’envoi de « ${file.name} » : ${upErr.message}. Vérifiez votre connexion, votre session propriétaire et la limite de 5 Mo.`)
 
         const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path)
         const isPrimary = images.length === 0 && i === 0
@@ -471,14 +471,19 @@ export default function AdminProductEdit() {
       const { error: uploadError } = await supabase.storage
         .from('product-images')
         .upload(path, file, { contentType: check.contentType, upsert: false })
-      if (uploadError) throw new Error('Impossible de téléverser la photo de cette variante.')
+      if (uploadError) throw new Error(`Échec de l’envoi de la photo : ${uploadError.message}. Vérifiez que vous êtes connecté en tant que propriétaire et que l’image fait moins de 5 Mo.`)
       const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path)
       const { error: updateError } = await supabase
         .from('product_variants')
         .update({ image_url: urlData.publicUrl })
         .eq('id', variant.id)
         .eq('product_id', id)
-      if (updateError) throw new Error('La photo est chargée, mais son association à la variante a échoué.')
+      if (updateError) {
+        if (/image_url|column/i.test(updateError.message)) {
+          throw new Error('La photo a été envoyée, mais la base de données ne connaît pas encore le champ image_url. La migration 018 doit être appliquée dans Supabase.')
+        }
+        throw new Error(`La photo a été envoyée, mais son association à la variante a échoué : ${updateError.message}`)
+      }
       setVariants((current) =>
         current.map((item) => item.id === variant.id ? { ...item, image_url: urlData.publicUrl } : item)
       )
@@ -801,8 +806,8 @@ export default function AdminProductEdit() {
             <div className="admin-card">
               <h2 className="mb-1 text-lg font-semibold text-offwhite">Options et variantes</h2>
               <p className="mb-4 text-xs text-charcoal-400">
-                Créez une option (par exemple « Couleur »), ses valeurs, puis chaque combinaison réellement
-                fabricable. Aucune combinaison n'est générée automatiquement.
+                Gestion simple : ajoutez une option (ex. Couleur), entrez ses valeurs (Rouge, Bleu), puis utilisez
+                « Créer automatiquement les variantes ». Ajoutez ensuite une photo directement sur chaque variante.
               </p>
 
               <div className="flex gap-2">
@@ -937,8 +942,8 @@ export default function AdminProductEdit() {
                   </div>
                   {options.length === 1 && (
                     <p className="mt-2 text-xs text-charcoal-500">
-                      Ajout rapide : crée une variante pour chaque valeur active de « {options[0].name} ».
-                      Le prix et le stock saisis ci-dessus sont appliqués à chaque variante ; les variantes déjà créées sont ignorées.
+                      Le plus simple : une variante sera créée pour chaque valeur de « {options[0].name} ».
+                      Le prix et le stock ci-dessus seront appliqués à toutes. Les variantes existantes seront conservées.
                     </p>
                   )}
                 </div>
@@ -966,7 +971,7 @@ export default function AdminProductEdit() {
                           </p>
                           <label className="mt-1 inline-flex cursor-pointer items-center gap-1 text-xs text-brand-red-light hover:text-brand-red">
                             <Upload className="h-3 w-3" />
-                            {variant.image_url ? 'Changer la photo' : 'Ajouter une photo'}
+                            {variant.image_url ? 'Modifier la photo' : 'Ajouter une photo'}
                             <input
                               type="file"
                               accept="image/jpeg,image/png,image/webp,image/avif"

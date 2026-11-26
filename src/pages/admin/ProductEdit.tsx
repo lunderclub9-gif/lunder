@@ -152,7 +152,7 @@ export default function AdminProductEdit() {
 
         const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path)
         const isPrimary = images.length === 0 && i === 0
-        const { data: imgData } = await supabase
+        const { data: imgData, error: imageInsertError } = await supabase
           .from('product_images')
           .insert({
             product_id: id,
@@ -163,7 +163,11 @@ export default function AdminProductEdit() {
           })
           .select('*')
           .single()
-        if (imgData) setImages((prev) => [...prev, imgData as ProductImage])
+        if (imageInsertError || !imgData) {
+          await supabase.storage.from('product-images').remove([path])
+          throw new Error(`La photo a été envoyée, mais son ajout à la galerie a échoué : ${imageInsertError?.message ?? 'aucune donnée retournée'}`)
+        }
+        setImages((prev) => [...prev, imgData as ProductImage])
       }
       if (isPostHogEnabled) {
         posthog.capture('product_images_uploaded', { product_id: id, image_count: files.length })

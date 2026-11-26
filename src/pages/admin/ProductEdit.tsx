@@ -341,6 +341,61 @@ export default function AdminProductEdit() {
   const selectedValueIds = options.map((option) => variantSelection[option.id]).filter(Boolean)
   const combinationComplete = options.length > 0 && selectedValueIds.length === options.length
 
+  const createVariantsForSingleOption = async () => {
+    if (!id || options.length !== 1) return
+    const option = options[0]
+    const values = (option.values ?? []).filter((value) => value.is_active)
+    const existingValueIds = new Set(
+      variants.flatMap((variant) => (variant.values ?? []).map((item) => item.option_value_id))
+    )
+    const missingValues = values.filter((value) => !existingValueIds.has(value.id))
+    if (missingValues.length === 0) {
+      setError('Toutes les valeurs ont déjà leur variante.')
+      return
+    }
+
+    const price = variantPrice.trim() ? Math.round(Number(variantPrice)) : null
+    const stock = Number(variantStock)
+    if (price !== null && (!Number.isFinite(price) || price < 0)) {
+      setError('Le prix des variantes doit être un nombre positif.')
+      return
+    }
+    if (!Number.isFinite(stock) || stock < 0) {
+      setError('Le stock initial doit être un nombre positif ou nul.')
+      return
+    }
+
+    setError(null)
+    const { data: created, error: createError } = await supabase
+      .from('product_variants')
+      .insert(missingValues.map((value) => ({
+        product_id: id,
+        label: value.value,
+        price_dzd: price,
+        stock_quantity: Math.round(stock),
+      })))
+      .select('id, label')
+
+    if (createError || !created?.length) {
+      setError('Impossible de créer automatiquement les variantes.')
+      return
+    }
+
+    const links = created.map((variant) => {
+      const value = missingValues.find((item) => item.value === variant.label)
+      return value ? { variant_id: variant.id, option_value_id: value.id } : null
+    }).filter((link): link is { variant_id: string; option_value_id: string } => link !== null)
+
+    const { error: linkError } = await supabase.from('product_variant_values').insert(links)
+    if (linkError) {
+      await supabase.from('product_variants').delete().in('id', created.map((variant) => variant.id))
+      setError('Les variantes n’ont pas pu être reliées à leurs valeurs. Aucune variante partielle n’a été conservée.')
+      return
+    }
+
+    await loadVariants(id)
+  }
+
   const createVariant = async () => {
     if (!id || !combinationComplete) return
     setError(null)
@@ -859,15 +914,33 @@ export default function AdminProductEdit() {
                       />
                     </label>
                   </div>
-                  <button
-                    type="button"
-                    onClick={createVariant}
-                    disabled={!combinationComplete}
-                    className="btn-primary mt-3"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Créer la variante
-                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={createVariant}
+                      disabled={!combinationComplete}
+                      className="btn-primary"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Créer la variante
+                    </button>
+                    {options.length === 1 && (
+                      <button
+                        type="button"
+                        onClick={() => void createVariantsForSingleOption()}
+                        disabled={!(options[0].values ?? []).some((value) => value.is_active)}
+                        className="btn-secondary"
+                      >
+                        Créer une variante par valeur
+                      </button>
+                    )}
+                  </div>
+                  {options.length === 1 && (
+                    <p className="mt-2 text-xs text-charcoal-500">
+                      Ajout rapide : crée une variante pour chaque valeur active de « {options[0].name} ».
+                      Le prix et le stock saisis ci-dessus sont appliqués à chaque variante ; les variantes déjà créées sont ignorées.
+                    </p>
+                  )}
                 </div>
               )}
 

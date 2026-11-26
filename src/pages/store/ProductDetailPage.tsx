@@ -120,6 +120,17 @@ export default function ProductDetailPage() {
     )
   }, [selectableOptions, selection, variants])
 
+  useEffect(() => {
+    if (!product) return
+    if (matchedVariant?.image_url) {
+      setActiveImage(matchedVariant.image_url)
+      setMediaMode('photos')
+      return
+    }
+    const primary = images.find((image) => image.is_primary) ?? images[0]
+    setActiveImage(primary?.image_url ?? null)
+  }, [matchedVariant?.id, matchedVariant?.image_url, product?.id, images])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">

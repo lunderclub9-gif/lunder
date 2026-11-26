@@ -128,6 +128,7 @@ export type ProductVariant = {
   price_dzd: number | null
   stock_quantity: number
   made_to_order: boolean | null
+  image_url?: string | null
   is_active: boolean
   created_at?: string
   values?: { option_value_id: string }[]

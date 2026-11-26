@@ -401,6 +401,40 @@ export default function AdminProductEdit() {
     await loadVariants(id)
   }
 
+  const handleVariantImageUpload = async (
+    variant: ProductVariant,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0]
+    if (!file || !id) return
+    setUploading(true)
+    setError(null)
+    try {
+      const check = await validateImage(file)
+      if (!check.ok) throw new Error(check.message)
+      const path = id + '/variants/' + variant.id + '-' + Date.now() + '.' + check.extension
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(path, file, { contentType: check.contentType, upsert: false })
+      if (uploadError) throw new Error('Impossible de téléverser la photo de cette variante.')
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path)
+      const { error: updateError } = await supabase
+        .from('product_variants')
+        .update({ image_url: urlData.publicUrl })
+        .eq('id', variant.id)
+        .eq('product_id', id)
+      if (updateError) throw new Error('La photo est chargée, mais son association à la variante a échoué.')
+      setVariants((current) =>
+        current.map((item) => item.id === variant.id ? { ...item, image_url: urlData.publicUrl } : item)
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors du téléversement de la photo.')
+    } finally {
+      setUploading(false)
+      event.target.value = ''
+    }
+  }
+
   const toggleVariant = async (variant: ProductVariant) => {
     const { error: updateError } = await supabase
       .from('product_variants')
@@ -844,13 +878,31 @@ export default function AdminProductEdit() {
                       key={variant.id}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-charcoal-400/15 px-3 py-2"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-offwhite">{variantLabel(variant)}</p>
-                        <p className="text-xs text-charcoal-400">
-                          {variant.price_dzd != null ? `${variant.price_dzd} DA` : 'Prix du produit'} ·{' '}
-                          {variant.stock_quantity} en stock
-                          {!variant.is_active && ' · désactivée'}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        {variant.image_url ? (
+                          <img src={variant.image_url} alt={variantLabel(variant)} className="h-14 w-14 rounded-lg border border-charcoal-400/20 object-cover" />
+                        ) : (
+                          <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-charcoal-400/30 text-[10px] text-charcoal-500">Photo</div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-offwhite">{variantLabel(variant)}</p>
+                          <p className="text-xs text-charcoal-400">
+                            {variant.price_dzd != null ? String(variant.price_dzd) + ' DA' : 'Prix du produit'} ·{' '}
+                            {variant.stock_quantity} en stock
+                            {!variant.is_active && ' · désactivée'}
+                          </p>
+                          <label className="mt-1 inline-flex cursor-pointer items-center gap-1 text-xs text-brand-red-light hover:text-brand-red">
+                            <Upload className="h-3 w-3" />
+                            {variant.image_url ? 'Changer la photo' : 'Ajouter une photo'}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/avif"
+                              className="hidden"
+                              disabled={uploading}
+                              onChange={(event) => void handleVariantImageUpload(variant, event)}
+                            />
+                          </label>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <button

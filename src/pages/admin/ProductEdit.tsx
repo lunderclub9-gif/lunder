@@ -1018,7 +1018,7 @@ export default function AdminProductEdit() {
                   <button type="button" onClick={() => void createSelectedShapeColorVariants()} disabled={creatingVariants || !selectedShapeId || !selectedColorIds.length} className="btn-primary mt-3">{creatingVariants ? 'Création...' : 'Créer les variantes sélectionnées'}</button>
                 </div>
               )}
-              {options.length > 0 && (
+              {options.length > 0 && !(options.some((o) => /^(forme|shape)$/i.test(o.name.trim())) && options.some((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))) && (
                 <div className="mt-4 rounded-lg border border-charcoal-400/15 p-3">
                   <p className="text-sm font-semibold text-offwhite">Créer une variante</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">

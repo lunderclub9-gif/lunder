@@ -35,6 +35,9 @@ export default function AdminProductEdit() {
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [newOptionName, setNewOptionName] = useState('')
   const [optionValueDraft, setOptionValueDraft] = useState<Record<string, string>>({})
+  const [bulkValueDraft, setBulkValueDraft] = useState<Record<string, string>>({})
+  const [selectedShapeId, setSelectedShapeId] = useState('')
+  const [selectedColorIds, setSelectedColorIds] = useState<string[]>([])
   const [variantSelection, setVariantSelection] = useState<Record<string, string>>({})
   const [variantPrice, setVariantPrice] = useState('')
   const [variantStock, setVariantStock] = useState('0')
@@ -332,6 +335,64 @@ export default function AdminProductEdit() {
     }
     setOptionValueDraft((prev) => ({ ...prev, [option.id]: '' }))
     if (id) await loadOptions(id)
+  }
+
+  const addOptionValuesBulk = async (option: ProductOption) => {
+    if (!id) return
+    const values = (bulkValueDraft[option.id] ?? '').split(/[\\n,;]+/).map((v) => v.trim()).filter(Boolean)
+    const existing = new Set((option.values ?? []).map((v) => v.value.toLowerCase()))
+    const unique = [...new Set(values)].filter((v) => !existing.has(v.toLowerCase()))
+    if (!unique.length) { setError('Toutes ces valeurs existent déjà.'); return }
+    const { error } = await supabase.from('product_option_values').insert(unique.map((value, index) => ({ option_id: option.id, value, sort_order: (option.values ?? []).length + index })))
+    if (error) { setError("Impossible d'ajouter les valeurs."); return }
+    setBulkValueDraft((prev) => ({ ...prev, [option.id]: '' }))
+    await loadOptions(id)
+  }
+
+  const uploadOptionValueImage = async (valueId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !id) return
+    setUploading(true)
+    try {
+      const check = await validateImage(file)
+      if (!check.ok) throw new Error(check.message)
+      const path = `${id}/options/${valueId}-${Date.now()}.${check.extension}`
+      const { error: uploadError } = await supabase.storage.from('product-images').upload(path, file, { contentType: check.contentType, upsert: false })
+      if (uploadError) throw uploadError
+      const { data } = supabase.storage.from('product-images').getPublicUrl(path)
+      const { error } = await supabase.from('product_option_values').update({ image_url: data.publicUrl }).eq('id', valueId)
+      if (error) { await supabase.storage.from('product-images').remove([path]); if (/image_url|column/i.test(error.message)) throw new Error('Appliquez la migration 020 pour activer les photos des formes et couleurs.'); throw error }
+      await loadOptions(id)
+    } catch (err) { setError(err instanceof Error ? err.message : "Erreur lors de l'envoi de la photo.") }
+    finally { setUploading(false); event.target.value = '' }
+  }
+
+  const createSelectedShapeColorVariants = async () => {
+    if (!id) return
+    const shapeOption = options.find((o) => /^(forme|shape)$/i.test(o.name.trim()))
+    const colorOption = options.find((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))
+    const shape = shapeOption?.values?.find((v) => v.id === selectedShapeId)
+    const chosen = (colorOption?.values ?? []).filter((v) => selectedColorIds.includes(v.id) && v.is_active)
+    if (!shape || !chosen.length) { setError('Choisissez une forme et au moins une couleur.'); return }
+    const existing = new Set(variants.map((v) => (v.values ?? []).map((x) => x.option_value_id).sort().join(',')))
+    const missing = chosen.filter((color) => !existing.has([shape.id, color.id].sort().join(',')))
+    if (!missing.length) { setError('Ces variantes existent déjà.'); return }
+    const price = variantPrice.trim() ? Math.round(Number(variantPrice)) : null
+    const stock = Number(variantStock)
+    if ((price !== null && (!Number.isFinite(price) || price < 0)) || !Number.isFinite(stock) || stock < 0) { setError('Vérifiez le prix et le stock.'); return }
+    setCreatingVariants(true); setError(null)
+    const created: string[] = []
+    try {
+      for (const color of missing) {
+        const { data, error } = await supabase.from('product_variants').insert({ product_id: id, label: `${shape.value} / ${color.value}`, price_dzd: price, stock_quantity: Math.round(stock) }).select('id').single()
+        if (error || !data) throw new Error(error?.message ?? 'Création impossible.')
+        created.push(data.id)
+        const { error: linkError } = await supabase.from('product_variant_values').insert([{ variant_id: data.id, option_value_id: shape.id }, { variant_id: data.id, option_value_id: color.id }])
+        if (linkError) throw linkError
+      }
+      await loadVariants(id); setSelectedColorIds([]); setVariantPrice(''); setVariantStock('0')
+    } catch (err) { if (created.length) await supabase.from('product_variants').delete().in('id', created); setError(err instanceof Error ? err.message : 'Création impossible.'); await loadVariants(id) }
+    finally { setCreatingVariants(false) }
   }
 
   const deleteOptionValue = async (valueId: string) => {
@@ -912,18 +973,20 @@ export default function AdminProductEdit() {
                     </div>
 
                     {(option.values ?? []).length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
                         {(option.values ?? []).map((value) => (
-                          <span key={value.id} className="inline-flex items-center gap-1.5 rounded-full bg-charcoal-700 px-3 py-1 text-xs text-offwhite">
-                            {value.value}
-                            <button onClick={() => deleteOptionValue(value.id)} aria-label={`Retirer ${value.value}`}>
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
+                          <div key={value.id} className="flex items-center gap-2 rounded-lg bg-charcoal-800/60 p-2">
+                            {value.image_url ? <img src={value.image_url} alt={value.value} className="h-10 w-10 rounded object-cover" /> : <span className="h-10 w-10 rounded border border-dashed border-charcoal-400/30" />}
+                            <span className="min-w-0 flex-1 text-xs text-offwhite">{value.value}</span>
+                            <label className="cursor-pointer text-xs text-brand-red-light">Photo<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" disabled={uploading} onChange={(event) => void uploadOptionValueImage(value.id, event)} /></label>
+                            <button onClick={() => deleteOptionValue(value.id)} aria-label={`Retirer ${value.value}`}><X className="h-3 w-3" /></button>
+                          </div>
                         ))}
                       </div>
                     )}
 
+                    <textarea rows={2} value={bulkValueDraft[option.id] ?? ''} onChange={(e) => setBulkValueDraft((prev) => ({ ...prev, [option.id]: e.target.value }))} className="input-field mt-2 resize-y text-sm" placeholder="Ajout multiple : Bleu, Noir, Blanc (ou une valeur par ligne)" />
+                    <button type="button" onClick={() => void addOptionValuesBulk(option)} className="mt-2 text-xs text-brand-red-light">Ajouter toutes les valeurs</button>
                     <div className="mt-2 flex gap-2">
                       <input
                         type="text"
@@ -945,6 +1008,16 @@ export default function AdminProductEdit() {
                 ))}
               </div>
 
+              {options.some((o) => /^(forme|shape)$/i.test(o.name.trim())) && options.some((o) => /^(couleur|color|colour)$/i.test(o.name.trim())) && (
+                <div className="mt-4 rounded-lg border border-brand-red/25 bg-brand-red/5 p-3">
+                  <p className="text-sm font-semibold text-offwhite">Couleurs disponibles par forme</p>
+                  <p className="mt-1 text-xs text-charcoal-400">Choisissez une forme puis cochez uniquement ses couleurs. Répétez pour chaque forme.</p>
+                  <label className="mt-3 block"><span className="label-text">Forme</span><select value={selectedShapeId} onChange={(e) => setSelectedShapeId(e.target.value)} className="input-field"><option value="">Choisir...</option>{(options.find((o) => /^(forme|shape)$/i.test(o.name.trim()))?.values ?? []).map((v) => <option key={v.id} value={v.id}>{v.value}</option>)}</select></label>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">{(options.find((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))?.values ?? []).map((v) => <label key={v.id} className="flex items-center gap-2 rounded border border-charcoal-400/15 p-2 text-sm text-offwhite"><input type="checkbox" checked={selectedColorIds.includes(v.id)} onChange={(e) => setSelectedColorIds((current) => e.target.checked ? [...current,v.id] : current.filter((x) => x !== v.id))} className="accent-brand-red"/>{v.image_url ? <img src={v.image_url} alt="" className="h-8 w-8 rounded object-cover"/> : <span className="h-8 w-8 rounded border border-dashed border-charcoal-400/30"/>}{v.value}</label>)}</div>
+                  <div className="mt-2 flex gap-3 text-xs"><button type="button" onClick={() => setSelectedColorIds((options.find((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))?.values ?? []).map((v) => v.id))} className="text-brand-red-light">Tout sélectionner</button><button type="button" onClick={() => setSelectedColorIds([])} className="text-charcoal-400">Tout effacer</button></div>
+                  <button type="button" onClick={() => void createSelectedShapeColorVariants()} disabled={creatingVariants || !selectedShapeId || !selectedColorIds.length} className="btn-primary mt-3">{creatingVariants ? 'Création...' : 'Créer les variantes sélectionnées'}</button>
+                </div>
+              )}
               {options.length > 0 && (
                 <div className="mt-4 rounded-lg border border-charcoal-400/15 p-3">
                   <p className="text-sm font-semibold text-offwhite">Créer une variante</p>

@@ -40,6 +40,7 @@ export default function AdminProductEdit() {
   const [variantSelection, setVariantSelection] = useState<Record<string, string>>({})
   const [variantPrice, setVariantPrice] = useState('')
   const [variantStock, setVariantStock] = useState('0')
+  const [creatingVariants, setCreatingVariants] = useState(false)
 
   const [form, setForm] = useState({
     name: '',
@@ -148,11 +149,11 @@ export default function AdminProductEdit() {
         const { error: upErr } = await supabase.storage
           .from('product-images')
           .upload(path, file, { contentType: check.contentType, upsert: false })
-        if (upErr) throw new Error(`« ${file.name} » a été refusé par le stockage (format ou taille).`)
+        if (upErr) throw new Error(`Échec de l’envoi de « ${file.name} » : ${upErr.message}. Vérifiez votre connexion, votre session propriétaire et la limite de 5 Mo.`)
 
         const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path)
         const isPrimary = images.length === 0 && i === 0
-        const { data: imgData } = await supabase
+        const { data: imgData, error: imageInsertError } = await supabase
           .from('product_images')
           .insert({
             product_id: id,
@@ -163,7 +164,11 @@ export default function AdminProductEdit() {
           })
           .select('*')
           .single()
-        if (imgData) setImages((prev) => [...prev, imgData as ProductImage])
+        if (imageInsertError || !imgData) {
+          await supabase.storage.from('product-images').remove([path])
+          throw new Error(`La photo a été envoyée, mais son ajout à la galerie a échoué : ${imageInsertError?.message ?? 'aucune donnée retournée'}`)
+        }
+        setImages((prev) => [...prev, imgData as ProductImage])
       }
       if (isPostHogEnabled) {
         posthog.capture('product_images_uploaded', { product_id: id, image_count: files.length })
@@ -213,8 +218,19 @@ export default function AdminProductEdit() {
 
   const setPrimaryImage = async (imageId: string) => {
     if (!id) return
-    await supabase.from('product_images').update({ is_primary: false }).eq('product_id', id)
-    await supabase.from('product_images').update({ is_primary: true }).eq('id', imageId)
+    setError(null)
+    const previousPrimary = images.find((image) => image.is_primary)
+    const { error: clearError } = await supabase.from('product_images').update({ is_primary: false }).eq('product_id', id)
+    if (clearError) {
+      setError(`Impossible de modifier la photo principale : ${clearError.message}`)
+      return
+    }
+    const { error: primaryError } = await supabase.from('product_images').update({ is_primary: true }).eq('id', imageId).eq('product_id', id)
+    if (primaryError) {
+      if (previousPrimary) await supabase.from('product_images').update({ is_primary: true }).eq('id', previousPrimary.id).eq('product_id', id)
+      setError(`La photo principale n’a pas été modifiée : ${primaryError.message}`)
+      return
+    }
     setImages((prev) => prev.map((img) => ({ ...img, is_primary: img.id === imageId })))
     if (isPostHogEnabled) posthog.capture('product_primary_image_set', { product_id: id, image_id: imageId })
   }
@@ -341,6 +357,156 @@ export default function AdminProductEdit() {
   const selectedValueIds = options.map((option) => variantSelection[option.id]).filter(Boolean)
   const combinationComplete = options.length > 0 && selectedValueIds.length === options.length
 
+  const createVariantsForSingleOption = async () => {
+    if (!id || options.length !== 1) return
+    const option = options[0]
+    const values = (option.values ?? []).filter((value) => value.is_active)
+    const existingValueIds = new Set(
+      variants.flatMap((variant) => (variant.values ?? []).map((item) => item.option_value_id))
+    )
+    const missingValues = values.filter((value) => !existingValueIds.has(value.id))
+    if (missingValues.length === 0) {
+      setError('Toutes les valeurs ont déjà leur variante.')
+      return
+    }
+
+    const price = variantPrice.trim() ? Math.round(Number(variantPrice)) : null
+    const stock = Number(variantStock)
+    if (price !== null && (!Number.isFinite(price) || price < 0)) {
+      setError('Le prix des variantes doit être un nombre positif.')
+      return
+    }
+    if (!Number.isFinite(stock) || stock < 0) {
+      setError('Le stock initial doit être un nombre positif ou nul.')
+      return
+    }
+
+    setError(null)
+    const { data: created, error: createError } = await supabase
+      .from('product_variants')
+      .insert(missingValues.map((value) => ({
+        product_id: id,
+        label: value.value,
+        price_dzd: price,
+        stock_quantity: Math.round(stock),
+      })))
+      .select('id, label')
+
+    if (createError || !created?.length) {
+      setError('Impossible de créer automatiquement les variantes.')
+      return
+    }
+
+    const links = created.map((variant) => {
+      const value = missingValues.find((item) => item.value === variant.label)
+      return value ? { variant_id: variant.id, option_value_id: value.id } : null
+    }).filter((link): link is { variant_id: string; option_value_id: string } => link !== null)
+
+    const { error: linkError } = await supabase.from('product_variant_values').insert(links)
+    if (linkError) {
+      await supabase.from('product_variants').delete().in('id', created.map((variant) => variant.id))
+      setError('Les variantes n’ont pas pu être reliées à leurs valeurs. Aucune variante partielle n’a été conservée.')
+      return
+    }
+
+    await loadVariants(id)
+  }
+
+  const createAllVariantCombinations = async () => {
+    if (!id || options.length === 0) return
+    const optionValues = options.map((option) => ({
+      option,
+      values: (option.values ?? []).filter((value) => value.is_active),
+    }))
+    if (optionValues.some((item) => item.values.length === 0)) {
+      setError('Ajoutez au moins une valeur active pour chaque option.')
+      return
+    }
+
+    const combinations: { valueIds: string[]; label: string }[] = []
+    const build = (index: number, selected: { optionId: string; valueId: string; label: string }[]) => {
+      if (index === optionValues.length) {
+        combinations.push({
+          valueIds: selected.map((item) => item.valueId),
+          label: selected.map((item) => item.label).join(' / '),
+        })
+        return
+      }
+      const current = optionValues[index]
+      current.values.forEach((value) => build(index + 1, [
+        ...selected,
+        { optionId: current.option.id, valueId: value.id, label: value.value },
+      ]))
+    }
+    build(0, [])
+
+    if (combinations.length > 100) {
+      setError('Cette configuration crée plus de 100 variantes. Réduisez les valeurs ou créez les variantes nécessaires manuellement.')
+      return
+    }
+
+    const existing = new Set(variants.map((variant) =>
+      (variant.values ?? []).map((item) => item.option_value_id).sort().join(',')
+    ))
+    const missing = combinations.filter((item) => !existing.has([...item.valueIds].sort().join(',')))
+    if (missing.length === 0) {
+      setError('Toutes les combinaisons existent déjà.')
+      return
+    }
+
+    const price = variantPrice.trim() ? Math.round(Number(variantPrice)) : null
+    const stock = Number(variantStock)
+    if (price !== null && (!Number.isFinite(price) || price < 0)) {
+      setError('Le prix des variantes doit être un nombre positif.')
+      return
+    }
+    if (!Number.isFinite(stock) || stock < 0) {
+      setError('Le stock initial doit être un nombre positif ou nul.')
+      return
+    }
+
+    setCreatingVariants(true)
+    setError(null)
+    const createdIds: string[] = []
+    try {
+      for (const combination of missing) {
+        const { data, error: createError } = await supabase
+          .from('product_variants')
+          .insert({
+            product_id: id,
+            label: combination.label,
+            price_dzd: price,
+            stock_quantity: Math.round(stock),
+          })
+          .select('id')
+          .single()
+        if (createError || !data) throw new Error(createError?.message ?? 'Création de variante impossible.')
+        createdIds.push(data.id)
+
+        const { error: linkError } = await supabase.from('product_variant_values').insert(
+          combination.valueIds.map((valueId) => ({ variant_id: data.id, option_value_id: valueId }))
+        )
+        if (linkError) throw new Error(linkError.message)
+      }
+      await loadVariants(id)
+      setVariantSelection({})
+      setVariantPrice('')
+      setVariantStock('0')
+    } catch (err) {
+      if (createdIds.length > 0) {
+        const { error: cleanupError } = await supabase.from('product_variants').delete().in('id', createdIds)
+        setError(cleanupError
+          ? 'Une erreur est survenue et certaines variantes peuvent nécessiter une vérification dans l’administration.'
+          : 'La création a échoué. Les variantes créées pendant cette opération ont été annulées.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Impossible de créer les variantes.')
+      }
+      await loadVariants(id)
+    } finally {
+      setCreatingVariants(false)
+    }
+  }
+
   const createVariant = async () => {
     if (!id || !combinationComplete) return
     setError(null)
@@ -399,6 +565,46 @@ export default function AdminProductEdit() {
     setVariantPrice('')
     setVariantStock('0')
     await loadVariants(id)
+  }
+
+  const handleVariantImageUpload = async (
+    variant: ProductVariant,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0]
+    if (!file || !id) return
+    setUploading(true)
+    setError(null)
+    try {
+      const check = await validateImage(file)
+      if (!check.ok) throw new Error(check.message)
+      const path = id + '/variants/' + variant.id + '-' + (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now().toString()) + '.' + check.extension
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(path, file, { contentType: check.contentType, upsert: false })
+      if (uploadError) throw new Error(`Échec de l’envoi de la photo : ${uploadError.message}. Vérifiez que vous êtes connecté en tant que propriétaire et que l’image fait moins de 5 Mo.`)
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path)
+      const { error: updateError } = await supabase
+        .from('product_variants')
+        .update({ image_url: urlData.publicUrl })
+        .eq('id', variant.id)
+        .eq('product_id', id)
+      if (updateError) {
+        await supabase.storage.from('product-images').remove([path])
+        if (/image_url|column/i.test(updateError.message)) {
+          throw new Error('La photo n’a pas été associée : le champ image_url manque dans Supabase. La migration 018 doit être appliquée.')
+        }
+        throw new Error(`Impossible d’associer la photo à cette variante : ${updateError.message}`)
+      }
+      setVariants((current) =>
+        current.map((item) => item.id === variant.id ? { ...item, image_url: urlData.publicUrl } : item)
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors du téléversement de la photo.')
+    } finally {
+      setUploading(false)
+      event.target.value = ''
+    }
   }
 
   const toggleVariant = async (variant: ProductVariant) => {
@@ -500,8 +706,8 @@ export default function AdminProductEdit() {
         setForm((prev) => ({ ...prev, status: payload.status }))
         if (seoColumnError && form.seo_keywords.trim()) setError('Produit enregistré. Les mots-clés SEO seront sauvegardés après application de la migration 014.')
       }
-    } catch {
-      setError("Erreur lors de l'enregistrement. Vérifiez les champs.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'enregistrement du produit.")
     } finally {
       setSaving(false)
     }
@@ -712,8 +918,9 @@ export default function AdminProductEdit() {
             <div className="admin-card">
               <h2 className="mb-1 text-lg font-semibold text-offwhite">Options et variantes</h2>
               <p className="mb-4 text-xs text-charcoal-400">
-                Créez une option (par exemple « Couleur »), ses valeurs, puis chaque combinaison réellement
-                fabricable. Aucune combinaison n'est générée automatiquement.
+                Regroupez les couleurs et les formes dans une seule fiche produit. Ajoutez vos options et leurs valeurs,
+                puis créez les variantes. Chaque variante peut avoir sa propre photo, son prix et son stock.
+                Le client choisira sa version sur la page du produit et son choix apparaîtra dans la commande.
               </p>
 
               <div className="flex gap-2">
@@ -825,15 +1032,41 @@ export default function AdminProductEdit() {
                       />
                     </label>
                   </div>
-                  <button
-                    type="button"
-                    onClick={createVariant}
-                    disabled={!combinationComplete}
-                    className="btn-primary mt-3"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Créer la variante
-                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={createVariant}
+                      disabled={!combinationComplete}
+                      className="btn-primary"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Créer la variante
+                    </button>
+                    {options.length === 1 && (
+                      <button
+                        type="button"
+                        onClick={() => void createVariantsForSingleOption()}
+                        disabled={!(options[0].values ?? []).some((value) => value.is_active)}
+                        className="btn-secondary"
+                      >
+                        Créer une variante par valeur
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void createAllVariantCombinations()}
+                      disabled={creatingVariants || options.some((option) => !(option.values ?? []).some((value) => value.is_active))}
+                      className="btn-secondary"
+                    >
+                      {creatingVariants ? 'Création en cours…' : 'Créer toutes les combinaisons'}
+                    </button>
+                  </div>
+                  {options.length === 1 && (
+                    <p className="mt-2 text-xs text-charcoal-500">
+                      Le plus simple : une variante sera créée pour chaque valeur de « {options[0].name} ».
+                      Le prix et le stock ci-dessus seront appliqués à toutes. Les variantes existantes seront conservées.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -844,13 +1077,31 @@ export default function AdminProductEdit() {
                       key={variant.id}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-charcoal-400/15 px-3 py-2"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-offwhite">{variantLabel(variant)}</p>
-                        <p className="text-xs text-charcoal-400">
-                          {variant.price_dzd != null ? `${variant.price_dzd} DA` : 'Prix du produit'} ·{' '}
-                          {variant.stock_quantity} en stock
-                          {!variant.is_active && ' · désactivée'}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        {variant.image_url ? (
+                          <img src={variant.image_url} alt={variantLabel(variant)} className="h-14 w-14 rounded-lg border border-charcoal-400/20 object-cover" />
+                        ) : (
+                          <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-charcoal-400/30 text-[10px] text-charcoal-500">Photo</div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-offwhite">{variantLabel(variant)}</p>
+                          <p className="text-xs text-charcoal-400">
+                            {variant.price_dzd != null ? String(variant.price_dzd) + ' DA' : 'Prix du produit'} ·{' '}
+                            {variant.stock_quantity} en stock
+                            {!variant.is_active && ' · désactivée'}
+                          </p>
+                          <label className="mt-1 inline-flex cursor-pointer items-center gap-1 text-xs text-brand-red-light hover:text-brand-red">
+                            <Upload className="h-3 w-3" />
+                            {variant.image_url ? 'Modifier la photo' : 'Ajouter une photo'}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/avif"
+                              className="hidden"
+                              disabled={uploading}
+                              onChange={(event) => void handleVariantImageUpload(variant, event)}
+                            />
+                          </label>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <button
@@ -876,7 +1127,15 @@ export default function AdminProductEdit() {
             </div>
           )}
 
-          {!isNew && id && <ProductCostCard productId={id} />}
+          {!isNew && id && (
+            <details className="admin-card">
+              <summary className="cursor-pointer list-none text-lg font-semibold text-offwhite">
+                Calculer le coût de fabrication
+                <span className="mt-1 block text-xs font-normal text-charcoal-400">Facultatif · visible uniquement dans l’administration</span>
+              </summary>
+              <div className="mt-4"><ProductCostCard productId={id} /></div>
+            </details>
+          )}
 
           <div className="admin-card">
             <h2 className="mb-4 text-lg font-semibold text-offwhite">Statut et visibilité</h2>
@@ -907,8 +1166,9 @@ export default function AdminProductEdit() {
             </div>
           </div>
 
-          <div className="admin-card">
-            <h2 className="mb-4 text-lg font-semibold text-offwhite">SEO</h2>
+          <details className="admin-card">
+            <summary className="cursor-pointer list-none text-lg font-semibold text-offwhite">Paramètres avancés · SEO</summary>
+            <div className="mt-4">
             <div className="space-y-4">
               <div>
                 <label className="label-text">Titre SEO</label>
@@ -937,7 +1197,8 @@ export default function AdminProductEdit() {
                 <input type="text" value={form.seo_keywords} onChange={(e) => setForm({ ...form, seo_keywords: e.target.value })} className="input-field" placeholder="impression 3D, accessoire, Algérie" />
               </div>
             </div>
-          </div>
+            </div>
+          </details>
         </div>
 
         <div className="space-y-6">
@@ -962,7 +1223,8 @@ export default function AdminProductEdit() {
                   Ajouter des photos
                 </button>
                 <p className="mt-2 text-xs text-charcoal-500">
-                  JPEG, PNG, WebP ou AVIF · 5 Mo maximum par photo.
+                  Photos propres à ce produit · JPEG, PNG, WebP ou AVIF · 5 Mo maximum par photo.
+                  Chaque image est enregistrée dans sa galerie et ne remplace pas les photos des autres produits.
                 </p>
                 {images.length > 0 && (
                   <div className="mt-4 space-y-3">

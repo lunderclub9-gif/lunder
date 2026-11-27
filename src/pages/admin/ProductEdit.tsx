@@ -217,8 +217,19 @@ export default function AdminProductEdit() {
 
   const setPrimaryImage = async (imageId: string) => {
     if (!id) return
-    await supabase.from('product_images').update({ is_primary: false }).eq('product_id', id)
-    await supabase.from('product_images').update({ is_primary: true }).eq('id', imageId)
+    setError(null)
+    const previousPrimary = images.find((image) => image.is_primary)
+    const { error: clearError } = await supabase.from('product_images').update({ is_primary: false }).eq('product_id', id)
+    if (clearError) {
+      setError(`Impossible de modifier la photo principale : ${clearError.message}`)
+      return
+    }
+    const { error: primaryError } = await supabase.from('product_images').update({ is_primary: true }).eq('id', imageId).eq('product_id', id)
+    if (primaryError) {
+      if (previousPrimary) await supabase.from('product_images').update({ is_primary: true }).eq('id', previousPrimary.id).eq('product_id', id)
+      setError(`La photo principale n’a pas été modifiée : ${primaryError.message}`)
+      return
+    }
     setImages((prev) => prev.map((img) => ({ ...img, is_primary: img.id === imageId })))
     if (isPostHogEnabled) posthog.capture('product_primary_image_set', { product_id: id, image_id: imageId })
   }
@@ -471,7 +482,7 @@ export default function AdminProductEdit() {
     try {
       const check = await validateImage(file)
       if (!check.ok) throw new Error(check.message)
-      const path = id + '/variants/' + variant.id + '-' + Date.now() + '.' + check.extension
+      const path = id + '/variants/' + variant.id + '-' + (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now().toString()) + '.' + check.extension
       const { error: uploadError } = await supabase.storage
         .from('product-images')
         .upload(path, file, { contentType: check.contentType, upsert: false })
@@ -483,10 +494,11 @@ export default function AdminProductEdit() {
         .eq('id', variant.id)
         .eq('product_id', id)
       if (updateError) {
+        await supabase.storage.from('product-images').remove([path])
         if (/image_url|column/i.test(updateError.message)) {
-          throw new Error('La photo a été envoyée, mais la base de données ne connaît pas encore le champ image_url. La migration 018 doit être appliquée dans Supabase.')
+          throw new Error('La photo n’a pas été associée : le champ image_url manque dans Supabase. La migration 018 doit être appliquée.')
         }
-        throw new Error(`La photo a été envoyée, mais son association à la variante a échoué : ${updateError.message}`)
+        throw new Error(`Impossible d’associer la photo à cette variante : ${updateError.message}`)
       }
       setVariants((current) =>
         current.map((item) => item.id === variant.id ? { ...item, image_url: urlData.publicUrl } : item)
@@ -598,8 +610,8 @@ export default function AdminProductEdit() {
         setForm((prev) => ({ ...prev, status: payload.status }))
         if (seoColumnError && form.seo_keywords.trim()) setError('Produit enregistré. Les mots-clés SEO seront sauvegardés après application de la migration 014.')
       }
-    } catch {
-      setError("Erreur lors de l'enregistrement. Vérifiez les champs.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'enregistrement du produit.")
     } finally {
       setSaving(false)
     }
@@ -1010,7 +1022,15 @@ export default function AdminProductEdit() {
             </div>
           )}
 
-          {!isNew && id && <ProductCostCard productId={id} />}
+          {!isNew && id && (
+            <details className="admin-card">
+              <summary className="cursor-pointer list-none text-lg font-semibold text-offwhite">
+                Calculer le coût de fabrication
+                <span className="mt-1 block text-xs font-normal text-charcoal-400">Facultatif · visible uniquement dans l’administration</span>
+              </summary>
+              <div className="mt-4"><ProductCostCard productId={id} /></div>
+            </details>
+          )}
 
           <div className="admin-card">
             <h2 className="mb-4 text-lg font-semibold text-offwhite">Statut et visibilité</h2>
@@ -1041,8 +1061,9 @@ export default function AdminProductEdit() {
             </div>
           </div>
 
-          <div className="admin-card">
-            <h2 className="mb-4 text-lg font-semibold text-offwhite">SEO</h2>
+          <details className="admin-card">
+            <summary className="cursor-pointer list-none text-lg font-semibold text-offwhite">Paramètres avancés · SEO</summary>
+            <div className="mt-4">
             <div className="space-y-4">
               <div>
                 <label className="label-text">Titre SEO</label>
@@ -1071,7 +1092,8 @@ export default function AdminProductEdit() {
                 <input type="text" value={form.seo_keywords} onChange={(e) => setForm({ ...form, seo_keywords: e.target.value })} className="input-field" placeholder="impression 3D, accessoire, Algérie" />
               </div>
             </div>
-          </div>
+            </div>
+          </details>
         </div>
 
         <div className="space-y-6">
@@ -1096,7 +1118,8 @@ export default function AdminProductEdit() {
                   Ajouter des photos
                 </button>
                 <p className="mt-2 text-xs text-charcoal-500">
-                  JPEG, PNG, WebP ou AVIF · 5 Mo maximum par photo.
+                  Photos propres à ce produit · JPEG, PNG, WebP ou AVIF · 5 Mo maximum par photo.
+                  Chaque image est enregistrée dans sa galerie et ne remplace pas les photos des autres produits.
                 </p>
                 {images.length > 0 && (
                   <div className="mt-4 space-y-3">

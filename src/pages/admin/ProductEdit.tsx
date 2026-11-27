@@ -723,7 +723,7 @@ export default function AdminProductEdit() {
       </h1>
       {isNew && (
         <p className="mb-6 text-sm text-charcoal-400">
-          Renseignez le nom, la catégorie et le prix, puis enregistrez. Vous pourrez ensuite ajouter les photos, le modèle 3D et les variantes du produit.
+          Suivez les sections dans l’ordre : informations, prix et stock, photos, modèle 3D, puis couleurs et formes. Enregistrez une première fois pour activer les médias et les variantes ; vous pourrez ensuite tout gérer depuis cette même fiche produit.
         </p>
       )}
 
@@ -742,8 +742,8 @@ export default function AdminProductEdit() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="space-y-6">
           <div className="admin-card">
             <h2 className="mb-4 text-lg font-semibold text-offwhite">Informations générales</h2>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -874,11 +874,11 @@ export default function AdminProductEdit() {
 
           {!isNew && (
             <div className="admin-card">
-              <h2 className="mb-1 text-lg font-semibold text-offwhite">Options et variantes</h2>
+              <h2 className="mb-1 text-lg font-semibold text-offwhite">Couleurs, formes et variantes</h2>
               <p className="mb-4 text-xs text-charcoal-400">
-                Regroupez les couleurs et les formes dans une seule fiche produit. Ajoutez vos options et leurs valeurs,
-                puis créez les variantes. Chaque variante peut avoir sa propre photo, son prix et son stock.
-                Le client choisira sa version sur la page du produit et son choix apparaîtra dans la commande.
+                Ajoutez les caractéristiques que le client peut choisir (par exemple Couleur : Rouge, Noir ; Forme : Ronde, Carrée).
+                Créez ensuite toutes les combinaisons en une fois. Chaque combinaison peut avoir sa photo, son prix et son stock ;
+                le choix du client sera enregistré dans sa commande.
               </p>
 
               <div className="flex gap-2">
@@ -1151,7 +1151,7 @@ export default function AdminProductEdit() {
 
         <div className="space-y-6">
           <div className="admin-card">
-            <h2 className="mb-4 text-lg font-semibold text-offwhite">Photos</h2>
+            <h2 className="mb-4 text-lg font-semibold text-offwhite">Photos du produit</h2>
             {!isNew && (
               <>
                 <input
@@ -1198,72 +1198,3 @@ export default function AdminProductEdit() {
                             onClick={() => deleteImage(img.id, img.image_url)}
                             className="rounded-md bg-charcoal-800 p-2 text-charcoal-200 hover:text-brand-red"
                             aria-label="Supprimer"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                        {img.is_primary && (
-                          <span className="absolute bottom-1 left-1 rounded bg-brand-red px-1.5 py-0.5 text-[10px] font-medium text-white">
-                            Principale
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {images.length === 0 && (
-                  <p className="mt-3 text-xs text-charcoal-500">Enregistrez d'abord le produit pour ajouter des photos.</p>
-                )}
-              </>
-            )}
-            {isNew && <p className="text-xs text-charcoal-500">Enregistrez le produit pour pouvoir ajouter des photos.</p>}
-          </div>
-
-          <div className="admin-card">
-            <h2 className="mb-4 text-lg font-semibold text-offwhite">Modèle 3D (GLB/GLTF)</h2>
-            {!isNew && (
-              <>
-                <input
-                  ref={modelInputRef}
-                  type="file"
-                  accept=".glb,.gltf"
-                  onChange={handleModelUpload}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => modelInputRef.current?.click()}
-                  disabled={uploading}
-                  className="btn-secondary w-full"
-                >
-                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  {form.model_url ? 'Remplacer le modèle' : 'Ajouter un modèle 3D'}
-                </button>
-                <p className="mt-2 text-xs text-charcoal-500">
-                  GLB recommandé (25 Mo maximum). Un GLTF n'est accepté que si ses ressources sont intégrées.
-                </p>
-                {form.model_url && (
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-charcoal-400/15 p-3">
-                    <p className="text-xs text-green-400">Modèle 3D téléversé</p>
-                    <button type="button" onClick={() => void deleteModel()} className="inline-flex items-center gap-1 rounded-md bg-charcoal-800 px-3 py-2 text-xs text-brand-red-light hover:bg-charcoal-700"><Trash2 className="h-4 w-4" /> Supprimer le modèle</button>
-                  </div>
-                )}
-              </>
-            )}
-            {isNew && <p className="text-xs text-charcoal-500">Enregistrez le produit pour pouvoir ajouter un modèle 3D.</p>}
-          </div>
-
-          <button onClick={() => handleSave()} disabled={saving} className="btn-primary w-full">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Enregistrer
-          </button>
-          {form.status !== 'published' && (
-            <button onClick={() => handleSave(true)} disabled={saving} className="btn-secondary mt-2 w-full">
-              <Save className="h-4 w-4" />
-              Enregistrer et publier
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}

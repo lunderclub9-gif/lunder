@@ -148,6 +148,15 @@ export default function ProductDetailPage() {
       setMediaMode('photos')
       return
     }
+    const selectedOptionImage = [...selectableOptions]
+      .reverse()
+      .map((option) => option.values?.find((value) => value.id === selection[option.id])?.image_url)
+      .find(Boolean)
+    if (selectedOptionImage) {
+      setActiveImage(selectedOptionImage)
+      setMediaMode('photos')
+      return
+    }
     const primary = images.find((image) => image.is_primary) ?? images[0]
     setActiveImage(primary?.image_url ?? null)
   }, [matchedVariant?.id, matchedVariant?.image_url, product?.id, images])
@@ -310,6 +319,7 @@ export default function ProductDetailPage() {
                           : 'border-charcoal-400/20 text-charcoal-300 hover:border-charcoal-300'
                       }`}
                     >
+                      {value.image_url && <img src={value.image_url} alt="" className="mb-1 h-10 w-10 rounded-md object-cover" />}
                       {value.value}
                     </button>
                   ))}

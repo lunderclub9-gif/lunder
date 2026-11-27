@@ -29,12 +29,10 @@ export default function AdminProductEdit() {
   const [uploading, setUploading] = useState(false)
   const [images, setImages] = useState<ProductImage[]>([])
   const [originalModelUrl, setOriginalModelUrl] = useState('')
-  const [colors, setColors] = useState<string[]>([])
 
   const [options, setOptions] = useState<ProductOption[]>([])
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [newOptionName, setNewOptionName] = useState('')
-  const [optionValueDraft, setOptionValueDraft] = useState<Record<string, string>>({})
   const [bulkValueDraft, setBulkValueDraft] = useState<Record<string, string>>({})
   const [selectedShapeId, setSelectedShapeId] = useState('')
   const [selectedColorIds, setSelectedColorIds] = useState<string[]>([])
@@ -123,7 +121,6 @@ export default function AdminProductEdit() {
         seo_keywords: ((p as Product & { seo_keywords?: string[] }).seo_keywords ?? []).join(', '),
       })
       setOriginalModelUrl(p.model_url ?? '')
-      setColors(p.available_colors ?? [])
     }
     const { data: imgs } = await supabase
       .from('product_images')
@@ -318,23 +315,6 @@ export default function AdminProductEdit() {
       return next
     })
     await Promise.all([loadOptions(id), loadVariants(id)])
-  }
-
-  const addOptionValue = async (option: ProductOption) => {
-    const value = (optionValueDraft[option.id] ?? '').trim()
-    if (!value) return
-    setError(null)
-    const { error: insertError } = await supabase.from('product_option_values').insert({
-      option_id: option.id,
-      value,
-      sort_order: (option.values ?? []).length,
-    })
-    if (insertError) {
-      setError('Impossible d’ajouter cette valeur (elle existe peut-être déjà).')
-      return
-    }
-    setOptionValueDraft((prev) => ({ ...prev, [option.id]: '' }))
-    if (id) await loadOptions(id)
   }
 
   const addOptionValuesBulk = async (option: ProductOption) => {
@@ -717,7 +697,6 @@ export default function AdminProductEdit() {
         weight_g: form.weight_g ? parseFloat(form.weight_g) : null,
         dimensions: form.dimensions || null,
         material: form.material || null,
-        available_colors: colors,
         model_url: form.model_url || null,
         status: publish ? ('published' as const) : form.status,
         is_featured: form.is_featured,
@@ -1003,24 +982,20 @@ export default function AdminProductEdit() {
                       </div>
                     )}
 
-                    <textarea rows={2} value={bulkValueDraft[option.id] ?? ''} onChange={(e) => setBulkValueDraft((prev) => ({ ...prev, [option.id]: e.target.value }))} className="input-field mt-2 resize-y text-sm" placeholder="Ajout multiple : Bleu, Noir, Blanc (ou une valeur par ligne)" />
-                    <button type="button" onClick={() => void addOptionValuesBulk(option)} className="mt-2 text-xs text-brand-red-light">Ajouter toutes les valeurs</button>
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        type="text"
-                        value={optionValueDraft[option.id] ?? ''}
-                        onChange={(e) =>
-                          setOptionValueDraft((prev) => ({ ...prev, [option.id]: e.target.value }))
-                        }
-                        onKeyDown={(e) =>
-                          e.key === 'Enter' && (e.preventDefault(), addOptionValue(option))
-                        }
-                        className="input-field"
-                        placeholder={`Valeur de ${option.name} (ex: Rouge)`}
+                    <div className="mt-3">
+                      <label className="label-text">Ajouter des valeurs</label>
+                      <textarea
+                        rows={2}
+                        value={bulkValueDraft[option.id] ?? ''}
+                        onChange={(e) => setBulkValueDraft((prev) => ({ ...prev, [option.id]: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void addOptionValuesBulk(option) } }}
+                        className="input-field mt-1 resize-y text-sm"
+                        placeholder="Exemple : Bleu, Noir, Blanc (ou une valeur par ligne)"
                       />
-                      <button type="button" onClick={() => addOptionValue(option)} className="btn-secondary px-3 text-xs">
-                        Ajouter
-                      </button>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <p className="text-[11px] text-charcoal-500">Les doublons sont ignorés · Ctrl + Entrée pour ajouter</p>
+                        <button type="button" onClick={() => void addOptionValuesBulk(option)} disabled={!bulkValueDraft[option.id]?.trim()} className="btn-secondary px-3 text-xs"><Plus className="h-3 w-3" /> Ajouter</button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1033,6 +1008,10 @@ export default function AdminProductEdit() {
                   <label className="mt-3 block"><span className="label-text">Forme</span><select value={selectedShapeId} onChange={(e) => { setSelectedShapeId(e.target.value); setSelectedColorIds([]) }} className="input-field"><option value="">Choisir...</option>{(options.find((o) => /^(forme|shape)$/i.test(o.name.trim()))?.values ?? []).map((v) => <option key={v.id} value={v.id}>{v.value}</option>)}</select></label>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">{(options.find((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))?.values ?? []).map((v) => <label key={v.id} className="flex items-center gap-2 rounded border border-charcoal-400/15 p-2 text-sm text-offwhite"><input type="checkbox" checked={selectedColorIds.includes(v.id)} onChange={(e) => setSelectedColorIds((current) => e.target.checked ? [...current,v.id] : current.filter((x) => x !== v.id))} className="accent-brand-red"/>{v.image_url ? <img src={v.image_url} alt="" className="h-8 w-8 rounded object-cover"/> : <span className="h-8 w-8 rounded border border-dashed border-charcoal-400/30"/>}{v.value}</label>)}</div>
                   <div className="mt-2 flex gap-3 text-xs"><button type="button" onClick={() => setSelectedColorIds((options.find((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))?.values ?? []).map((v) => v.id))} className="text-brand-red-light">Tout sélectionner</button><button type="button" onClick={() => setSelectedColorIds([])} className="text-charcoal-400">Tout effacer</button></div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label><span className="label-text">Prix des variantes (DA)</span><input type="number" min={0} value={variantPrice} onChange={(e) => setVariantPrice(e.target.value)} className="input-field" placeholder="Vide = prix du produit" /></label>
+                    <label><span className="label-text">Stock initial pour chaque couleur</span><input type="number" min={0} value={variantStock} onChange={(e) => setVariantStock(e.target.value)} className="input-field" /></label>
+                  </div>
                   <button type="button" onClick={() => void createSelectedShapeColorVariants()} disabled={creatingVariants || !selectedShapeId || !selectedColorIds.length} className="btn-primary mt-3">{creatingVariants ? 'Création...' : 'Créer les variantes sélectionnées'}</button>
                 </div>
               )}

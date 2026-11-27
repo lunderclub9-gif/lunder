@@ -832,9 +832,12 @@ export default function AdminProductEdit() {
             </div>
           </div>
 
-          <div className="admin-card">
-            <h2 className="mb-4 text-lg font-semibold text-offwhite">Caractéristiques</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
+          <details className="admin-card">
+            <summary className="cursor-pointer list-none text-lg font-semibold text-offwhite">
+              Informations techniques
+              <span className="mt-1 block text-xs font-normal text-charcoal-400">Facultatif · matière, poids et dimensions</span>
+            </summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="label-text">Matière</label>
                 <input
@@ -867,7 +870,7 @@ export default function AdminProductEdit() {
                 />
               </div>
             </div>
-          </div>
+          </details>
 
           {!isNew && (
             <div className="admin-card">

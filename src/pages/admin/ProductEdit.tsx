@@ -12,7 +12,6 @@ import {
 } from '@/lib/supabase'
 import { slugify, generateSku } from '@/lib/format'
 import { validateImage, validateModel } from '@/lib/media'
-import ProductCostCard from '@/components/admin/ProductCostCard'
 import posthog, { isPostHogEnabled } from '@/lib/posthog'
 
 export default function AdminProductEdit() {
@@ -31,7 +30,6 @@ export default function AdminProductEdit() {
   const [images, setImages] = useState<ProductImage[]>([])
   const [originalModelUrl, setOriginalModelUrl] = useState('')
   const [colors, setColors] = useState<string[]>([])
-  const [colorInput, setColorInput] = useState('')
 
   const [options, setOptions] = useState<ProductOption[]>([])
   const [variants, setVariants] = useState<ProductVariant[]>([])
@@ -284,14 +282,6 @@ export default function AdminProductEdit() {
       }
     }
   }
-
-  const addColor = () => {
-    const c = colorInput.trim()
-    if (c && !colors.includes(c)) setColors([...colors, c])
-    setColorInput('')
-  }
-
-  const removeColor = (c: string) => setColors(colors.filter((x) => x !== c))
 
   const addOption = async () => {
     if (!id) return
@@ -728,9 +718,14 @@ export default function AdminProductEdit() {
         Retour aux produits
       </button>
 
-      <h1 className="mb-6 text-2xl font-bold text-offwhite">
+      <h1 className="mb-2 text-2xl font-bold text-offwhite">
         {isNew ? 'Nouveau produit' : 'Modifier le produit'}
       </h1>
+      {isNew && (
+        <p className="mb-6 text-sm text-charcoal-400">
+          Suivez les sections dans l’ordre : informations, prix et stock, photos, modèle 3D, puis couleurs et formes. Enregistrez une première fois pour activer les médias et les variantes ; vous pourrez ensuite tout gérer depuis cette même fiche produit.
+        </p>
+      )}
 
       {form.status !== 'published' && (
         <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
@@ -747,8 +742,8 @@ export default function AdminProductEdit() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="space-y-6">
           <div className="admin-card">
             <h2 className="mb-4 text-lg font-semibold text-offwhite">Informations générales</h2>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -761,10 +756,6 @@ export default function AdminProductEdit() {
                   className="input-field"
                   placeholder="Ex: Support de téléphone adjustable"
                 />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="label-text">Slug URL (SEO)</label>
-                <input type="text" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} className="input-field" placeholder="genere-depuis-le-nom" />
               </div>
               <div className="sm:col-span-2">
                 <label className="label-text">Description</label>
@@ -788,16 +779,6 @@ export default function AdminProductEdit() {
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="label-text">SKU</label>
-                <input
-                  type="text"
-                  value={form.sku}
-                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                  className="input-field"
-                  placeholder="Auto-généré si vide"
-                />
               </div>
             </div>
           </div>
@@ -851,9 +832,12 @@ export default function AdminProductEdit() {
             </div>
           </div>
 
-          <div className="admin-card">
-            <h2 className="mb-4 text-lg font-semibold text-offwhite">Caractéristiques</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
+          <details className="admin-card">
+            <summary className="cursor-pointer list-none text-lg font-semibold text-offwhite">
+              Informations techniques
+              <span className="mt-1 block text-xs font-normal text-charcoal-400">Facultatif · matière, poids et dimensions</span>
+            </summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="label-text">Matière</label>
                 <input
@@ -885,42 +869,16 @@ export default function AdminProductEdit() {
                   placeholder="Ex: 100 x 50 x 30 mm"
                 />
               </div>
-              <div className="sm:col-span-2">
-                <label className="label-text">Couleurs disponibles</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={colorInput}
-                    onChange={(e) => setColorInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addColor())}
-                    className="input-field"
-                    placeholder="Ajouter une couleur..."
-                  />
-                  <button type="button" onClick={addColor} className="btn-secondary px-4">Ajouter</button>
-                </div>
-                {colors.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {colors.map((c) => (
-                      <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-charcoal-700 px-3 py-1 text-xs text-offwhite">
-                        {c}
-                        <button onClick={() => removeColor(c)} aria-label="Retirer">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
-          </div>
+          </details>
 
           {!isNew && (
             <div className="admin-card">
-              <h2 className="mb-1 text-lg font-semibold text-offwhite">Options et variantes</h2>
+              <h2 className="mb-1 text-lg font-semibold text-offwhite">Couleurs, formes et variantes</h2>
               <p className="mb-4 text-xs text-charcoal-400">
-                Regroupez les couleurs et les formes dans une seule fiche produit. Ajoutez vos options et leurs valeurs,
-                puis créez les variantes. Chaque variante peut avoir sa propre photo, son prix et son stock.
-                Le client choisira sa version sur la page du produit et son choix apparaîtra dans la commande.
+                Ajoutez les caractéristiques que le client peut choisir (par exemple Couleur : Rouge, Noir ; Forme : Ronde, Carrée).
+                Créez ensuite toutes les combinaisons en une fois. Chaque combinaison peut avoir sa photo, son prix et son stock ;
+                le choix du client sera enregistré dans sa commande.
               </p>
 
               <div className="flex gap-2">
@@ -1127,16 +1085,6 @@ export default function AdminProductEdit() {
             </div>
           )}
 
-          {!isNew && id && (
-            <details className="admin-card">
-              <summary className="cursor-pointer list-none text-lg font-semibold text-offwhite">
-                Calculer le coût de fabrication
-                <span className="mt-1 block text-xs font-normal text-charcoal-400">Facultatif · visible uniquement dans l’administration</span>
-              </summary>
-              <div className="mt-4"><ProductCostCard productId={id} /></div>
-            </details>
-          )}
-
           <div className="admin-card">
             <h2 className="mb-4 text-lg font-semibold text-offwhite">Statut et visibilité</h2>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1203,7 +1151,7 @@ export default function AdminProductEdit() {
 
         <div className="space-y-6">
           <div className="admin-card">
-            <h2 className="mb-4 text-lg font-semibold text-offwhite">Photos</h2>
+            <h2 className="mb-4 text-lg font-semibold text-offwhite">Photos du produit</h2>
             {!isNew && (
               <>
                 <input

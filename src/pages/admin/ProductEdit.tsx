@@ -320,8 +320,14 @@ export default function AdminProductEdit() {
   const addOptionValuesBulk = async (option: ProductOption) => {
     if (!id) return
     const values = (bulkValueDraft[option.id] ?? '').split(/[\n,;]+/).map((v) => v.trim()).filter(Boolean)
-    const existing = new Set((option.values ?? []).map((v) => v.value.toLowerCase()))
-    const unique = [...new Set(values)].filter((v) => !existing.has(v.toLowerCase()))
+    const existing = new Set((option.values ?? []).map((v) => v.value.trim().toLocaleLowerCase()))
+    const seen = new Set<string>()
+    const unique = values.filter((value) => {
+      const normalized = value.toLocaleLowerCase()
+      if (existing.has(normalized) || seen.has(normalized)) return false
+      seen.add(normalized)
+      return true
+    })
     if (!unique.length) { setError('Toutes ces valeurs existent déjà.'); return }
     const { error } = await supabase.from('product_option_values').insert(unique.map((value, index) => ({ option_id: option.id, value, sort_order: (option.values ?? []).length + index })))
     if (error) { setError("Impossible d'ajouter les valeurs."); return }
@@ -916,9 +922,7 @@ export default function AdminProductEdit() {
             <div className="admin-card">
               <h2 className="mb-1 text-lg font-semibold text-offwhite">Couleurs, formes et variantes</h2>
               <p className="mb-4 text-xs text-charcoal-400">
-                Ajoutez les caractéristiques que le client peut choisir (par exemple Couleur : Rouge, Noir ; Forme : Ronde, Carrée).
-                Créez ensuite toutes les combinaisons en une fois. Chaque combinaison peut avoir sa photo, son prix et son stock ;
-                le choix du client sera enregistré dans sa commande.
+                1. Ajoutez les formes et les couleurs une seule fois. 2. Ajoutez une photo à chaque valeur si nécessaire. 3. Pour chaque forme, cochez uniquement les couleurs disponibles et créez les variantes correspondantes. Le choix du client sera enregistré dans sa commande.
               </p>
 
               <button type="button" onClick={async () => {

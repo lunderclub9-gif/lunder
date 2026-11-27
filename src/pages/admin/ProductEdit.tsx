@@ -723,7 +723,7 @@ export default function AdminProductEdit() {
       </h1>
       {isNew && (
         <p className="mb-6 text-sm text-charcoal-400">
-          Renseignez le nom, la catégorie et le prix, puis enregistrez. Vous pourrez ensuite ajouter les photos, le modèle 3D et les variantes du produit.
+          Suivez les sections dans l’ordre : informations, prix et stock, photos, modèle 3D, puis couleurs et formes. Enregistrez une première fois pour activer les médias et les variantes ; vous pourrez ensuite tout gérer depuis cette même fiche produit.
         </p>
       )}
 
@@ -742,8 +742,8 @@ export default function AdminProductEdit() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="space-y-6">
           <div className="admin-card">
             <h2 className="mb-4 text-lg font-semibold text-offwhite">Informations générales</h2>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -874,11 +874,11 @@ export default function AdminProductEdit() {
 
           {!isNew && (
             <div className="admin-card">
-              <h2 className="mb-1 text-lg font-semibold text-offwhite">Options et variantes</h2>
+              <h2 className="mb-1 text-lg font-semibold text-offwhite">Couleurs, formes et variantes</h2>
               <p className="mb-4 text-xs text-charcoal-400">
-                Regroupez les couleurs et les formes dans une seule fiche produit. Ajoutez vos options et leurs valeurs,
-                puis créez les variantes. Chaque variante peut avoir sa propre photo, son prix et son stock.
-                Le client choisira sa version sur la page du produit et son choix apparaîtra dans la commande.
+                Ajoutez les caractéristiques que le client peut choisir (par exemple Couleur : Rouge, Noir ; Forme : Ronde, Carrée).
+                Créez ensuite toutes les combinaisons en une fois. Chaque combinaison peut avoir sa photo, son prix et son stock ;
+                le choix du client sera enregistré dans sa commande.
               </p>
 
               <div className="flex gap-2">
@@ -1151,7 +1151,7 @@ export default function AdminProductEdit() {
 
         <div className="space-y-6">
           <div className="admin-card">
-            <h2 className="mb-4 text-lg font-semibold text-offwhite">Photos</h2>
+            <h2 className="mb-4 text-lg font-semibold text-offwhite">Photos du produit</h2>
             {!isNew && (
               <>
                 <input

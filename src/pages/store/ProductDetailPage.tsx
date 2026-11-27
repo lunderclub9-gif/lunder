@@ -159,7 +159,7 @@ export default function ProductDetailPage() {
     }
     const primary = images.find((image) => image.is_primary) ?? images[0]
     setActiveImage(primary?.image_url ?? null)
-  }, [matchedVariant?.id, matchedVariant?.image_url, product?.id, images])
+  }, [matchedVariant?.id, matchedVariant?.image_url, product?.id, images, selection, selectableOptions])
 
   if (loading) {
     return (

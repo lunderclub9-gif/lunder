@@ -942,6 +942,24 @@ export default function AdminProductEdit() {
                 le choix du client sera enregistré dans sa commande.
               </p>
 
+              <button type="button" onClick={async () => {
+                if (!id) return
+                const existing = await supabase.from('product_options').select('id,name').eq('product_id', id)
+                if (existing.error) { setError('Impossible de charger les options du produit.'); return }
+                const names = new Set((existing.data ?? []).map((item) => item.name.trim().toLowerCase()))
+                if (!names.has('forme')) {
+                  const { error } = await supabase.from('product_options').insert({ product_id: id, name: 'Forme', sort_order: 0 })
+                  if (error) { setError('Impossible de créer Forme.'); return }
+                }
+                if (!names.has('couleur')) {
+                  const { error } = await supabase.from('product_options').insert({ product_id: id, name: 'Couleur', sort_order: 1 })
+                  if (error) { setError('Impossible de créer Couleur.'); return }
+                }
+                const refreshed = await supabase.from('product_options').select('id,name').eq('product_id', id)
+                const ordered = (refreshed.data ?? []).slice().sort((a,b) => (/^forme$/i.test(a.name)?0:/^couleur$/i.test(a.name)?1:2)-(/^forme$/i.test(b.name)?0:/^couleur$/i.test(b.name)?1:2))
+                for (let index=0; index<ordered.length; index++) await supabase.from('product_options').update({ sort_order:index }).eq('id',ordered[index].id)
+                await loadOptions(id)
+              }} className="btn-secondary mb-3"><Plus className="h-4 w-4"/> Créer rapidement Forme + Couleur</button>
               <div className="flex gap-2">
                 <input
                   type="text"

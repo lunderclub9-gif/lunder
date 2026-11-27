@@ -76,12 +76,8 @@ export default function ProductDetailPage() {
       setOptions(optionList)
       setVariants((vars as ProductVariant[]) ?? [])
 
-      const initial: Record<string, string> = {}
-      optionList.forEach((option) => {
-        const first = option.values?.[0]
-        if (first) initial[option.id] = first.id
-      })
-      setSelection(initial)
+      // Let the customer choose each option in sequence; never preselect a value.
+      setSelection({})
 
       if (p.available_colors.length > 0) setSelectedColor(p.available_colors[0])
       setLoading(false)
@@ -107,6 +103,11 @@ export default function ProductDetailPage() {
     [options]
   )
 
+  // Options are presented progressively: choose the first option (e.g. Forme),
+  // then only values belonging to real variants matching the previous choices.
+  const nextOptionIndex = selectableOptions.findIndex((option) => !selection[option.id])
+  const visibleOptionCount = nextOptionIndex === -1 ? selectableOptions.length : nextOptionIndex + 1
+
   const matchedVariant = useMemo(() => {
     if (selectableOptions.length === 0) return null
     const chosen = selectableOptions.map((option) => selection[option.id])
@@ -119,6 +120,26 @@ export default function ProductDetailPage() {
       }) ?? null
     )
   }, [selectableOptions, selection, variants])
+
+  const isOptionValueAvailable = (optionIndex: number, valueId: string) => {
+    const required = selectableOptions
+      .slice(0, optionIndex)
+      .map((option) => selection[option.id])
+      .filter(Boolean)
+    return variants.some((variant) => {
+      const ids = (variant.values ?? []).map((item) => item.option_value_id)
+      return ids.includes(valueId) && required.every((selectedId) => ids.includes(selectedId))
+    })
+  }
+
+  const selectOptionValue = (optionIndex: number, valueId: string) => {
+    const option = selectableOptions[optionIndex]
+    setSelection((previous) => {
+      const next = { ...previous, [option.id]: valueId }
+      selectableOptions.slice(optionIndex + 1).forEach((laterOption) => delete next[laterOption.id])
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!product) return
@@ -155,15 +176,16 @@ export default function ProductDetailPage() {
   const madeToOrder = matchedVariant?.made_to_order ?? product.made_to_order
   const stockQuantity = matchedVariant ? matchedVariant.stock_quantity : product.stock_quantity
   const displayPrice = matchedVariant?.price_dzd ?? product.price_dzd
-  const combinationAvailable = selectableOptions.length === 0 || matchedVariant !== null
+  const allOptionsSelected = selectableOptions.every((option) => Boolean(selection[option.id]))
+  const combinationAvailable = selectableOptions.length === 0 || (allOptionsSelected && matchedVariant !== null)
   const inStock = combinationAvailable && (madeToOrder || stockQuantity > 0)
 
   const selectedVariantLabel = matchedVariant
     ? matchedVariant.label ??
       selectableOptions
-        .map((option) => option.values?.find((value) => value.id === selection[option.id])?.value)
+        .map((option) => `${option.name}: ${option.values?.find((value) => value.id === selection[option.id])?.value ?? ''}`)
         .filter(Boolean)
-        .join(' / ') ??
+        .join(' · ') ??
       null
     : null
 
@@ -266,27 +288,38 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {selectableOptions.map((option) => (
-            <div key={option.id}>
-              <h3 className="mb-2 text-sm font-semibold text-offwhite">{option.name}</h3>
-              <div className="flex flex-wrap gap-2">
-                {(option.values ?? []).map((value) => (
-                  <button
-                    key={value.id}
-                    onClick={() => setSelection((prev) => ({ ...prev, [option.id]: value.id }))}
-                    aria-pressed={selection[option.id] === value.id}
-                    className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
-                      selection[option.id] === value.id
-                        ? 'border-brand-red bg-brand-red/10 text-brand-red-light'
-                        : 'border-charcoal-400/20 text-charcoal-300 hover:border-charcoal-300'
-                    }`}
-                  >
-                    {value.value}
-                  </button>
-                ))}
+          {selectableOptions.slice(0, visibleOptionCount).map((option, optionIndex) => {
+            const availableValues = (option.values ?? []).filter((value) =>
+              isOptionValueAvailable(optionIndex, value.id)
+            )
+            return (
+              <div key={option.id} className="rounded-xl border border-charcoal-400/15 bg-charcoal-800/30 p-4">
+                <h3 className="mb-2 text-sm font-semibold text-offwhite">
+                  {optionIndex + 1}. {option.name}
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {availableValues.map((value) => (
+                    <button
+                      key={value.id}
+                      type="button"
+                      onClick={() => selectOptionValue(optionIndex, value.id)}
+                      aria-pressed={selection[option.id] === value.id}
+                      className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
+                        selection[option.id] === value.id
+                          ? 'border-brand-red bg-brand-red/10 text-brand-red-light'
+                          : 'border-charcoal-400/20 text-charcoal-300 hover:border-charcoal-300'
+                      }`}
+                    >
+                      {value.value}
+                    </button>
+                  ))}
+                  {availableValues.length === 0 && (
+                    <p className="text-xs text-charcoal-400">Aucune valeur disponible pour cette sélection.</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
 
           {selectableOptions.length === 0 && product.available_colors.length > 0 && (
             <div>
@@ -341,11 +374,11 @@ export default function ProductDetailPage() {
               <button
                 type="button"
                 onClick={handleAddToCart}
-                disabled={!inStock}
+                disabled={!inStock || (selectableOptions.length > 0 && !allOptionsSelected)}
                 className="btn-primary flex-1"
               >
                 <ShoppingCart className="h-4 w-4" />
-                {inStock ? 'Ajouter au panier' : combinationAvailable ? 'Indisponible' : 'Combinaison indisponible'}
+                {!allOptionsSelected && selectableOptions.length > 0 ? 'Choisissez les options' : inStock ? 'Ajouter au panier' : combinationAvailable ? 'Indisponible' : 'Combinaison indisponible'}
               </button>
               <Link to="/boutique/panier" className="btn-secondary">
                 Voir le panier

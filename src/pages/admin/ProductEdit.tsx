@@ -339,7 +339,7 @@ export default function AdminProductEdit() {
 
   const addOptionValuesBulk = async (option: ProductOption) => {
     if (!id) return
-    const values = (bulkValueDraft[option.id] ?? '').split(/[\\n,;]+/).map((v) => v.trim()).filter(Boolean)
+    const values = (bulkValueDraft[option.id] ?? '').split(/[\n,;]+/).map((v) => v.trim()).filter(Boolean)
     const existing = new Set((option.values ?? []).map((v) => v.value.toLowerCase()))
     const unique = [...new Set(values)].filter((v) => !existing.has(v.toLowerCase()))
     if (!unique.length) { setError('Toutes ces valeurs existent déjà.'); return }

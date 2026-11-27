@@ -40,6 +40,7 @@ export default function AdminProductEdit() {
   const [variantSelection, setVariantSelection] = useState<Record<string, string>>({})
   const [variantPrice, setVariantPrice] = useState('')
   const [variantStock, setVariantStock] = useState('0')
+  const [creatingVariants, setCreatingVariants] = useState(false)
 
   const [form, setForm] = useState({
     name: '',
@@ -409,6 +410,101 @@ export default function AdminProductEdit() {
     }
 
     await loadVariants(id)
+  }
+
+  const createAllVariantCombinations = async () => {
+    if (!id || options.length === 0) return
+    const optionValues = options.map((option) => ({
+      option,
+      values: (option.values ?? []).filter((value) => value.is_active),
+    }))
+    if (optionValues.some((item) => item.values.length === 0)) {
+      setError('Ajoutez au moins une valeur active pour chaque option.')
+      return
+    }
+
+    const combinations: { valueIds: string[]; label: string }[] = []
+    const build = (index: number, selected: { optionId: string; valueId: string; label: string }[]) => {
+      if (index === optionValues.length) {
+        combinations.push({
+          valueIds: selected.map((item) => item.valueId),
+          label: selected.map((item) => item.label).join(' / '),
+        })
+        return
+      }
+      const current = optionValues[index]
+      current.values.forEach((value) => build(index + 1, [
+        ...selected,
+        { optionId: current.option.id, valueId: value.id, label: value.value },
+      ]))
+    }
+    build(0, [])
+
+    if (combinations.length > 100) {
+      setError('Cette configuration crée plus de 100 variantes. Réduisez les valeurs ou créez les variantes nécessaires manuellement.')
+      return
+    }
+
+    const existing = new Set(variants.map((variant) =>
+      (variant.values ?? []).map((item) => item.option_value_id).sort().join(',')
+    ))
+    const missing = combinations.filter((item) => !existing.has([...item.valueIds].sort().join(',')))
+    if (missing.length === 0) {
+      setError('Toutes les combinaisons existent déjà.')
+      return
+    }
+
+    const price = variantPrice.trim() ? Math.round(Number(variantPrice)) : null
+    const stock = Number(variantStock)
+    if (price !== null && (!Number.isFinite(price) || price < 0)) {
+      setError('Le prix des variantes doit être un nombre positif.')
+      return
+    }
+    if (!Number.isFinite(stock) || stock < 0) {
+      setError('Le stock initial doit être un nombre positif ou nul.')
+      return
+    }
+
+    setCreatingVariants(true)
+    setError(null)
+    const createdIds: string[] = []
+    try {
+      for (const combination of missing) {
+        const { data, error: createError } = await supabase
+          .from('product_variants')
+          .insert({
+            product_id: id,
+            label: combination.label,
+            price_dzd: price,
+            stock_quantity: Math.round(stock),
+          })
+          .select('id')
+          .single()
+        if (createError || !data) throw new Error(createError?.message ?? 'Création de variante impossible.')
+        createdIds.push(data.id)
+
+        const { error: linkError } = await supabase.from('product_variant_values').insert(
+          combination.valueIds.map((valueId) => ({ variant_id: data.id, option_value_id: valueId }))
+        )
+        if (linkError) throw new Error(linkError.message)
+      }
+      await loadVariants(id)
+      setVariantSelection({})
+      setVariantPrice('')
+      setVariantStock('0')
+    } catch (err) {
+      if (createdIds.length > 0) {
+        const { error: cleanupError } = await supabase.from('product_variants').delete().in('id', createdIds)
+        setError(cleanupError
+          ? 'Une erreur est survenue et certaines variantes peuvent nécessiter une vérification dans l’administration.'
+          : 'La création a échoué. Les variantes créées pendant cette opération ont été annulées.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Impossible de créer les variantes.')
+      }
+      await loadVariants(id)
+    } finally {
+      setCreatingVariants(false)
+    }
   }
 
   const createVariant = async () => {
@@ -822,8 +918,9 @@ export default function AdminProductEdit() {
             <div className="admin-card">
               <h2 className="mb-1 text-lg font-semibold text-offwhite">Options et variantes</h2>
               <p className="mb-4 text-xs text-charcoal-400">
-                Gestion simple : ajoutez une option (ex. Couleur), entrez ses valeurs (Rouge, Bleu), puis utilisez
-                « Créer automatiquement les variantes ». Ajoutez ensuite une photo directement sur chaque variante.
+                Regroupez les couleurs et les formes dans une seule fiche produit. Ajoutez vos options et leurs valeurs,
+                puis créez les variantes. Chaque variante peut avoir sa propre photo, son prix et son stock.
+                Le client choisira sa version sur la page du produit et son choix apparaîtra dans la commande.
               </p>
 
               <div className="flex gap-2">
@@ -955,6 +1052,14 @@ export default function AdminProductEdit() {
                         Créer une variante par valeur
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => void createAllVariantCombinations()}
+                      disabled={creatingVariants || options.some((option) => !(option.values ?? []).some((value) => value.is_active))}
+                      className="btn-secondary"
+                    >
+                      {creatingVariants ? 'Création en cours…' : 'Créer toutes les combinaisons'}
+                    </button>
                   </div>
                   {options.length === 1 && (
                     <p className="mt-2 text-xs text-charcoal-500">

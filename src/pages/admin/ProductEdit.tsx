@@ -12,7 +12,6 @@ import {
 } from '@/lib/supabase'
 import { slugify, generateSku } from '@/lib/format'
 import { validateImage, validateModel } from '@/lib/media'
-import ProductCostCard from '@/components/admin/ProductCostCard'
 import posthog, { isPostHogEnabled } from '@/lib/posthog'
 
 export default function AdminProductEdit() {
@@ -31,7 +30,6 @@ export default function AdminProductEdit() {
   const [images, setImages] = useState<ProductImage[]>([])
   const [originalModelUrl, setOriginalModelUrl] = useState('')
   const [colors, setColors] = useState<string[]>([])
-  const [colorInput, setColorInput] = useState('')
 
   const [options, setOptions] = useState<ProductOption[]>([])
   const [variants, setVariants] = useState<ProductVariant[]>([])
@@ -284,14 +282,6 @@ export default function AdminProductEdit() {
       }
     }
   }
-
-  const addColor = () => {
-    const c = colorInput.trim()
-    if (c && !colors.includes(c)) setColors([...colors, c])
-    setColorInput('')
-  }
-
-  const removeColor = (c: string) => setColors(colors.filter((x) => x !== c))
 
   const addOption = async () => {
     if (!id) return
@@ -728,9 +718,14 @@ export default function AdminProductEdit() {
         Retour aux produits
       </button>
 
-      <h1 className="mb-6 text-2xl font-bold text-offwhite">
+      <h1 className="mb-2 text-2xl font-bold text-offwhite">
         {isNew ? 'Nouveau produit' : 'Modifier le produit'}
       </h1>
+      {isNew && (
+        <p className="mb-6 text-sm text-charcoal-400">
+          Renseignez le nom, la catégorie et le prix, puis enregistrez. Vous pourrez ensuite ajouter les photos, le modèle 3D et les variantes du produit.
+        </p>
+      )}
 
       {form.status !== 'published' && (
         <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
@@ -763,10 +758,6 @@ export default function AdminProductEdit() {
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="label-text">Slug URL (SEO)</label>
-                <input type="text" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} className="input-field" placeholder="genere-depuis-le-nom" />
-              </div>
-              <div className="sm:col-span-2">
                 <label className="label-text">Description</label>
                 <textarea
                   value={form.description}
@@ -788,16 +779,6 @@ export default function AdminProductEdit() {
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="label-text">SKU</label>
-                <input
-                  type="text"
-                  value={form.sku}
-                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                  className="input-field"
-                  placeholder="Auto-généré si vide"
-                />
               </div>
             </div>
           </div>
@@ -884,32 +865,6 @@ export default function AdminProductEdit() {
                   className="input-field"
                   placeholder="Ex: 100 x 50 x 30 mm"
                 />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="label-text">Couleurs disponibles</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={colorInput}
-                    onChange={(e) => setColorInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addColor())}
-                    className="input-field"
-                    placeholder="Ajouter une couleur..."
-                  />
-                  <button type="button" onClick={addColor} className="btn-secondary px-4">Ajouter</button>
-                </div>
-                {colors.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {colors.map((c) => (
-                      <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-charcoal-700 px-3 py-1 text-xs text-offwhite">
-                        {c}
-                        <button onClick={() => removeColor(c)} aria-label="Retirer">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -1125,16 +1080,6 @@ export default function AdminProductEdit() {
                 </div>
               )}
             </div>
-          )}
-
-          {!isNew && id && (
-            <details className="admin-card">
-              <summary className="cursor-pointer list-none text-lg font-semibold text-offwhite">
-                Calculer le coût de fabrication
-                <span className="mt-1 block text-xs font-normal text-charcoal-400">Facultatif · visible uniquement dans l’administration</span>
-              </summary>
-              <div className="mt-4"><ProductCostCard productId={id} /></div>
-            </details>
           )}
 
           <div className="admin-card">

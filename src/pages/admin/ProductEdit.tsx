@@ -29,12 +29,13 @@ export default function AdminProductEdit() {
   const [uploading, setUploading] = useState(false)
   const [images, setImages] = useState<ProductImage[]>([])
   const [originalModelUrl, setOriginalModelUrl] = useState('')
-  const [colors, setColors] = useState<string[]>([])
 
   const [options, setOptions] = useState<ProductOption[]>([])
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [newOptionName, setNewOptionName] = useState('')
-  const [optionValueDraft, setOptionValueDraft] = useState<Record<string, string>>({})
+  const [bulkValueDraft, setBulkValueDraft] = useState<Record<string, string>>({})
+  const [selectedShapeId, setSelectedShapeId] = useState('')
+  const [selectedColorIds, setSelectedColorIds] = useState<string[]>([])
   const [variantSelection, setVariantSelection] = useState<Record<string, string>>({})
   const [variantPrice, setVariantPrice] = useState('')
   const [variantStock, setVariantStock] = useState('0')
@@ -120,7 +121,6 @@ export default function AdminProductEdit() {
         seo_keywords: ((p as Product & { seo_keywords?: string[] }).seo_keywords ?? []).join(', '),
       })
       setOriginalModelUrl(p.model_url ?? '')
-      setColors(p.available_colors ?? [])
     }
     const { data: imgs } = await supabase
       .from('product_images')
@@ -317,21 +317,68 @@ export default function AdminProductEdit() {
     await Promise.all([loadOptions(id), loadVariants(id)])
   }
 
-  const addOptionValue = async (option: ProductOption) => {
-    const value = (optionValueDraft[option.id] ?? '').trim()
-    if (!value) return
-    setError(null)
-    const { error: insertError } = await supabase.from('product_option_values').insert({
-      option_id: option.id,
-      value,
-      sort_order: (option.values ?? []).length,
+  const addOptionValuesBulk = async (option: ProductOption) => {
+    if (!id) return
+    const values = (bulkValueDraft[option.id] ?? '').split(/[\n,;]+/).map((v) => v.trim()).filter(Boolean)
+    const existing = new Set((option.values ?? []).map((v) => v.value.trim().toLocaleLowerCase()))
+    const seen = new Set<string>()
+    const unique = values.filter((value) => {
+      const normalized = value.toLocaleLowerCase()
+      if (existing.has(normalized) || seen.has(normalized)) return false
+      seen.add(normalized)
+      return true
     })
-    if (insertError) {
-      setError('Impossible d’ajouter cette valeur (elle existe peut-être déjà).')
-      return
-    }
-    setOptionValueDraft((prev) => ({ ...prev, [option.id]: '' }))
-    if (id) await loadOptions(id)
+    if (!unique.length) { setError('Toutes ces valeurs existent déjà.'); return }
+    const { error } = await supabase.from('product_option_values').insert(unique.map((value, index) => ({ option_id: option.id, value, sort_order: (option.values ?? []).length + index })))
+    if (error) { setError("Impossible d'ajouter les valeurs."); return }
+    setBulkValueDraft((prev) => ({ ...prev, [option.id]: '' }))
+    await loadOptions(id)
+  }
+
+  const uploadOptionValueImage = async (valueId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !id) return
+    setUploading(true)
+    try {
+      const check = await validateImage(file)
+      if (!check.ok) throw new Error(check.message)
+      const path = `${id}/options/${valueId}-${Date.now()}.${check.extension}`
+      const { error: uploadError } = await supabase.storage.from('product-images').upload(path, file, { contentType: check.contentType, upsert: false })
+      if (uploadError) throw uploadError
+      const { data } = supabase.storage.from('product-images').getPublicUrl(path)
+      const { error } = await supabase.from('product_option_values').update({ image_url: data.publicUrl }).eq('id', valueId)
+      if (error) { await supabase.storage.from('product-images').remove([path]); if (/image_url|column/i.test(error.message)) throw new Error('Appliquez la migration 020 pour activer les photos des formes et couleurs.'); throw error }
+      await loadOptions(id)
+    } catch (err) { setError(err instanceof Error ? err.message : "Erreur lors de l'envoi de la photo.") }
+    finally { setUploading(false); event.target.value = '' }
+  }
+
+  const createSelectedShapeColorVariants = async () => {
+    if (!id) return
+    const shapeOption = options.find((o) => /^(forme|shape)$/i.test(o.name.trim()))
+    const colorOption = options.find((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))
+    const shape = shapeOption?.values?.find((v) => v.id === selectedShapeId)
+    const chosen = (colorOption?.values ?? []).filter((v) => selectedColorIds.includes(v.id) && v.is_active)
+    if (!shape || !chosen.length) { setError('Choisissez une forme et au moins une couleur.'); return }
+    const existing = new Set(variants.map((v) => (v.values ?? []).map((x) => x.option_value_id).sort().join(',')))
+    const missing = chosen.filter((color) => !existing.has([shape.id, color.id].sort().join(',')))
+    if (!missing.length) { setError('Ces variantes existent déjà.'); return }
+    const price = variantPrice.trim() ? Math.round(Number(variantPrice)) : null
+    const stock = Number(variantStock)
+    if ((price !== null && (!Number.isFinite(price) || price < 0)) || !Number.isFinite(stock) || stock < 0) { setError('Vérifiez le prix et le stock.'); return }
+    setCreatingVariants(true); setError(null)
+    const created: string[] = []
+    try {
+      for (const color of missing) {
+        const { data, error } = await supabase.from('product_variants').insert({ product_id: id, label: `${shape.value} / ${color.value}`, price_dzd: price, stock_quantity: Math.round(stock) }).select('id').single()
+        if (error || !data) throw new Error(error?.message ?? 'Création impossible.')
+        created.push(data.id)
+        const { error: linkError } = await supabase.from('product_variant_values').insert([{ variant_id: data.id, option_value_id: shape.id }, { variant_id: data.id, option_value_id: color.id }])
+        if (linkError) throw linkError
+      }
+      await loadVariants(id); setSelectedColorIds([]); setVariantPrice(''); setVariantStock('0')
+    } catch (err) { if (created.length) await supabase.from('product_variants').delete().in('id', created); setError(err instanceof Error ? err.message : 'Création impossible.'); await loadVariants(id) }
+    finally { setCreatingVariants(false) }
   }
 
   const deleteOptionValue = async (valueId: string) => {
@@ -656,7 +703,6 @@ export default function AdminProductEdit() {
         weight_g: form.weight_g ? parseFloat(form.weight_g) : null,
         dimensions: form.dimensions || null,
         material: form.material || null,
-        available_colors: colors,
         model_url: form.model_url || null,
         status: publish ? ('published' as const) : form.status,
         is_featured: form.is_featured,
@@ -876,11 +922,27 @@ export default function AdminProductEdit() {
             <div className="admin-card">
               <h2 className="mb-1 text-lg font-semibold text-offwhite">Couleurs, formes et variantes</h2>
               <p className="mb-4 text-xs text-charcoal-400">
-                Ajoutez les caractéristiques que le client peut choisir (par exemple Couleur : Rouge, Noir ; Forme : Ronde, Carrée).
-                Créez ensuite toutes les combinaisons en une fois. Chaque combinaison peut avoir sa photo, son prix et son stock ;
-                le choix du client sera enregistré dans sa commande.
+                1. Ajoutez les formes et les couleurs une seule fois. 2. Ajoutez une photo à chaque valeur si nécessaire. 3. Pour chaque forme, cochez uniquement les couleurs disponibles et créez les variantes correspondantes. Le choix du client sera enregistré dans sa commande.
               </p>
 
+              <button type="button" onClick={async () => {
+                if (!id) return
+                const existing = await supabase.from('product_options').select('id,name').eq('product_id', id)
+                if (existing.error) { setError('Impossible de charger les options du produit.'); return }
+                const names = new Set((existing.data ?? []).map((item) => item.name.trim().toLowerCase()))
+                if (!names.has('forme')) {
+                  const { error } = await supabase.from('product_options').insert({ product_id: id, name: 'Forme', sort_order: 0 })
+                  if (error) { setError('Impossible de créer Forme.'); return }
+                }
+                if (!names.has('couleur')) {
+                  const { error } = await supabase.from('product_options').insert({ product_id: id, name: 'Couleur', sort_order: 1 })
+                  if (error) { setError('Impossible de créer Couleur.'); return }
+                }
+                const refreshed = await supabase.from('product_options').select('id,name').eq('product_id', id)
+                const ordered = (refreshed.data ?? []).slice().sort((a,b) => (/^forme$/i.test(a.name)?0:/^couleur$/i.test(a.name)?1:2)-(/^forme$/i.test(b.name)?0:/^couleur$/i.test(b.name)?1:2))
+                for (let index=0; index<ordered.length; index++) await supabase.from('product_options').update({ sort_order:index }).eq('id',ordered[index].id)
+                await loadOptions(id)
+              }} className="btn-secondary mb-3"><Plus className="h-4 w-4"/> Créer rapidement Forme + Couleur</button>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -912,40 +974,52 @@ export default function AdminProductEdit() {
                     </div>
 
                     {(option.values ?? []).length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
                         {(option.values ?? []).map((value) => (
-                          <span key={value.id} className="inline-flex items-center gap-1.5 rounded-full bg-charcoal-700 px-3 py-1 text-xs text-offwhite">
-                            {value.value}
-                            <button onClick={() => deleteOptionValue(value.id)} aria-label={`Retirer ${value.value}`}>
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
+                          <div key={value.id} className="flex items-center gap-2 rounded-lg bg-charcoal-800/60 p-2">
+                            {value.image_url ? <img src={value.image_url} alt={value.value} className="h-10 w-10 rounded object-cover" /> : <span className="h-10 w-10 rounded border border-dashed border-charcoal-400/30" />}
+                            <span className="min-w-0 flex-1 text-xs text-offwhite">{value.value}</span>
+                            <label className="cursor-pointer text-xs text-brand-red-light">Photo<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" disabled={uploading} onChange={(event) => void uploadOptionValueImage(value.id, event)} /></label>
+                            <button onClick={() => deleteOptionValue(value.id)} aria-label={`Retirer ${value.value}`}><X className="h-3 w-3" /></button>
+                          </div>
                         ))}
                       </div>
                     )}
 
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        type="text"
-                        value={optionValueDraft[option.id] ?? ''}
-                        onChange={(e) =>
-                          setOptionValueDraft((prev) => ({ ...prev, [option.id]: e.target.value }))
-                        }
-                        onKeyDown={(e) =>
-                          e.key === 'Enter' && (e.preventDefault(), addOptionValue(option))
-                        }
-                        className="input-field"
-                        placeholder={`Valeur de ${option.name} (ex: Rouge)`}
+                    <div className="mt-3">
+                      <label className="label-text">Ajouter des valeurs</label>
+                      <textarea
+                        rows={2}
+                        value={bulkValueDraft[option.id] ?? ''}
+                        onChange={(e) => setBulkValueDraft((prev) => ({ ...prev, [option.id]: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void addOptionValuesBulk(option) } }}
+                        className="input-field mt-1 resize-y text-sm"
+                        placeholder="Exemple : Bleu, Noir, Blanc (ou une valeur par ligne)"
                       />
-                      <button type="button" onClick={() => addOptionValue(option)} className="btn-secondary px-3 text-xs">
-                        Ajouter
-                      </button>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <p className="text-[11px] text-charcoal-500">Les doublons sont ignorés · Ctrl + Entrée pour ajouter</p>
+                        <button type="button" onClick={() => void addOptionValuesBulk(option)} disabled={!bulkValueDraft[option.id]?.trim()} className="btn-secondary px-3 text-xs"><Plus className="h-3 w-3" /> Ajouter</button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {options.length > 0 && (
+              {options.some((o) => /^(forme|shape)$/i.test(o.name.trim())) && options.some((o) => /^(couleur|color|colour)$/i.test(o.name.trim())) && (
+                <div className="mt-4 rounded-lg border border-brand-red/25 bg-brand-red/5 p-3">
+                  <p className="text-sm font-semibold text-offwhite">Couleurs disponibles par forme</p>
+                  <p className="mt-1 text-xs text-charcoal-400">Choisissez une forme puis cochez uniquement ses couleurs. Répétez pour chaque forme.</p>
+                  <label className="mt-3 block"><span className="label-text">Forme</span><select value={selectedShapeId} onChange={(e) => { setSelectedShapeId(e.target.value); setSelectedColorIds([]) }} className="input-field"><option value="">Choisir...</option>{(options.find((o) => /^(forme|shape)$/i.test(o.name.trim()))?.values ?? []).map((v) => <option key={v.id} value={v.id}>{v.value}</option>)}</select></label>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">{(options.find((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))?.values ?? []).map((v) => <label key={v.id} className="flex items-center gap-2 rounded border border-charcoal-400/15 p-2 text-sm text-offwhite"><input type="checkbox" checked={selectedColorIds.includes(v.id)} onChange={(e) => setSelectedColorIds((current) => e.target.checked ? [...current,v.id] : current.filter((x) => x !== v.id))} className="accent-brand-red"/>{v.image_url ? <img src={v.image_url} alt="" className="h-8 w-8 rounded object-cover"/> : <span className="h-8 w-8 rounded border border-dashed border-charcoal-400/30"/>}{v.value}</label>)}</div>
+                  <div className="mt-2 flex gap-3 text-xs"><button type="button" onClick={() => setSelectedColorIds((options.find((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))?.values ?? []).map((v) => v.id))} className="text-brand-red-light">Tout sélectionner</button><button type="button" onClick={() => setSelectedColorIds([])} className="text-charcoal-400">Tout effacer</button></div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label><span className="label-text">Prix des variantes (DA)</span><input type="number" min={0} value={variantPrice} onChange={(e) => setVariantPrice(e.target.value)} className="input-field" placeholder="Vide = prix du produit" /></label>
+                    <label><span className="label-text">Stock initial pour chaque couleur</span><input type="number" min={0} value={variantStock} onChange={(e) => setVariantStock(e.target.value)} className="input-field" /></label>
+                  </div>
+                  <button type="button" onClick={() => void createSelectedShapeColorVariants()} disabled={creatingVariants || !selectedShapeId || !selectedColorIds.length} className="btn-primary mt-3">{creatingVariants ? 'Création...' : 'Créer les variantes sélectionnées'}</button>
+                </div>
+              )}
+              {options.length > 0 && !(options.some((o) => /^(forme|shape)$/i.test(o.name.trim())) && options.some((o) => /^(couleur|color|colour)$/i.test(o.name.trim()))) && (
                 <div className="mt-4 rounded-lg border border-charcoal-400/15 p-3">
                   <p className="text-sm font-semibold text-offwhite">Créer une variante</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">

@@ -108,6 +108,7 @@ export type ProductOptionValue = {
   price_delta_dzd: number
   sort_order: number
   is_active: boolean
+  image_url?: string | null
   created_at?: string
 }
 
